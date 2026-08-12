@@ -45,3 +45,14 @@ rom/spacewar.bin
 verilator/spacewar.bin
 verilator/bin/
 verilator/.vs/sim/v17/ipch/AutoPCH/181b54f0b0efa9df/SIM_MAIN.ipch
+
+# reference emulator sources and software corpus (large, not part of the core)
+refs/
+software/
+verilator/sim.vcd
+
+# verilator build artifacts and headless sim output
+verilator/obj_dir_headless/
+verilator/out/
+build_id.v
+output_files/

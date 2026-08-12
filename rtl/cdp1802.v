@@ -21,6 +21,7 @@
 
 module cdp1802 (
   input               CLOCK,      // CLOCK
+  input               clk_enable, // one pulse per machine cycle (8 CLOCKs on real silicon)
   input               CLEAR_N,    // CLEAR_N   (RESET)
 
   output reg          Q,          // external pin Q 
@@ -82,19 +83,18 @@ module cdp1802 (
   reg   IE;   // Interrupt Enable
 
   // ---------- execution states -------------------------
-  reg [3:0] state, state_n = 4'd0;
+  reg [3:0] state, state_n;
 
   localparam RESET     = 4'd0;    //    hardware reset asserted
   localparam FETCH     = 4'd1;    // S0 fetching opcode from PC
   localparam EXECUTE   = 4'd2;    // S1 main exection state
-  localparam EXECUTE2  = 4'd3;    // S1 second execute, if memory was read
-  localparam BRANCH2   = 4'd4;    //    long branch, collect new PC hi-byte
   localparam BRANCH3   = 4'd5;    //    short branch, new PC lo-byte
   localparam SKIP      = 4'd6;    //    for untaken
 
   localparam DMA_IN    = 4'd7;    // S2 DMA_IN state
   localparam DMA_OUT   = 4'd8;    // S2 DMA_OUT state
   localparam INTERRUPT = 4'd9;    // S3 Interrupt state
+  localparam IDLE      = 4'd10;   //    IDL, waiting for DMA or interrupt
 
 /*
   localparam RESET [3:0]     = 4'b0000;  // sc_execute
@@ -121,11 +121,15 @@ module cdp1802 (
   reg   [7:0] D;                  // data register (accumulator)
   reg         DF;                 // data flag (ALU carry)
   reg   [7:0] B;                  // used for hi-byte of long branch
-  reg   [7:0] ram_q_;             // registered copy of ram_q, for multi-cycle ops
+  reg         resume_exec;        // a DMA burst stole a cycle before this instruction's S1
   wire  [3:0] I, N;               // the current instruction
 
+
   // ---------- RAM hookups ------------------------------
-  assign ram_d = (I == 4'h6) ? io_din : D;
+  // SAV writes T; MARK writes the (X,P) it is capturing into T this same cycle.
+  assign ram_d = (I == 4'h6)      ? io_din :
+                 ({I, N} == 8'h78) ? T      :
+                 ({I, N} == 8'h79) ? {X, P} : D;
   assign ram_a = Rrd;             // RAM address always one of the 16-bit regs
 
 /*
@@ -160,65 +164,55 @@ module cdp1802 (
     endcase
   wire take = sense ^ N[3];
 
+  // ---------- interrupt / DMA arbitration ----------------------------
+  // The 1802 samples DMA and interrupt requests at a machine-cycle boundary, DMA first. INT_N is
+  // active low -- rcastudioii.sv drives it from ~INT -- so a request is INT_N == 0. The old code
+  // tested INT_N == 1'b1, which is why the interrupt was never taken even once it was uncommented.
+  // DMA outranks the interrupt, and both are only taken between instructions.
+  wire int_pending = ~INT_N & IE;
+  wire [3:0] next_cycle = dma_in_req  ? DMA_IN    :
+                          dma_out_req ? DMA_OUT   :
+                          int_pending ? INTERRUPT : FETCH;
+
   // ---------- fetch/interrupt/dma/execute ----------------------------
+  // state_n is assigned on every path: leaving DMA_IN/DMA_OUT unassigned inferred a latch.
   always @*
     case (state)
-    FETCH: begin
-      SC <= 2'b00; // SC1 0 SC0 0  S0 Fetch
-      //$display("state_n FETCH");
-      state_n = EXECUTE;
-    end
-    EXECUTE: begin
-      SC <= 2'b01; // SC1 0 SC0 1  S1 Execute
-      /* 
-      if (dma_in_req == 1'b1)
-        state_n <= DMA_IN;
-      else if (dma_out_req == 1'b1)
-        state_n <= DMA_OUT;
-      else if (INT_N == 1'b1 & IE == 1'b1)
-        state_n <= INTERRUPT;
-      else begin
-      */
-        case (I)
-          4'h3:     state_n = take ? BRANCH3 : FETCH;
-          4'hc:     state_n = take ? BRANCH2 : SKIP;
-          default:  state_n = ram_rd ? EXECUTE2 : FETCH;
-        endcase
-      //end
-      /*
-      if (ir == inst_idl)
-        state_n <= EXECUTE;
-      else
-        state_n <= FETCH;
-      */
-    end
-    BRANCH2: begin
-      $display("state_n BRANCH2");
-      state_n = BRANCH3;
-    end
-    DMA_IN: begin
-      $display("state_n DMA_IN");
-      SC <= 2'b10; // SC1 1 SC0 0  S2 DMA      
-    end
-    DMA_OUT: begin
-      $display("state_n DMA_OUT");
-      SC <= 2'b10; // SC1 1 SC0 0  S2 DMA      
-    end    
-    INTERRUPT: begin
-      $display("state_n INTERRUPT");
-      SC <= 2'b11; // SC1 1 SC0 1  S3 Interrupt        
-      state_n = FETCH;
-    end
-    default: begin
-      //$display("state_n default");
-      state_n = FETCH;
-    end
+    FETCH:      state_n = (dma_in_req | dma_out_req) ? next_cycle : EXECUTE;
+    EXECUTE:
+      casez ({I, N})
+      8'h00:    state_n = IDLE;                       // IDL: hold until DMA or interrupt
+      8'hc?:    state_n = take ? BRANCH3 : SKIP;      // long branch / long skip take 3 cycles
+      default:  state_n = next_cycle;                 // everything else is 2
+      endcase
+    BRANCH3:    state_n = next_cycle;
+    SKIP:       state_n = next_cycle;
+    IDLE:       state_n = (next_cycle == FETCH) ? IDLE : next_cycle;
+    // After a DMA burst, resume the execute cycle we stole it from, if any.
+    DMA_IN,
+    DMA_OUT:    state_n = (dma_in_req | dma_out_req) ? next_cycle :
+                          resume_exec                ? EXECUTE    : next_cycle;
+    INTERRUPT:  state_n = FETCH;
+    default:    state_n = FETCH;
     endcase
-  assign {I, N} = (state == EXECUTE) ? ram_q : ram_q_;
+
+  // SC was driven with <= inside this combinational block and left unassigned on most paths, which
+  // inferred a latch and meant the 1861 could never see a DMA or interrupt state code.
+  always @*
+    case (state)
+    FETCH:            SC = 2'b00;   // S0 fetch
+    DMA_IN, DMA_OUT:  SC = 2'b10;   // S2 DMA
+    INTERRUPT:        SC = 2'b11;   // S3 interrupt
+    default:          SC = 2'b01;   // S1 execute
+    endcase
+
+  reg [7:0] IR;                   // instruction register, latched at the end of FETCH
+  assign {I, N} = IR;
 
   // ---------- decode and execute -----------------------
   wire [3:0] P_n = ((I == 4'hD)) ? N : P;           // SEP
-  wire [3:0] X_n = ((I == 4'hE)) ? N : X;           // SEX
+  wire [3:0] X_n = (I == 4'hE)       ? N :          // SEX
+                   ({I, N} == 8'h79) ? P : X;       // MARK moves P into X
   wire Q_n = (({I, N} == 8'h7a) | ({I, N} == 8'h7b)) ? N[0] : Q; // REQ, SEQ
 
   reg [5:0] action;                 // reg. address; RAM rd; RAM wr
@@ -228,36 +222,58 @@ module cdp1802 (
   localparam MEM_RD  = 2'b10;       // memory read strobe
   localparam MEM_WR  = 2'b01;       // memory write strobe
 
-  always @(state, I, N)
+  // NOTE: Rwd must NOT be written in terms of Rrd. Rrd is R[Ra], Ra comes out
+  // of `action`, and `action` is assigned by this very block -- writing
+  // {action, Rwd} = {..., Rrd ...} makes Rwd a function of the *previous*
+  // evaluation's Ra. Combined with the old `always @(state, I, N)` sensitivity
+  // list (which omits Rrd, P and X) that silently wrote the wrong register and
+  // the core never got past address $0004 of the BIOS. Each case therefore
+  // names the register it reads explicitly.
+  always @*
     case (state)
-    FETCH, BRANCH2, SKIP:           {action, Rwd} = {P, MEM_RD, Rrd + 16'd1};
-    EXECUTE, EXECUTE2:
-      casez ({I, N})
-      /* LDN  */ 8'h0?:             {action, Rwd} = {N, MEM_RD, Rrd};
-      /* INC  */ 8'h1?:             {action, Rwd} = {N, MEM___, Rrd + 16'd1};
-      /* DEC  */ 8'h2?:             {action, Rwd} = {N, MEM___, Rrd - 16'd1};
-      /* LDA  */ 8'h4?:             {action, Rwd} = {N, MEM_RD, Rrd + 16'd1};
-      /* STR  */ 8'h5?:             {action, Rwd} = {N, MEM_WR, Rrd};
+    FETCH, SKIP:                    {action, Rwd} = {P, MEM_RD, R[P] + 16'd1};
+    // 8'h00 is IDL, not LDN R0. Handled ahead of the casez so the IDL and LDN patterns do not
+    // overlap (they did, which is legal casez priority but warns in both Quartus and verilator).
+    EXECUTE:
+      if ({I, N} == 8'h00)          {action, Rwd} = {P, MEM___, R[P]};
+      else casez ({I, N})
+      /* LDN  */ 8'h0?:             {action, Rwd} = {N, MEM_RD, R[N]};
+      /* INC  */ 8'h1?:             {action, Rwd} = {N, MEM___, R[N] + 16'd1};
+      /* DEC  */ 8'h2?:             {action, Rwd} = {N, MEM___, R[N] - 16'd1};
+      /* LDA  */ 8'h4?:             {action, Rwd} = {N, MEM_RD, R[N] + 16'd1};
+      /* STR  */ 8'h5?:             {action, Rwd} = {N, MEM_WR, R[N]};
       /* SEP  */ 8'hd?,
       /* SEX  */ 8'he?,
       /* GLO  */ 8'h8?,
-      /* GHI  */ 8'h9?:             {action, Rwd} = {N, MEM___, Rrd};
-      /* PLO  */ 8'ha?:             {action, Rwd} = {N, MEM___, Rrd[15:8], D};
-      /* PHI  */ 8'hb?:             {action, Rwd} = {N, MEM___, D, Rrd[7:0]};
+      /* GHI  */ 8'h9?:             {action, Rwd} = {N, MEM___, R[N]};
+      /* PLO  */ 8'ha?:             {action, Rwd} = {N, MEM___, R[N][15:8], D};
+      /* PHI  */ 8'hb?:             {action, Rwd} = {N, MEM___, D, R[N][7:0]};
 
-      /* STXD */ 8'h73:             {action, Rwd} = {X, MEM_WR, Rrd - 16'd1};
+      /* RET  */ 8'h70,
+      /* DIS  */ 8'h71:             {action, Rwd} = {X, MEM_RD, R[X] + 16'd1};
+      /* SAV  */ 8'h78:             {action, Rwd} = {X, MEM_WR, R[X]};
+      /* MARK */ 8'h79:             {action, Rwd} = {4'd2, MEM_WR, R[2] - 16'd1};
+
+      /* STXD */ 8'h73:             {action, Rwd} = {X, MEM_WR, R[X] - 16'd1};
       /* LDXA */ 8'h72,
-      /* OUT  */ {4'h6, 4'b0???}:   {action, Rwd} = {X, MEM_RD, Rrd + 16'd1};
-      /* INP  */ {4'h6, 4'b1???}:   {action, Rwd} = {X, MEM_WR, Rrd};
+      /* OUT  */ {4'h6, 4'b0???}:   {action, Rwd} = {X, MEM_RD, R[X] + 16'd1};
+      /* INP  */ {4'h6, 4'b1???}:   {action, Rwd} = {X, MEM_WR, R[X]};
 
       /* immediate and branch instructions must fetch from R[P] */
+      /* short branch resolves in this cycle: take it, or step over the address byte */
+      8'h3?:                        {action, Rwd} = {P, MEM_RD, take ? {R[P][15:8], ram_q}
+                                                                     : (R[P] + 16'd1)};
       8'h7c, 8'h7d, 8'h7f, 8'hf8, 8'hf9, 8'hfa, 8'hfb, 8'hfc, 8'hfd, 8'hff,
-      8'h3?, 8'hc?:                 {action, Rwd} = {P, MEM_RD, Rrd + 16'd1};
+      8'hc?:                        {action, Rwd} = {P, MEM_RD, R[P] + 16'd1};
 
-      default:                      {action, Rwd} = {X, MEM_RD, Rrd};
+      default:                      {action, Rwd} = {X, MEM_RD, R[X]};
       endcase
-    BRANCH3:                        {action, Rwd} = {P, MEM___, (I == 4'hc) ? B : Rrd[15:8], ram_q};
-    default:                        {action, Rwd} = {X, MEM___, Rrd};
+    BRANCH3:                        {action, Rwd} = {P, MEM___, B, ram_q};
+    // A DMA cycle always goes through R(0) and post-increments it -- that is what makes the 1861's
+    // 8 bytes per scanline walk through display memory without the CPU touching an address.
+    DMA_OUT:                        {action, Rwd} = {4'd0, MEM_RD, R[0] + 16'd1};
+    DMA_IN:                         {action, Rwd} = {4'd0, MEM_WR, R[0] + 16'd1};
+    default:                        {action, Rwd} = {X, MEM___, R[X]};
     endcase
 
   wire [8:0] carry = (I[3]) ? 9'd0 : {8'd0, DF};      // 0 or 1 for ADC
@@ -270,8 +286,8 @@ module cdp1802 (
     /* LDI  */ 8'hf8,
     /* LDA  */ 8'h4?,
     /* LDN  */ 8'h0?:               DFD_n = {DF, ram_q};
-    /* GLO  */ 8'h8?:               DFD_n = {DF, Rrd[7:0]};
-    /* GHI  */ 8'h9?:               DFD_n = {DF, Rrd[15:8]};
+    /* GLO  */ 8'h8?:               DFD_n = {DF, R[N][7:0]};
+    /* GHI  */ 8'h9?:               DFD_n = {DF, R[N][15:8]};
     /* INP  */ 8'b0110_1???:        DFD_n = {DF, io_din};
     /* OR   */ 8'b1111_?001:        DFD_n = {DF, D | ram_q};
     /* AND  */ 8'b1111_?010:        DFD_n = {DF, D & ram_q};
@@ -285,10 +301,15 @@ module cdp1802 (
     endcase
 
   assign io_n = N[2:0];
-  assign io_out = (I == 4'h6) & ~N[3] & (state == EXECUTE2) & (N[2:0] != 3'b000);
+  // OUT completes in EXECUTE now that memory reads no longer need a second cycle; this still
+  // said EXECUTE2, a state that no longer occurs, so OUT 2 never latched the keypad.
+  assign io_out = (I == 4'h6) & ~N[3] & (state == EXECUTE) & (N[2:0] != 3'b000);
   assign io_inp = (I == 4'h6) & N[3] & (state == EXECUTE) & (N[2:0] != 3'b000);
+  // OUT sends M(R(X)), which is the byte read during this EXECUTE cycle. While OUT completed in
+  // EXECUTE2 this was mem_r; now that it completes in EXECUTE, mem_r still holds the *opcode*, so
+  // OUT 2 was latching 0x62 into the keypad selector instead of the key number.
   assign io_dout = ram_q;
-  assign unsupported = {I, N} == 8'h70;
+  assign unsupported = 1'b0;      // RET/DIS/SAV/MARK/IDL are all implemented now
   /*
   always @(posedge CLOCK) begin
     if(unsupported) begin
@@ -311,115 +332,58 @@ module cdp1802 (
             p_Video->reset();
     }
     */
-    if (!CLEAR_N) begin  // WAIT_N ??   if (clear_ == 0 && wait_==1)
-        {ram_q_, Q, P, X} <= 0;
+    if (!CLEAR_N) begin
+        // 1802 reset leaves I=N=0, Q=0, X=0, P=0, R(0)=0 and *IE=1*. IE was never initialised
+        // before, so even a working interrupt path could not have fired.
+        {Q, P, X} <= 0;
         {DF, D} <= 9'd0;
-        R[0] <= 16'd0;
+        T     <= 8'd0;
+        IE    <= 1'b1;
+        IR    <= 8'd0;
+        resume_exec <= 1'b0;
+        R[0]  <= 16'd0;
         state <= RESET;
-      end 
+      end
     else begin
-      if(!WAIT_N && CLEAR_N) begin  // Pause  if (clear_ == 1 && wait_==0) cpuMode_ = PAUSE;
+      // Clear=1, Wait=1 is Run (see the table above). This used to be "!WAIT_N && CLEAR_N", i.e.
+      // it ran only while WAIT_N was asserted low -- which the same file calls Pause. It worked
+      // solely because rcastudioii.sv tied WAIT_N to 0.
+      // One state per machine cycle, not one per CLOCK. Free-running, this core executed ~16x more
+      // instructions per frame than a real Studio II (CLAUDE.md 6.1/7.3).
+      if (WAIT_N && clk_enable) begin
         state <= state_n;
+        if (state == FETCH) begin
+          IR <= ram_q;                                  // opcode for the coming EXECUTE
+          resume_exec <= (dma_in_req | dma_out_req);    // owe an EXECUTE after the burst
+        end
+        else if (state == EXECUTE) resume_exec <= 1'b0;
+        if (state == EXECUTE && !((I == 4'h7) && (N[3:1] == 3'b000)))
+          {Q, P, X} <= {Q_n, P_n, X_n};
+        R[Ra] <= Rwd;
         if (state == EXECUTE)
-          {ram_q_, Q, P, X} <= {ram_q, Q_n, P_n, X_n};
-        if (state != EXECUTE2)
-          R[Ra] <= Rwd;
-        if (((state == EXECUTE) & !ram_rd) || (state == EXECUTE2))
           {DF, D} <= DFD_n;
-        if (state == BRANCH2)
-          B <= ram_q;
+        if ((state == EXECUTE) && (I == 4'hc))
+          B <= ram_q;   // long branch high byte
+
+        // MARK: T gets the (X,P) in force before X_n moves P into X.
+        if ((state == EXECUTE) && ({I, N} == 8'h79))
+          T <= {X, P};
+
+        // RET (70) and DIS (71) both pop (X,P) from M(R(X)); RET enables interrupts, DIS disables.
+        if ((state == EXECUTE) && (I == 4'h7) && (N[3:1] == 3'b000)) begin
+          X  <= ram_q[7:4];
+          P  <= ram_q[3:0];
+          IE <= ~N[0];
+        end
+
+        // S3: the interrupt cycle saves (X,P) into T, then forces X=2, P=1 and masks further
+        // interrupts. The ISR's RET/DIS undoes this.
         if (state == INTERRUPT) begin
-          /*
-            registerT_= (dataPointer_<<4) | programCounter_;
-            dataPointer_=2;
-            programCounter_=1;
-            interruptEnable_=0;          
-          */
-          T[7:4] <= X;
-          T[3:0] <= P;
-          //X <= 2;
-          //P <= 1;          
-          IE <= 0;
-          $display("Interrupt");
-            /*
-            begin
-               SC <= sc_interrupt;
-               if (dma_in_req == 1'b1)
-                  next_state <= DMA_IN;
-               else if (dma_out_req == 1'b1)
-                  next_state <= DMA_OUT;
-               else
-                  next_state <= FETCH;
-               load_t <= 1'b1;
-               xp_sel <= xp_sel_interrupt;
-               ie_sel <= ie_sel_0;
-            end
-            */
+          T  <= {X, P};
+          X  <= 4'd2;
+          P  <= 4'd1;
+          IE <= 1'b0;
         end
-        else if(state == DMA_IN) begin
-          $display("DMA_IN");
-            /*
-            begin
-               SC <= sc_dma;
-               r_addr_sel <= r_addr_sel_0;
-               adder_opb_sel <= adder_opb_sel_1;
-               r_write_data_sel <= r_write_data_sel_adder;
-               r_write_high <= 1'b1;
-               r_write_low <= 1'b1;
-               mem_write <= 1'b1;
-               if (dma_in_req == 1'b1)
-                  next_state <= DMA_IN;
-               else if (dma_out_req == 1'b1)
-                  next_state <= DMA_OUT;
-               else if (clear == 1'b1)
-               begin
-                  r_write_high <= 1'b0;
-                  r_write_low <= 1'b0;
-                  next_state <= state_load;
-               end
-               else if (INT_N == 1'b1 & IE == 1'b1)
-                  next_state <= INTERRUPT;
-               else
-                  next_state <= FETCH;
-            end
-            */
-        end
-        else if(state == DMA_OUT) begin
-          $display("DMA_OUT");
-            /*
-            begin
-               SC <= sc_dma;
-               r_addr_sel <= r_addr_sel_0;
-               adder_opb_sel <= adder_opb_sel_1;
-               r_write_data_sel <= r_write_data_sel_adder;
-               r_write_high <= 1'b1;
-               r_write_low <= 1'b1;
-               mem_read <= 1'b1;
-               if (dma_in_req == 1'b1)
-                  next_state <= DMA_IN;
-               else if (dma_out_req == 1'b1)
-                  next_state <= DMA_OUT;
-               else if (clear == 1'b1)
-               begin
-                  r_write_high <= 1'b0;
-                  r_write_low <= 1'b0;
-                  next_state <= state_load;
-               end
-               else if (int_req == 1'b1 & ie == 1'b1)
-                  next_state <= INTERRUPT;
-               else
-                  next_state <= FETCH;
-            end
-            */
-        end
-      end
-      // Clear 0 Wait 0 Load      if (clear_ == 0 && wait_==0) cpuMode_ = LOAD;
-      else if(!CLEAR_N && !WAIT_N) begin
-        $display("Load");
-      end
-      // Clear 1 Wait 1 Run  if (clear_ == 1 && wait_==1) cpuMode_ = RUN;
-      else if(CLEAR_N && WAIT_N) begin
-        $display("Run");
       end
     end
   end

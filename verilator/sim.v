@@ -15,6 +15,7 @@ module top(
    output VGA_VS,
    output VGA_HB,
    output VGA_VB,
+   output VGA_DE,
 
    output [15:0] AUDIO_L,
    output [15:0] AUDIO_R,
@@ -37,11 +38,13 @@ module top(
 
    wire VSync, HSync;
    wire VBlank, HBlank;
+   wire video_de;
 
    assign VGA_VS = VSync;
    assign VGA_HS = HSync;
    assign VGA_VB = VBlank;
    assign VGA_HB = HBlank;
+   assign VGA_DE = video_de;
 
    // Convert 1bpp output to 8bpp
    wire video;
@@ -56,14 +59,30 @@ module top(
 wire ce_pix = 1'b1;
 wire reset = ioctl_download;
 
-reg key_strobe;
 wire key_strobe = old_keystb ^ ps2_key[10];
 reg old_keystb = 0;
 always @(posedge clk_48) old_keystb <= ps2_key[10];
 
+// clk_1m76: clk_sys / 4, mirroring the divider in RCAStudioII.sv
+reg [1:0] div = 2'd0;
+reg clk_1m76 = 1'b0;
+always @(posedge clk_48) begin
+   if (reset) begin
+      div      <= 2'd0;
+      clk_1m76 <= 1'b0;
+   end
+   else if (div == 2'd1) begin
+      clk_1m76 <= ~clk_1m76;
+      div      <= 2'd0;
+   end
+   else div <= div + 1'b1;
+end
+
 rcastudioii rcastudio
 (
 	.clk_sys(clk_48),
+	.clk_1m76(clk_1m76),
+	.clk_vid(clk_24),
 	.reset(reset),
 	
 	.ioctl_download(ioctl_download),
@@ -80,7 +99,7 @@ rcastudioii rcastudio
 	.VBlank(VBlank),
 	.VSync(VSync),
 
-   .video_de(),  
+	.video_de(video_de),
 
 	.video(video)
 );

@@ -5,7 +5,7 @@
 #pragma comment(lib, "dinput8.lib")
 #pragma comment(lib, "dxguid.lib")
 #endif
-#include "verilated_heavy.h"
+#include "verilated.h"   // was verilated_heavy.h, removed in Verilator 5
 #include <queue>
 #include <vector>
 
@@ -37,7 +37,7 @@ public:
 	unsigned int keyEventTimer = 0;
 	unsigned int keyEventWait = 50000;
 
-#define NONE         0xFF
+#define PS2_NONE     0xFF   // was NONE; collided with Verilator 5 VerilatedTraceSigDirection::NONE
 #define LCTRL        0x000100
 #define LSHIFT       0x000200
 #define LALT         0x000400

@@ -44,31 +44,32 @@ module rcastudioii
 
 wire        Disp_On;
 wire        Disp_Off;
-reg  [1:0]  SC = 2'b10;
-reg  [7:0]  video_din;
+// SC is driven by the CPU's output port, so it must be a net -- declaring it a reg with an
+// initial value of 2'b10 meant the 1861 saw a constant "DMA" state code.
+wire [1:0]  SC;
 
 wire        INT;
 wire        DMAO;
 wire        EFx;
 wire        Locked;
 
-reg         vram_rd;
 
 pixie_video pixie_video (
     // front end, CDP1802 bus clock domain
     .clk        (clk_sys),    // I
     .reset      (reset),      // I
-    .clk_enable (ce_pix),     // I      
+    .clk_enable (ce_pix),     // I
+    .cpu_ce     (cpu_ce),     // I  CPU machine-cycle enable, for sampling DMA bytes
 
     .SC         (SC),         // I [1:0]
-    //Temp hard coded display always on.
-//    .disp_on    (io_n[0]),    // I
-//    .disp_off   (~io_n[0]),   // I 
-    .disp_on    (1'b1),    // I
-    .disp_off   (1'b0),   // I 
+    // INP 1 turns the display on, OUT 1 turns it off (the BIOS enables it via CALL $0066). These
+    // were tied on/off, so the display could never be disabled and the 1861 started generating
+    // interrupts from reset instead of from the moment the BIOS enabled it. The earlier commented
+    // version keyed off io_n[0] alone, which cannot tell INP 1 from OUT 1.
+    .disp_on    (io_inp && (io_n == 3'd1)),  // I
+    .disp_off   (io_out && (io_n == 3'd1)),  // I
 
-    .data_addr  (vram_addr),  // O [9:0]
-    .data_in    (video_din),  // I [7:0]    
+    .data_in    (ram_q),      // I [7:0]  byte the CPU delivers during a DMA-OUT cycle
 
     .DMAO       (DMAO),       // O
     .INT        (INT),        // O
@@ -88,9 +89,11 @@ pixie_video pixie_video (
 
 ////////////////// KEYPAD //////////////////////////////////////////////////////////////////
 
-//The CPU will send out the key it wants to scan for over IO Port 1, so we latch on cpu_dout[3:0] once io_n[1] and io_out goes high.
+//The CPU selects the key to scan with OUT 2, latched into a CD4515. "io_n[1] && io_out" was a bit
+//test, so it also latched on OUT 3, OUT 6 and OUT 7; it must be an equality test on N == 2. The
+//assignment was blocking inside a clocked block, too.
 reg  [3:0] keylatch = 4'h0;
-always @(posedge clk_sys) if(io_n[1] && io_out) keylatch = cpu_dout[3:0];
+always @(posedge clk_sys) if(io_out && (io_n == 3'd2)) keylatch <= cpu_dout[3:0];
 
 wire       pressed = ps2_key[9];
 wire [7:0] code    = ps2_key[7:0];
@@ -129,10 +132,16 @@ reg  [9:0] playerB = 10'h0;
 
 ////////////////// CPU //////////////////////////////////////////////////////////////////
 
-wire  [3:0] EF; // = 4'b1111;
-assign EF = {playerB[keylatch], playerA[keylatch],1'b1,EFx};
+// EF4=player B, EF3=player A, EF2 unused (high), EF1=1861 display status. Only keys 0-9 exist, so
+// guard the index: keylatch 10-15 used to read off the end of the 10-bit playerA/playerB vectors.
+wire  [3:0] EF;
+wire        key_valid = (keylatch < 4'd10);
+assign EF = {key_valid & playerB[keylatch], key_valid & playerA[keylatch], 1'b1, EFx};
 
-reg  [7:0] cpu_din;
+// The Studio II has no input port that returns data -- the keypads are read through EF3/EF4,
+// and INP 1 only toggles the display, discarding the byte. Tie the CPU's input bus off
+// explicitly at 0 (what synthesis was silently defaulting to) rather than leave it undriven.
+wire [7:0] cpu_din = 8'h00;
 reg  [7:0] cpu_dout;
 wire       Q;
 wire       unsupported;
@@ -144,7 +153,20 @@ reg [15:0] cpu_ram_addr;
 reg  [7:0] cpu_ram_din;
 reg  [7:0] cpu_ram_dout;
 
-reg WAIT_N      = 1'b0;
+reg WAIT_N      = 1'b1;   // Clear=1, Wait=1 is Run. Was 0, which only worked because cdp1802.v
+                          // had its run/pause test inverted; both are fixed now.
+
+// ---- CPU machine-cycle enable -------------------------------------------------------------
+// The CDP1861 shifts one pixel per CPU clock and a 1802 machine cycle is 8 clocks, so the CPU
+// advances one state every 8 pixel times. Deriving this from ce_pix rather than counting clk_sys
+// keeps it correct whatever clk_sys is running at. 112 pixels x 262 lines / 8 = 3668 machine
+// cycles per frame, which is what a real Studio II gets.
+reg  [2:0] cpu_div = 3'd0;
+wire       cpu_ce  = ce_pix & (cpu_div == 3'd7);
+always @(posedge clk_sys) begin
+	if (reset)       cpu_div <= 3'd0;
+	else if (ce_pix) cpu_div <= cpu_div + 3'd1;
+end
 reg dma_in_req  = 1'b0;
 //reg dma_out_req = 1'b0;
 
@@ -154,6 +176,7 @@ wire MWR_N;
 wire MRD_N;
 cdp1802 cdp1802 (
   .CLOCK        (clk_sys),
+  .clk_enable   (cpu_ce),
   .CLEAR_N      (~reset),
 
   .Q            (Q),            // O external pin Q Turns the sound off and on. When logic '1', the beeper is on.
@@ -232,15 +255,18 @@ assign cpu_wr = (ram_a[11:0] >= 12'h800 && ram_a[11:0] < 12'hA00) ? ram_wr : 1'b
 dpram #(8, 12) dpram
 (
 	.clock(clk_sys),
+	.ram_cs(1'b1),
 	.address_a(ioctl_download ? ioctl_addr[11:0] + (ioctl_index > 0 ? 12'h0400 : 12'h0 ) : ram_a[11:0]),
 	.wren_a(ioctl_wr | cpu_wr),
 	.data_a(ioctl_download ? ioctl_dout : ram_d),
 	.q_a(ram_q),
 
+	// Port B was only ever the 1861's RAM scraper; the real part is fed by the CPU over DMA.
+	.ram_cs_b(1'b0),
 	.wren_b(1'b0),
-	.address_b(vram_addr[11:0]),
+	.address_b(12'd0),
 	.data_b(),
-	.q_b(video_din)
+	.q_b()
 );
 
 ////////////////// DMA //////////////////////////////////////////////////////////////////
@@ -265,7 +291,6 @@ wire vram_cs  = ram_a ==? 16'b0000_1001_xxxx_xxxx;
 wire mcart_cs = ram_a ==? 16'b0000_101x_xxxx_xxxx; 
 */
 
-reg  [15:0] vram_addr;
 //wire [15:0] AB = dma_busy ? dma_addr : ram_a;
 //wire  [7:0] DO = dma_busy ? dma_dout : ram_d;
 //wire pram_we = pram_cs ? dma_busy ? ~dma_write : ~ram_wr : 1'b1;

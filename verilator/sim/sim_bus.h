@@ -1,6 +1,6 @@
 #pragma once
 #include <queue>
-#include "verilated_heavy.h"
+#include "verilated.h"   // was verilated_heavy.h, removed in Verilator 5
 #include "sim_console.h"
 
 

@@ -1,3 +1,4 @@
+#include "sim_console.h"
 #include "sim_input.h"
 
 #include <string>
@@ -5,6 +6,7 @@
 
 #ifndef _MSC_VER
 #include <SDL2/SDL.h>
+extern bool headless; // defined in sim_main.cpp
 int m_keyboardStateCount;
 const Uint8* m_keyboardState;
 Uint8* m_keyboardState_last = NULL;
@@ -19,14 +21,13 @@ unsigned char m_keyboardState_last[256];
 #endif
 
 #include <vector>
-#include "sim_console.h"
 
 static DebugConsole console;
 
 #ifdef WIN32
 static const unsigned int ev2ps2[] =
 {
-	NONE, //0   KEY_RESERVED
+	PS2_NONE, //0   KEY_RESERVED
 	0x76, //1   KEY_ESC
 	0x16, //2   KEY_1
 	0x1e, //3   KEY_2
@@ -110,24 +111,24 @@ static const unsigned int ev2ps2[] =
 	0x7a, //81  KEY_KP3
 	0x70, //82  KEY_KP0
 	0x71, //83  KEY_KPDOT
-	NONE, //84  ???
-	NONE, //85  KEY_ZENKAKU
+	PS2_NONE, //84  ???
+	PS2_NONE, //85  KEY_ZENKAKU
 	0x61, //86  KEY_102ND
 	0x78, //87  KEY_F11
 	0x07, //88  KEY_F12
-	NONE, //89  KEY_RO
-	NONE, //90  KEY_KATAKANA
-	NONE, //91  KEY_HIRAGANA
-	NONE, //92  KEY_HENKAN
-	NONE, //93  KEY_KATAKANA
-	NONE, //94  KEY_MUHENKAN
-	NONE, //95  KEY_KPJPCOMMA
+	PS2_NONE, //89  KEY_RO
+	PS2_NONE, //90  KEY_KATAKANA
+	PS2_NONE, //91  KEY_HIRAGANA
+	PS2_NONE, //92  KEY_HENKAN
+	PS2_NONE, //93  KEY_KATAKANA
+	PS2_NONE, //94  KEY_MUHENKAN
+	PS2_NONE, //95  KEY_KPJPCOMMA
 	EXT | 0x5a, //96  KEY_KPENTER
 	 EXT | 0x14, //97  KEY_RIGHTCTRL
 	EXT | 0x4a, //98  KEY_KPSLASH
 	0xE2, //99  KEY_SYSRQ
 	 EXT | 0x11, //100 KEY_RIGHTALT
-	NONE, //101 KEY_LINEFEED
+	PS2_NONE, //101 KEY_LINEFEED
 	EXT | 0x6c, //102 KEY_HOME
 	EXT | 0x75, //103 KEY_UP
 	EXT | 0x7d, //104 KEY_PAGEUP
@@ -138,158 +139,158 @@ static const unsigned int ev2ps2[] =
 	EXT | 0x7a, //109 KEY_PAGEDOWN
 	EXT | 0x70, //110 KEY_INSERT
 	EXT | 0x71, //111 KEY_DELETE
-	NONE, //112 KEY_MACRO
-	NONE, //113 KEY_MUTE
-	NONE, //114 KEY_VOLUMEDOWN
-	NONE, //115 KEY_VOLUMEUP
-	NONE, //116 KEY_POWER
-	NONE, //117 KEY_KPEQUAL
-	NONE, //118 KEY_KPPLUSMINUS
+	PS2_NONE, //112 KEY_MACRO
+	PS2_NONE, //113 KEY_MUTE
+	PS2_NONE, //114 KEY_VOLUMEDOWN
+	PS2_NONE, //115 KEY_VOLUMEUP
+	PS2_NONE, //116 KEY_POWER
+	PS2_NONE, //117 KEY_KPEQUAL
+	PS2_NONE, //118 KEY_KPPLUSMINUS
 	0xE1, //119 KEY_PAUSE
-	NONE, //120 KEY_SCALE
-	NONE, //121 KEY_KPCOMMA
-	NONE, //122 KEY_HANGEUL
-	NONE, //123 KEY_HANJA
-	NONE, //124 KEY_YEN
+	PS2_NONE, //120 KEY_SCALE
+	PS2_NONE, //121 KEY_KPCOMMA
+	PS2_NONE, //122 KEY_HANGEUL
+	PS2_NONE, //123 KEY_HANJA
+	PS2_NONE, //124 KEY_YEN
 	 EXT | 0x1f, //125 KEY_LEFTMETA
 	 EXT | 0x27, //126 KEY_RIGHTMETA
-	NONE, //127 KEY_COMPOSE
-	NONE, //128 KEY_STOP
-	NONE, //129 KEY_AGAIN
-	NONE, //130 KEY_PROPS
-	NONE, //131 KEY_UNDO
-	NONE, //132 KEY_FRONT
-	NONE, //133 KEY_COPY
-	NONE, //134 KEY_OPEN
-	NONE, //135 KEY_PASTE
-	NONE, //136 KEY_FIND
-	NONE, //137 KEY_CUT
-	NONE, //138 KEY_HELP
-	NONE, //139 KEY_MENU
-	NONE, //140 KEY_CALC
-	NONE, //141 KEY_SETUP
-	NONE, //142 KEY_SLEEP
-	NONE, //143 KEY_WAKEUP
-	NONE, //144 KEY_FILE
-	NONE, //145 KEY_SENDFILE
-	NONE, //146 KEY_DELETEFILE
-	NONE, //147 KEY_XFER
-	NONE, //148 KEY_PROG1
-	NONE, //149 KEY_PROG2
-	NONE, //150 KEY_WWW
-	NONE, //151 KEY_MSDOS
-	NONE, //152 KEY_SCREENLOCK
-	NONE, //153 KEY_DIRECTION
-	NONE, //154 KEY_CYCLEWINDOWS
-	NONE, //155 KEY_MAIL
-	NONE, //156 KEY_BOOKMARKS
-	NONE, //157 KEY_COMPUTER
-	NONE, //158 KEY_BACK
-	NONE, //159 KEY_FORWARD
-	NONE, //160 KEY_CLOSECD
-	NONE, //161 KEY_EJECTCD
-	NONE, //162 KEY_EJECTCLOSECD
-	NONE, //163 KEY_NEXTSONG
-	NONE, //164 KEY_PLAYPAUSE
-	NONE, //165 KEY_PREVIOUSSONG
-	NONE, //166 KEY_STOPCD
-	NONE, //167 KEY_RECORD
-	NONE, //168 KEY_REWIND
-	NONE, //169 KEY_PHONE
-	NONE, //170 KEY_ISO
-	NONE, //171 KEY_CONFIG
-	NONE, //172 KEY_HOMEPAGE
-	NONE, //173 KEY_REFRESH
-	NONE, //174 KEY_EXIT
-	NONE, //175 KEY_MOVE
-	NONE, //176 KEY_EDIT
-	NONE, //177 KEY_SCROLLUP
-	NONE, //178 KEY_SCROLLDOWN
-	NONE, //179 KEY_KPLEFTPAREN
-	NONE, //180 KEY_KPRIGHTPAREN
-	NONE, //181 KEY_NEW
-	NONE, //182 KEY_REDO
-	NONE, //183 KEY_F13
-	NONE, //184 KEY_F14
-	NONE, //185 KEY_F15
-	NONE, //186 KEY_F16
+	PS2_NONE, //127 KEY_COMPOSE
+	PS2_NONE, //128 KEY_STOP
+	PS2_NONE, //129 KEY_AGAIN
+	PS2_NONE, //130 KEY_PROPS
+	PS2_NONE, //131 KEY_UNDO
+	PS2_NONE, //132 KEY_FRONT
+	PS2_NONE, //133 KEY_COPY
+	PS2_NONE, //134 KEY_OPEN
+	PS2_NONE, //135 KEY_PASTE
+	PS2_NONE, //136 KEY_FIND
+	PS2_NONE, //137 KEY_CUT
+	PS2_NONE, //138 KEY_HELP
+	PS2_NONE, //139 KEY_MENU
+	PS2_NONE, //140 KEY_CALC
+	PS2_NONE, //141 KEY_SETUP
+	PS2_NONE, //142 KEY_SLEEP
+	PS2_NONE, //143 KEY_WAKEUP
+	PS2_NONE, //144 KEY_FILE
+	PS2_NONE, //145 KEY_SENDFILE
+	PS2_NONE, //146 KEY_DELETEFILE
+	PS2_NONE, //147 KEY_XFER
+	PS2_NONE, //148 KEY_PROG1
+	PS2_NONE, //149 KEY_PROG2
+	PS2_NONE, //150 KEY_WWW
+	PS2_NONE, //151 KEY_MSDOS
+	PS2_NONE, //152 KEY_SCREENLOCK
+	PS2_NONE, //153 KEY_DIRECTION
+	PS2_NONE, //154 KEY_CYCLEWINDOWS
+	PS2_NONE, //155 KEY_MAIL
+	PS2_NONE, //156 KEY_BOOKMARKS
+	PS2_NONE, //157 KEY_COMPUTER
+	PS2_NONE, //158 KEY_BACK
+	PS2_NONE, //159 KEY_FORWARD
+	PS2_NONE, //160 KEY_CLOSECD
+	PS2_NONE, //161 KEY_EJECTCD
+	PS2_NONE, //162 KEY_EJECTCLOSECD
+	PS2_NONE, //163 KEY_NEXTSONG
+	PS2_NONE, //164 KEY_PLAYPAUSE
+	PS2_NONE, //165 KEY_PREVIOUSSONG
+	PS2_NONE, //166 KEY_STOPCD
+	PS2_NONE, //167 KEY_RECORD
+	PS2_NONE, //168 KEY_REWIND
+	PS2_NONE, //169 KEY_PHONE
+	PS2_NONE, //170 KEY_ISO
+	PS2_NONE, //171 KEY_CONFIG
+	PS2_NONE, //172 KEY_HOMEPAGE
+	PS2_NONE, //173 KEY_REFRESH
+	PS2_NONE, //174 KEY_EXIT
+	PS2_NONE, //175 KEY_MOVE
+	PS2_NONE, //176 KEY_EDIT
+	PS2_NONE, //177 KEY_SCROLLUP
+	PS2_NONE, //178 KEY_SCROLLDOWN
+	PS2_NONE, //179 KEY_KPLEFTPAREN
+	PS2_NONE, //180 KEY_KPRIGHTPAREN
+	PS2_NONE, //181 KEY_NEW
+	PS2_NONE, //182 KEY_REDO
+	PS2_NONE, //183 KEY_F13
+	PS2_NONE, //184 KEY_F14
+	PS2_NONE, //185 KEY_F15
+	PS2_NONE, //186 KEY_F16
 	EMU_SWITCH_1 | 1, //187 KEY_F17
 	EMU_SWITCH_1 | 2, //188 KEY_F18
 	EMU_SWITCH_1 | 3, //189 KEY_F19
 	EMU_SWITCH_1 | 4, //190 KEY_F20
-	NONE, //191 KEY_F21
-	NONE, //192 KEY_F22
-	NONE, //193 KEY_F23
+	PS2_NONE, //191 KEY_F21
+	PS2_NONE, //192 KEY_F22
+	PS2_NONE, //193 KEY_F23
 	0x5D, //194 U-mlaut on DE mapped to backslash
-	NONE, //195 ???
-	NONE, //196 ???
-	NONE, //197 ???
-	NONE, //198 ???
-	NONE, //199 ???
+	PS2_NONE, //195 ???
+	PS2_NONE, //196 ???
+	PS2_NONE, //197 ???
+	PS2_NONE, //198 ???
+	PS2_NONE, //199 ???
 	EXT | 0x75, //200 KEY_UP
-	NONE, //201 ???
-	NONE, //202 ???
+	PS2_NONE, //201 ???
+	PS2_NONE, //202 ???
 	EXT | 0x6b, //203 KEY_LEFT
-	NONE, //204 ???
+	PS2_NONE, //204 ???
 	EXT | 0x74, //205 KEY_RIGHT
-	NONE, //206 ???
-	NONE, //207 ???
+	PS2_NONE, //206 ???
+	PS2_NONE, //207 ???
 	EXT | 0x72, //208 KEY_DOWN
-	NONE, //209 ???
-	NONE, //210 ???
-	NONE, //211 ???
-	NONE, //212 ???
-	NONE, //213 ???
-	NONE, //214 ???
-	NONE, //215 ???
-	NONE, //216 ???
-	NONE, //217 ???
-	NONE, //218 ???
-	NONE, //219 ???
-	NONE, //220 ???
-	NONE, //221 ???
-	NONE, //222 ???
-	NONE, //223 ???
-	NONE, //224 ???
-	NONE, //225 ???
-	NONE, //226 ???
-	NONE, //227 ???
-	NONE, //228 ???
-	NONE, //229 ???
-	NONE, //230 ???
-	NONE, //231 ???
-	NONE, //232 ???
-	NONE, //233 ???
-	NONE, //234 ???
-	NONE, //235 ???
-	NONE, //236 ???
-	NONE, //237 ???
-	NONE, //238 ???
-	NONE, //239 ???
-	NONE, //240 ???
-	NONE, //241 ???
-	NONE, //242 ???
-	NONE, //243 ???
-	NONE, //244 ???
-	NONE, //245 ???
-	NONE, //246 ???
-	NONE, //247 ???
-	NONE, //248 ???
-	NONE, //249 ???
-	NONE, //250 ???
-	NONE, //251 ???
-	NONE, //252 ???
-	NONE, //253 ???
-	NONE, //254 ???
-	NONE  //255 ???
+	PS2_NONE, //209 ???
+	PS2_NONE, //210 ???
+	PS2_NONE, //211 ???
+	PS2_NONE, //212 ???
+	PS2_NONE, //213 ???
+	PS2_NONE, //214 ???
+	PS2_NONE, //215 ???
+	PS2_NONE, //216 ???
+	PS2_NONE, //217 ???
+	PS2_NONE, //218 ???
+	PS2_NONE, //219 ???
+	PS2_NONE, //220 ???
+	PS2_NONE, //221 ???
+	PS2_NONE, //222 ???
+	PS2_NONE, //223 ???
+	PS2_NONE, //224 ???
+	PS2_NONE, //225 ???
+	PS2_NONE, //226 ???
+	PS2_NONE, //227 ???
+	PS2_NONE, //228 ???
+	PS2_NONE, //229 ???
+	PS2_NONE, //230 ???
+	PS2_NONE, //231 ???
+	PS2_NONE, //232 ???
+	PS2_NONE, //233 ???
+	PS2_NONE, //234 ???
+	PS2_NONE, //235 ???
+	PS2_NONE, //236 ???
+	PS2_NONE, //237 ???
+	PS2_NONE, //238 ???
+	PS2_NONE, //239 ???
+	PS2_NONE, //240 ???
+	PS2_NONE, //241 ???
+	PS2_NONE, //242 ???
+	PS2_NONE, //243 ???
+	PS2_NONE, //244 ???
+	PS2_NONE, //245 ???
+	PS2_NONE, //246 ???
+	PS2_NONE, //247 ???
+	PS2_NONE, //248 ???
+	PS2_NONE, //249 ???
+	PS2_NONE, //250 ???
+	PS2_NONE, //251 ???
+	PS2_NONE, //252 ???
+	PS2_NONE, //253 ???
+	PS2_NONE, //254 ???
+	PS2_NONE  //255 ???
 };
 #else
 static const int ev2ps2[] =
 {
-	NONE, //0   KEY_RESERVED
-	NONE, //1   KEY_RESERVED
-	NONE, //2   KEY_RESERVED
-	NONE, //3   KEY_RESERVED
+	PS2_NONE, //0   KEY_RESERVED
+	PS2_NONE, //1   KEY_RESERVED
+	PS2_NONE, //2   KEY_RESERVED
+	PS2_NONE, //3   KEY_RESERVED
 	0x1c, //4  KEY_A
 	0x32, //5  KEY_B
 	0x21, //6  KEY_C
@@ -336,7 +337,7 @@ static const int ev2ps2[] =
 	0x54, //47  KEY_LEFTBRACE
 	0x5b, //48  KEY_RIGHTBRACE
 	0x5d, //49  KEY_BACKSLASH
-	NONE, //50  KEY_RESERVED
+	PS2_NONE, //50  KEY_RESERVED
 	0x4c, //51  KEY_SEMICOLON
 	0x52, //52  KEY_APOSTROPHE
 	0x0e, //53  KEY_GRAVE
@@ -356,7 +357,7 @@ static const int ev2ps2[] =
 	0x09, //67  KEY_F10
 	0x78, //68  KEY_F11
 	0x07, //69  KEY_F12
-	NONE, //70  KEY_PRINT
+	PS2_NONE, //70  KEY_PRINT
 	EMU_SWITCH_1 | 0x7E, //71  KEY_SCROLLLOCK
 	0xE1, //72 KEY_PAUSE
 	EXT | 0x70, //73  KEY_INSERT
@@ -369,7 +370,7 @@ static const int ev2ps2[] =
 	EXT | 0x6b, //80  KEY_LEFT
 	EXT | 0x72, //81  KEY_DOWN
 	EXT | 0x75, //82  KEY_UP
-	EMU_SWITCH_2 | 0x77, //83  KEY_NUMLOCK
+	0x77, //83  SDL_SCANCODE_NUMLOCKCLEAR  (Mac keypad Clear -> ADB 0x47 via adb.v)
 	EXT | 0x4a, //84  KEY_KPSLASH
 	0x7c, //85  KEY_KPASTERISK
 	0x7b, //86  KEY_KPMINUS
@@ -386,137 +387,138 @@ static const int ev2ps2[] =
 	0x7d, //97  KEY_KP9
 	0x70, //98  KEY_KP0
 	0x71, //99  KEY_KPDOT
-	NONE, //100 ???
-	NONE, //101 ???
-	NONE, //102 ???
-	NONE, //103 KEY_KPEQUAL
-	NONE, //104 KEY_F13
-	NONE, //105 KEY_F14
-	NONE, //106 KEY_F15
-	NONE, //107 KEY_F16
+	0x61, //100 SDL_SCANCODE_NONUSBACKSLASH  (102nd key / ISO <> between LShift and Z)
+	EXT | 0x27, //101 SDL_SCANCODE_APPLICATION  (reuse PS/2 R-Windows code -> Option/Closed Apple)
+	PS2_NONE, //102 KEY_POWER
+	0x0F, //103 SDL_SCANCODE_KP_EQUALS  (numeric keypad =)
+	PS2_NONE, //104 KEY_F13
+	PS2_NONE, //105 KEY_F14
+	PS2_NONE, //106 KEY_F15
+	PS2_NONE, //107 KEY_F16
 	EMU_SWITCH_1 | 1, //108 KEY_F17
 	EMU_SWITCH_1 | 2, //109 KEY_F18
 	EMU_SWITCH_1 | 3, //110 KEY_F19
 	EMU_SWITCH_1 | 4, //111 KEY_F20
-	NONE, //112 KEY_F21
-	NONE, //113 KEY_F22
-	NONE, //114 KEY_F23
-	NONE, //115 KEY_F24
-	NONE, //116 
-	NONE, //117 KEY_HELP
-	NONE, //118 
-	NONE, //119 
-	NONE, //120 
-	NONE, //121 
-	NONE, //122 
-	NONE, //123 
-	NONE, //124 
-	NONE, //125 
-	NONE, //126 
-	NONE, //127 
-	NONE, //128 
-	NONE, //129 
-	NONE, //130 
-	NONE, //131 
-	NONE, //132 
-	NONE, //133 
-	NONE, //134 
-	NONE, //135 
-	NONE, //136 
-	NONE, //137 
-	NONE, //138 
-	NONE, //139 
-	NONE, //140 
-	NONE, //141 
-	NONE, //142 
-	NONE, //143 
-	NONE, //144 
-	NONE, //145 
-	NONE, //146 
-	NONE, //147 
-	NONE, //148 
-	NONE, //149 
-	NONE, //150 
-	NONE, //151 
-	NONE, //152 
-	NONE, //153 
-	NONE, //154 
-	NONE, //155 
-	NONE, //156 
-	NONE, //157 
-	NONE, //158 
-	NONE, //159 
-	NONE, //160 
-	NONE, //161 
-	NONE, //162 
-	NONE, //163 
-	NONE, //164 
-	NONE, //165 
-	NONE, //166 
-	NONE, //167 
-	NONE, //168 
-	NONE, //169 
-	NONE, //170 
-	NONE, //171 
-	NONE, //172 
-	NONE, //173 
-	NONE, //174 
-	NONE, //175 
-	NONE, //176 
-	NONE, //177 
-	NONE, //178 
-	NONE, //179 
-	NONE, //180 
-	NONE, //181 
-	NONE, //182 
-	NONE, //183 
-	NONE, //184 
-	NONE, //185 
-	NONE, //186 
-	NONE, //187 
-	NONE, //188 
-	NONE, //189 
-	NONE, //180 
-	NONE, //191 
-	NONE, //192 
-	NONE, //193 
-	NONE, //194 
-	NONE, //195 
-	NONE, //196 
-	NONE, //197 
-	NONE, //198 
-	NONE, //109 
-	NONE, //200 
-	NONE, //201 
-	NONE, //202 
-	NONE, //203 
-	NONE, //204 
-	NONE, //205 
-	NONE, //206 
-	NONE, //207 
-	NONE, //208 
-	NONE, //209 
-	NONE, //210 
-	NONE, //211 
-	NONE, //212 
-	NONE, //213 
-	NONE, //214 
-	NONE, //215 
-	NONE, //216 
-	NONE, //217 
-	NONE, //218 
-	NONE, //219 
-	NONE, //220 
-	NONE, //221 
-	NONE, //222 
-	NONE, //223 
-	NONE, //224 
-	 0x12, //225  KEY_LEFTSHIFT
-	 0x11, //226  KEY_LEFTALT
-	NONE,          //227
-	 EXT | 0x14, //228  KEY_RIGHTCTRL
-	 0x59, //229  KEY_RIGHTSHIFT
-	 EXT | 0x11, //230 KEY_RIGHTALT
+	PS2_NONE, //112 KEY_F21
+	PS2_NONE, //113 KEY_F22
+	PS2_NONE, //114 KEY_F23
+	PS2_NONE, //115 KEY_F24
+	PS2_NONE, //116 
+	PS2_NONE, //117 KEY_HELP
+	PS2_NONE, //118 
+	PS2_NONE, //119 
+	PS2_NONE, //120 
+	PS2_NONE, //121 
+	PS2_NONE, //122 
+	PS2_NONE, //123 
+	PS2_NONE, //124 
+	PS2_NONE, //125 
+	PS2_NONE, //126 
+	PS2_NONE, //127 
+	PS2_NONE, //128 
+	PS2_NONE, //129 
+	PS2_NONE, //130 
+	PS2_NONE, //131 
+	PS2_NONE, //132 
+	PS2_NONE, //133 
+	PS2_NONE, //134 
+	PS2_NONE, //135 
+	PS2_NONE, //136 
+	PS2_NONE, //137 
+	PS2_NONE, //138 
+	PS2_NONE, //139 
+	PS2_NONE, //140 
+	PS2_NONE, //141 
+	PS2_NONE, //142 
+	PS2_NONE, //143 
+	PS2_NONE, //144 
+	PS2_NONE, //145 
+	PS2_NONE, //146 
+	PS2_NONE, //147 
+	PS2_NONE, //148 
+	PS2_NONE, //149 
+	PS2_NONE, //150 
+	PS2_NONE, //151 
+	PS2_NONE, //152 
+	PS2_NONE, //153 
+	PS2_NONE, //154 
+	PS2_NONE, //155 
+	PS2_NONE, //156 
+	PS2_NONE, //157 
+	PS2_NONE, //158 
+	PS2_NONE, //159 
+	PS2_NONE, //160 
+	PS2_NONE, //161 
+	PS2_NONE, //162 
+	PS2_NONE, //163 
+	PS2_NONE, //164 
+	PS2_NONE, //165 
+	PS2_NONE, //166 
+	PS2_NONE, //167 
+	PS2_NONE, //168 
+	PS2_NONE, //169 
+	PS2_NONE, //170 
+	PS2_NONE, //171 
+	PS2_NONE, //172 
+	PS2_NONE, //173 
+	PS2_NONE, //174 
+	PS2_NONE, //175 
+	PS2_NONE, //176 
+	PS2_NONE, //177 
+	PS2_NONE, //178 
+	PS2_NONE, //179 
+	PS2_NONE, //180 
+	PS2_NONE, //181 
+	PS2_NONE, //182 
+	PS2_NONE, //183 
+	PS2_NONE, //184 
+	PS2_NONE, //185 
+	PS2_NONE, //186 
+	PS2_NONE, //187 
+	PS2_NONE, //188 
+	PS2_NONE, //189 
+	PS2_NONE, //180 
+	PS2_NONE, //191 
+	PS2_NONE, //192 
+	PS2_NONE, //193 
+	PS2_NONE, //194 
+	PS2_NONE, //195 
+	PS2_NONE, //196 
+	PS2_NONE, //197 
+	PS2_NONE, //198 
+	PS2_NONE, //109 
+	PS2_NONE, //200 
+	PS2_NONE, //201 
+	PS2_NONE, //202 
+	PS2_NONE, //203 
+	PS2_NONE, //204 
+	PS2_NONE, //205 
+	PS2_NONE, //206 
+	PS2_NONE, //207 
+	PS2_NONE, //208 
+	PS2_NONE, //209 
+	PS2_NONE, //210 
+	PS2_NONE, //211 
+	PS2_NONE, //212 
+	PS2_NONE, //213 
+	PS2_NONE, //214 
+	PS2_NONE, //215 
+	PS2_NONE, //216 
+	PS2_NONE, //217 
+	PS2_NONE, //218 
+	PS2_NONE, //219 
+	PS2_NONE, //220 
+	PS2_NONE, //221 
+	PS2_NONE, //222 
+	PS2_NONE, //223 
+	 0x14, //224  SDL_SCANCODE_LCTRL
+	 0x12, //225  SDL_SCANCODE_LSHIFT
+	 0x11, //226  SDL_SCANCODE_LALT  (Open Apple / Command)
+	 EXT | 0x1F, //227  SDL_SCANCODE_LGUI  (Mac ⌘, Win key) -> Closed Apple / Option
+	 EXT | 0x14, //228  SDL_SCANCODE_RCTRL
+	 0x59, //229  SDL_SCANCODE_RSHIFT
+	 EXT | 0x11, //230  SDL_SCANCODE_RALT
+	 EXT | 0x27, //231  SDL_SCANCODE_RGUI  (RightGUI) -> Closed Apple / Option (menu key PS/2 code)
 
 };
 /* http://www-personal.umich.edu/~bazald/l/api/_s_d_l__scancode_8h.html */
@@ -535,6 +537,11 @@ bool ReadKeyboard()
 		else { return false; }
 	}
 #else
+	if (headless) {
+		m_keyboardStateCount = 0;
+		m_keyboardState = nullptr;
+		return true;
+	}
 	m_keyboardState = SDL_GetKeyboardState(&m_keyboardStateCount);
 	if (!m_keyboardState_last) m_keyboardState_last = (Uint8*)calloc(m_keyboardStateCount, sizeof(Uint8));
 	////fprintf(stderr,"count: %d\n",m_keyboardStateCount);
@@ -574,7 +581,7 @@ void SimInput::Read() {
 #ifdef WIN32
 		inputs[i] = m_keyboardState[mappings[i]] & 0x80;
 #else
-		inputs[i] = m_keyboardState[mappings[i]];
+		inputs[i] = headless ? 0 : m_keyboardState[mappings[i]];
 #endif
 	}
 
@@ -590,13 +597,38 @@ void SimInput::Read() {
 		m_keyboardState_last[k] = m_keyboardState[k];
 	}
 #else
-	for (int k = 0; k < m_keyboardStateCount; k++) {
-		if (m_keyboardState_last[k] != m_keyboardState[k]) {
-			bool ext = 0;
-			SimInput_PS2KeyEvent evt = SimInput_PS2KeyEvent(k, m_keyboardState[k], ext);
+	if (!headless) {
+		// Caps Lock: macOS SDL delivers the latch as a transient scancode
+		// blip that polling typically misses, but SDL_GetModState() &
+		// KMOD_CAPS reflects latch transitions reliably. Synthesize one
+		// PS/2 key-down activation per toggle; adb.v owns the IIgs latch
+		// state and ignores the matching physical key-up edge.
+		static int caps_mod_last = -1;
+		int caps_mod_now = (SDL_GetModState() & KMOD_CAPS) ? 1 : 0;
+		if (caps_mod_last == -1) caps_mod_last = caps_mod_now;
+		if (caps_mod_last != caps_mod_now) {
+			const unsigned int CAPSLOCK_PS2 = 0x58;
+			SimInput_PS2KeyEvent evt(57, true, false, CAPSLOCK_PS2);
 			keyEvents.push(evt);
+			caps_mod_last = caps_mod_now;
+			if (m_keyboardState_last && m_keyboardStateCount > 57) {
+				m_keyboardState_last[57] = caps_mod_now;
+			}
 		}
-		m_keyboardState_last[k] = m_keyboardState[k];
+		for (int k = 0; k < m_keyboardStateCount; k++) {
+			if (m_keyboardState_last[k] != m_keyboardState[k]) {
+				if (k == 57) {
+					// Caps Lock handled via SDL_GetModState above.
+					m_keyboardState_last[k] = m_keyboardState[k];
+					continue;
+				}
+				unsigned int mapped = ev2ps2[k];
+				bool ext = (mapped & EXT) != 0;
+				SimInput_PS2KeyEvent evt = SimInput_PS2KeyEvent(k, m_keyboardState[k], ext, mapped);
+				keyEvents.push(evt);
+			}
+			m_keyboardState_last[k] = m_keyboardState[k];
+		}
 	}
 #endif
 
@@ -626,21 +658,25 @@ bool ps2_clock = 1;
 
 void SimInput::BeforeEval()
 {
-	if (ps2_key == NULL) {
-		return;
-	}
 	if (keyEventTimer == 0) {
 
 		if (keyEvents.size() > 0) {
 			// Get chunk from queue
 			SimInput_PS2KeyEvent evt = keyEvents.front();
 			keyEvents.pop();
+
+			//ps2_key_temp = ev2ps2[evt.code];
 			ps2_key_temp = evt.mapped;
+			/*fprintf(stderr, "PS2 KEY: code=%02x pressed=%d ext=%d mapped=%02x\n", evt.code, evt.pressed, evt.extended, evt.mapped);*/
+
 			if (evt.extended) { ps2_key_temp |= (1UL << 8); }
 			if (evt.pressed) { ps2_key_temp |= (1UL << 9); }
 			if (ps2_clock) { ps2_key_temp |= (1UL << 10); }
+
 			ps2_clock = !ps2_clock;
+
 			*ps2_key = ps2_key_temp;
+
 			keyEventTimer = keyEventWait;
 		}
 	}
@@ -659,4 +695,3 @@ SimInput::~SimInput()
 {
 
 }
-

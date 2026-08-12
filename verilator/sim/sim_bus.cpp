@@ -4,7 +4,7 @@
 
 #include "sim_bus.h"
 #include "sim_console.h"
-#include "verilated_heavy.h"
+#include "verilated.h"   // was verilated_heavy.h, removed in Verilator 5
 
 #ifndef _MSC_VER
 #else

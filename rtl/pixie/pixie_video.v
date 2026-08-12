@@ -21,14 +21,14 @@ module pixie_video
     // front end, CDP1802 bus clock domain
     input             clk,
     input             reset,  
-    input             clk_enable,
+    input             clk_enable,   // pixel enable
+    input             cpu_ce,       // CPU machine-cycle enable
 
     input       [1:0] SC,         
     input             disp_on,
     input             disp_off,
 
     input       [7:0] data_in,     
-    output wire [15:0] data_addr,
 
     output            DMAO,     
     output            INT,     
@@ -47,31 +47,28 @@ module pixie_video
 );
 
 // RCA Studio II
-pixie_video_studioii pixie_video_studioii (
-    .clk        (video_clk),    // I
+cdp1861 cdp1861 (
+    .clk        (clk),          // I  pixel-rate domain
+    .ce_pix     (clk_enable),   // I
+    .cpu_ce     (cpu_ce),       // I  one pulse per CPU machine cycle
     .reset      (reset),        // I
 
-    .csync      (csync),        // O
-    .video      (video),        // O
-
-    .VSync      (VSync),        // O
-    .HSync      (HSync),        // O  
-    .VBlank     (VBlank),       // O
-    .HBlank     (HBlank),       // O
-    .video_de   (video_de),     // O
-
-    // frontend
-    .clk_enable (clk_enable),   // I
     .SC         (SC),           // I [1:0]
+    .data_in    (data_in),      // I [7:0]  byte the CPU delivers during DMA-OUT
     .disp_on    (disp_on),      // I
     .disp_off   (disp_off),     // I
-    .data_in    (data_in),      // I [7:0]
 
     .DMAO       (DMAO),         // O
     .INT        (INT),          // O
     .EFx        (EFx),          // O
 
-    .mem_addr   (data_addr)     // O [9:0]
+    .csync      (csync),        // O
+    .video      (video),        // O
+    .VSync      (VSync),        // O
+    .HSync      (HSync),        // O
+    .VBlank     (VBlank),       // O
+    .HBlank     (HBlank),       // O
+    .video_de   (video_de)      // O
 );
 
 endmodule
