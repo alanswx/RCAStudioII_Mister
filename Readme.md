@@ -33,15 +33,59 @@ The core is held in reset until a BIOS is loaded.
 
 ## Controls
 
-The Studio II has two 10-key keypads.
+The Studio II has two 10-key keypads. The left one is player A (read through
+`EF3`), the right is player B (`EF4`); software scans them by writing the key
+number to `OUT 2` and testing the flags — see `docs/keyboard.txt`.
 
 | | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
 |---|---|---|---|---|---|---|---|---|---|---|
 | **Player A** | `0` | `1` | `2` | `3` | `4` | `5` | `6` | `7` | `8` | `9` |
 | **Player B** | `P` | `Q` | `W` | `E` | `R` | `T` | `Y` | `U` | `I` | `O` |
 
-With no cartridge the BIOS built-in games start on **3**, **4** or **5**. Most
-cartridges start on **1** or **2**.
+With no cartridge the BIOS built-in games start on **3**, **4** or **5**.
+
+### Per-cartridge
+
+Original RCA manuals are not included with the dumps, so the table below is
+**measured, not documented**: each cartridge was run in the simulator and every
+key tried. "Starts with" is the key that first puts something on screen;
+"responds to" lists keys that demonstrably change the game state afterwards. It
+tells you which keys are live, **not what they do** — that would need the
+manuals, and guessing would be worse than saying so.
+
+Regenerate it with `tools/probe-keys.sh`.
+
+| Cartridge | Starts with | Player A responds to | Player B responds to |
+|-----------|-------------|----------------------|----------------------|
+| 86677b (Europe) | `any` | — | — |
+| 87201 (Europe) | `any` | — | — |
+| Concentration Match (Europe) | `any` | `1 2 3 4 5 6 7 8 9` | `1 2 3 4 5 6 7 8` |
+| Demonstration Cartridge (USA) | `any` | — | — |
+| Pinball (Europe) | `1 2` | — | `1` |
+| Speedway + Tag (Europe) | `1 2` | `2 4 8` | `2 4 8` |
+| Star Wars (Europe) | `1 2 3` | `1 2 3` | `1 2 3` |
+| TV Arcade I - Space War (USA) | `1 3` | `2` | — |
+| TV Arcade II - Fun with Numbers (USA) | `1 2 3` | — | `1 2 3 4 5 6 7 8` |
+| TV Arcade III - Tennis + Squash (USA) | `1 2` | — | `4 5 6` |
+| TV Arcade IV - Baseball (USA) | `0` | — | `2 5 8` |
+| TV Arcade Series - Gunfighter + Moonship Battle (USA, Europe) | `1 2 3` | — | `2 5 8` |
+| TV Arcade Series - Speedway + Tag (USA) | `1 2` | `2 4 8` | `2 4 8` |
+| TV Casino Series - Blackjack (USA) | `1 2` | — | `0` |
+| TV Casino Series - TV Bingo (USA, Europe) | `1 2` | `1` | — |
+| TV Mystic Series - Biorhythm (USA, Europe) | `0` | — | `1 2 3 4 5 6 7 8 0` |
+| TV School House I (USA) | `any` | `1 2 3 4 5 6 7 8 9` | — |
+| TV School House II - Math Fun (USA, Europe) | `1 2` | `1 2 3 4 5` | — |
+
+Notes on the measurements:
+
+- `any` means the cartridge draws regardless of which key is pressed — these are
+  demos or menu-driven titles rather than games with a start button.
+- A dash means no key changed the outcome in the window tested. That can mean
+  the title genuinely ignores that keypad, or that it needs a longer or
+  different input sequence than the probe used.
+- `86677b`, `87201` and `Demonstration Cartridge` show no response on either
+  keypad; the first two are also the cartridges whose frames differ from the
+  reference emulator (see below), so treat them as untested rather than working.
 
 ## Building
 

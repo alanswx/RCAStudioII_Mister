@@ -191,7 +191,16 @@ always @(posedge clk) begin
     end
 end
 
-assign video = display_enabled & in_active & shift_reg[7];
+// shift_reg is loaded one pixel before its first bit is visible, so the active-window gate has to
+// be delayed to match it. Gating on the undelayed in_active blanked the last pixel of byte 7 --
+// the rightmost column of the screen, which showed up as a missing right-hand border.
+reg in_active_d;
+always @(posedge clk) begin
+    if (reset)       in_active_d <= 1'b0;
+    else if (ce_pix) in_active_d <= in_active;
+end
+
+assign video = display_enabled & in_active_d & shift_reg[7];
 
 // were emitted this frame.
 
