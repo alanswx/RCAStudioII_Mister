@@ -15,9 +15,8 @@ Output is **pixel-identical to a reference emulator on 18 of 21 test frames**.
 The three that differ are memory/dice games whose BIOS-updated RNG seed
 diverges, not rendering faults.
 
-Not yet implemented: **sound**, the **CLEAR key** (every cartridge manual starts
-"Press CLEAR" — it is the Studio II's hardware reset), the **`.st2` cartridge
-loader** (raw `.bin` only), full **memory decode/mirroring**, and PAL.
+Not yet implemented: **sound**, the **`.st2` cartridge loader** (raw `.bin`
+only), full **memory decode/mirroring**, and PAL.
 
 ## Installing
 
@@ -43,7 +42,10 @@ number to `OUT 2` and testing the flags — see `docs/keyboard.txt`.
 | **Player A** | `0` | `1` | `2` | `3` | `4` | `5` | `6` | `7` | `8` | `9` |
 | **Player B** | `P` | `Q` | `W` | `E` | `R` | `T` | `Y` | `U` | `I` | `O` |
 
-With no cartridge the BIOS built-in games start on **3**, **4** or **5**.
+**CLEAR** — the console reset button every manual asks for — is **F3**, or
+**Clear** in the OSD.
+
+With no cartridge, the five BIOS built-in games are selected with keys **1**–**5** on keyboard A — see below.
 
 ### Per-cartridge
 
@@ -98,12 +100,28 @@ Scans for **Fun with Numbers, Math Fun, Biorhythm and Star Wars** are in `docs/`
 but are not written up yet; consult them directly, or use the measured table
 above.
 
-All four manuals begin **"Press CLEAR"**. CLEAR is the Studio II's hardware
-reset — this core does not implement it yet (see Known gaps), so use the OSD
-reset or restart the core instead.
+Every manual begins **"Press CLEAR"**. CLEAR is the Studio II's console reset
+button (see `docs/RCA_Studio_II_Service_Manual.pdf`, Figure 1); press **F3**, or
+use **Clear** in the OSD.
 
 Movement is the keypad cross on both keyboards: **2** up, **8** down, **4**
 left, **6** right, **5** fire.
+
+#### Built-in games (no cartridge)
+
+Five games live in the BIOS. From `docs/RCA_Studio_II_Service_Manual.pdf` (pages
+7–8), which uses them as the console's self-test. Press **CLEAR** first, then:
+
+| Game | Select | Controls |
+|------|--------|----------|
+| **Doodles** | A **1** | Keyboard B moves the dot per the arrows on the panel. **B5** leaves a trail as you "write"; **B0** leaves none. Retrace to erase. |
+| **Patterns** | A **2** | Screen stays dark; keyboard B "writes" per the panel arrows. Memory holds 130 moves — after 130 the pattern auto-repeats, and for fewer, **B0** starts the repeat cycle. |
+| **Freeway** | A **3** | **B4**/**B6** steer left/right, **A2** throttle, **A8** brake. Avoid the computer car for two minutes; distance travelled shows at the end. |
+| **Bowling** | A **4** | **A5** rolls straight, **A2** hooks left (up), **A8** hooks right (down). Strike scores 20 (`ST-20`), spare 15 (`SP-15`). Player 2 then uses keyboard B. |
+| **Addition** | A **5** | Add the three digits shown and press the total on either keyboard within five seconds. Faster answers score more, max 11 a set; a wrong answer locks you out of that set. 20 sets. |
+
+These match what the core does: A2 correctly shows a dark screen, A1 puts a
+single dot at the lower left, and A4/A5 draw the bowling and score displays.
 
 #### TV Arcade III — Tennis / Squash
 
@@ -239,7 +257,9 @@ CPU instruction tracing and VRAM dumps — see `--help`.
   source layout, build notes, remaining defects, roadmap, and how the core is
   verified against a reference emulator.
 - `docs/` — hardware notes (memory map, I/O, video, cartridge format) scraped
-  from the classicgaming Studio 2 technical pages.
+  from the classicgaming Studio 2 technical pages, scanned cartridge manuals
+  (`*.zip`), and the RCA Model 18V100 service manual, which has the console
+  block diagram, the CLEAR button and the clock-adjustment procedure.
 
 ## Credits
 

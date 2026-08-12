@@ -302,16 +302,7 @@ windows `$0A00-$0BFF`, `$0C00-$0DFF` and `$0E00-$0FFF` are not decoded.
 - No PAL support, no aspect/scanline options, no `Clear` button in the OSD, and
   the BIOS is not embedded (the core is held in reset until one is loaded).
 
-### 6.5 No CLEAR key
-Every original cartridge manual begins "Press CLEAR" before the game-select key
-— CLEAR is the Studio II's hardware reset, wired to the 1802's `CLEAR_N`. The
-core exposes no equivalent, so cartridges are entered without the reset they
-expect. Scripted start sequences reproduce the reference emulator exactly, but
-neither reaches active play, and this is the most likely reason.
-
-Map it to an OSD button and/or a host key driving `CLEAR_N`.
-
-### 6.6 Keypad mapping
+### 6.5 Keypad mapping
 PS/2 scancode only, no joystick/gamepad support. The
 mapping is a straight number-row / `P Q W E R T Y U I O` split rather than the
 3x4 keypad layout MAME uses.
@@ -338,14 +329,10 @@ at 64-127 — and write each 256-byte block to `page[i] << 8`. Add
 Split ROM / cart / RAM with the documented mirroring and add the `$0A00-$0BFF`,
 `$0C00-$0DFF` and `$0E00-$0FFF` cartridge windows.
 
-### 7.4 CLEAR key
-Wire an OSD button and a host key to `CLEAR_N` (§6.5). Cheap, and it unblocks
-testing the cartridges the way their manuals describe.
-
-### 7.5 Polish
+### 7.4 Polish
 Aspect ratio, `CE_PIXEL`, joystick mapping, PAL option, embedded BIOS.
 
-### 7.6 Keep the comparison green
+### 7.5 Keep the comparison green
 Any RTL change should be re-checked against the reference emulator (§9) before
 committing. The regression is cheap — a few seconds per cartridge.
 
@@ -423,6 +410,21 @@ cartridges including an RCA test cart.
 ---
 
 ## 10. What changed (2026-08-12)
+
+**CLEAR key.** Added, mapped to **F1** and an OSD "Clear" button, folded into
+`reset` (which drives the 1802's `CLEAR_N`). `docs/RCA_Studio_II_Service_Manual.pdf`
+Figure 1 shows it as a console pushbutton between the two keypads, and the test
+procedure on page 5 — "press and hold Clear... release Clear" — confirms it is a
+momentary reset, which is what this implements. Note this does **not** change
+simulator behaviour: both sims already reset at power-on, so scripted sequences
+were never missing a CLEAR. It matters on real hardware and in the GUI sim, where
+there was previously no way to reset without reloading the core.
+
+The same manual settles a timing question: the Studio II clock is a **slug-tuned
+RC oscillator**, adjusted by eye for "zero waveform drift" against the 60 Hz line
+(§13, Figure 33). There is no exact crystal frequency, which is why MAME uses a
+round 1760000 Hz.
+
 
 The core went from "puts a picture on screen but most of the machine is
 stubbed" to pixel-identical output. Briefly, so the history is not lost:

@@ -213,6 +213,7 @@ localparam CONF_STR = {
 //	"O[2],TV Mode,NTSC,PAL;",
 	"-;",
 //	"T[0],Reset;",
+	"T[1],Clear;",
 	"R[0],Reset and close OSD;",
 	"V,v",`BUILD_DATE 
 };
@@ -221,6 +222,19 @@ wire forced_scandoubler;
 wire   [1:0] buttons;
 wire [127:0] status;
 wire  [10:0] ps2_key;
+
+// CLEAR is the Studio II's console button. On real hardware it drives the 1802's
+// CLEAR pin and resets the CDP1861: MAME's studio2 machine_reset() does exactly
+// m_vdc->reset(), and Emma 02 resets its Pixie on the same path. Folding it into
+// this core's `reset` gives both, since that net feeds the CPU's CLEAR_N and the
+// pixie. Mapped to F3 (0x04) to match MAME's KEYCODE_F3, and to the OSD "Clear"
+// button; F3 is free because player A uses the number row and player B P-O.
+reg clear_key = 1'b0;
+always @(posedge clk_sys) begin
+	reg old_stb;
+	old_stb <= ps2_key[10];
+	if (old_stb != ps2_key[10] && ps2_key[7:0] == 8'h04) clear_key <= ps2_key[9];
+end
 
 wire        ioctl_download;
 wire  [7:0] ioctl_index;
@@ -279,7 +293,7 @@ always @(posedge clk_sys) begin
 end
 
 //wire reset = ioctl_download;
-wire reset = RESET | status[0] | buttons[1] | ioctl_download | download_reset | ~rom_loaded; 
+wire reset = RESET | status[0] | status[1] | clear_key | buttons[1] | ioctl_download | download_reset | ~rom_loaded;
 
 // reset after download
 reg [7:0] download_reset_cnt;
