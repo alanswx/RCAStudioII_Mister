@@ -302,12 +302,21 @@ windows `$0A00-$0BFF`, `$0C00-$0DFF` and `$0E00-$0FFF` are not decoded.
 - No PAL support, no aspect/scanline options, no `Clear` button in the OSD, and
   the BIOS is not embedded (the core is held in reset until one is loaded).
 
-### 6.5 Keypad mapping
-PS/2 scancode only, no joystick/gamepad support and no `Clear`/reset key. The
+### 6.5 No CLEAR key
+Every original cartridge manual begins "Press CLEAR" before the game-select key
+— CLEAR is the Studio II's hardware reset, wired to the 1802's `CLEAR_N`. The
+core exposes no equivalent, so cartridges are entered without the reset they
+expect. Scripted start sequences reproduce the reference emulator exactly, but
+neither reaches active play, and this is the most likely reason.
+
+Map it to an OSD button and/or a host key driving `CLEAR_N`.
+
+### 6.6 Keypad mapping
+PS/2 scancode only, no joystick/gamepad support. The
 mapping is a straight number-row / `P Q W E R T Y U I O` split rather than the
 3x4 keypad layout MAME uses.
 
-### 6.6 Minor
+### 6.7 Minor
 - `sys/` is shared framework code and must not be edited; the remaining Quartus
   warnings (unused SDRAM/SDIO pins, open-drain removal) all originate there and
   are present in every MiSTer core.
@@ -329,11 +338,14 @@ at 64-127 — and write each 256-byte block to `page[i] << 8`. Add
 Split ROM / cart / RAM with the documented mirroring and add the `$0A00-$0BFF`,
 `$0C00-$0DFF` and `$0E00-$0FFF` cartridge windows.
 
-### 7.4 Polish
-Aspect ratio, `CE_PIXEL`, joystick mapping, PAL option, OSD reset, embedded
-BIOS.
+### 7.4 CLEAR key
+Wire an OSD button and a host key to `CLEAR_N` (§6.5). Cheap, and it unblocks
+testing the cartridges the way their manuals describe.
 
-### 7.5 Keep the comparison green
+### 7.5 Polish
+Aspect ratio, `CE_PIXEL`, joystick mapping, PAL option, embedded BIOS.
+
+### 7.6 Keep the comparison green
 Any RTL change should be re-checked against the reference emulator (§9) before
 committing. The regression is cheap — a few seconds per cartridge.
 
