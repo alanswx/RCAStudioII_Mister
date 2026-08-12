@@ -7,12 +7,15 @@ Guidance for working in this repo. Read this before changing RTL.
 ## 1. What this is
 
 A MiSTer FPGA core for the **RCA Studio II** (1977), an RCA CDP1802 ("COSMAC")
-based console with CDP1861 "Pixie" video. The repo started from the MiSTer
-template core, so `Readme.md` is still the *template's* readme — it describes
-the framework, not this core. Ignore it.
+based console with CDP1861 "Pixie" video.
 
-**State of the core: early prototype.** It builds and puts a picture on screen,
-but large parts of the machine are unimplemented or stubbed. See §6.
+**State of the core: playable.** The CPU has the full instruction set the BIOS
+needs, interrupts and DMA; the video is a real CDP1861 driven by DMA, not a RAM
+scraper. Frames are **pixel-identical to the reference emulator on 18 of 21**
+test cases (§9), and the core builds clean in Quartus with timing closed (§4).
+
+What is still missing: **sound** (`Q` is unused), the **ST2 cartridge loader**
+in RTL, proper **memory decode/mirroring**, and PAL. See §6.
 
 Licence: GPL-2.0-or-later (file headers). Note `rtl/reference/cosmac.vhdl` and
 its translation `rtl/cosmac.v` are Eric Smith's GPL-3.0 code — compatible with
@@ -115,20 +118,23 @@ DMA-OUT cycles.** The current core implements none of them (§6.1).
 |------|------|
 | `RCAStudioII.sv` | MiSTer `emu` top: hps_io, PLL, OSD config string, video out |
 | `rtl/rcastudioii.sv` | Core glue: CPU + pixie + RAM + keypad |
-| `rtl/cdp1802.v` | The CPU **in use** — minimal, incomplete (§6.1) |
+| `rtl/cdp1802.v` | The CPU: full BIOS instruction set, interrupts, DMA, machine-cycle timing |
 | `rtl/dpram.sv` | Dual-port block RAM |
 | `rtl/pixie/pixie_video.v` | Thin wrapper |
-| `rtl/pixie/pixie_video_studioii.v` | The video **in use** — a RAM scraper, not a 1861 (§6.2) |
+| `rtl/pixie/cdp1861.v` | The video: a real CDP1861, DMA-fed, no frame buffer |
 
 ### Files present but NOT compiled (dead / reference)
-`rtl/cosmac.v`, `rtl/cdp1861.v`, `rtl/dma.v`, `rtl/keypad.v`, `rtl/debounce.v`,
-`rtl/rom.v`, `rtl/beep.sv`, `rtl/pixie/pixie_video_old.v`,
-`rtl/pixie/pixie_dp_*.v{,hdl}`, `rtl/reference/`.
+`rtl/cosmac.v`, `rtl/dma.v`, `rtl/keypad.v`, `rtl/debounce.v`, `rtl/rom.v`,
+`rtl/beep.sv`, `rtl/pixie/pixie_video_old.v`, `rtl/pixie/pixie_dp_*.v{,hdl}`,
+`rtl/reference/`.
 
-`rtl/cosmac.v` is the important one: an X-HDL translation of Eric Smith's
-`cosmac.vhdl`, a **complete and correct** 1802 with the full instruction set,
-interrupts and DMA. It is instantiated only inside a comment block in
-`rtl/rcastudioii.sv:186-203`. See §7.1.
+`rtl/cosmac.v` (Eric Smith's GPL-3 1802, via X-HDL) was once the planned
+replacement CPU. It is no longer needed — `rtl/cdp1802.v` now has the
+instruction set, interrupts, DMA and cycle timing the BIOS requires. Keep it
+only as a cross-reference.
+
+Note `rtl/pixie/cdp1861.v` is the *live* video module; the old
+`pixie_video_studioii.v` RAM scraper has been deleted.
 
 ### Clocks
 `rtl/pll/pll_0002.v`: `outclk_0 = 7.040229 MHz` (`clk_sys`),
@@ -141,29 +147,61 @@ interrupts and DMA. It is instantiated only inside a comment block in
 ## 4. Build & test
 
 ### Quartus
-Quartus **17.0.x** only (MiSTer requirement). Project `RCAStudioII.qpf`.
-Top entity is `sys_top` (from `sys/`). Not installed on this machine.
+Quartus **17.0.x** only (MiSTer requirement). Project `RCAStudioII.qpf`, top
+entity `sys_top` (from `sys/`). Quartus is not installed natively here; it runs
+in the `raetro/quartus:mister` Docker image (Quartus 17.0.2):
 
-### Verilator sim (`verilator/`)
 ```sh
-cd verilator && make          # builds obj_dir/Vtop, an ImGui/SDL2 sim
+tools/quartus-build.sh          # full build -> output_files/RCAStudioII.rbf
+tools/quartus-build.sh map      # analysis & synthesis only (~1.5 min)
+tools/quartus-build.sh clean
 ```
-`verilator` 5.x and `sdl2` are installed via Homebrew here.
 
-**The sim build is currently broken** — fix these first:
-- `verilator/Makefile:59,62` — `\` followed by a TAB on the `cdp1861.v` and
-  `dma.v` lines kills the line continuation → `commands commence before first
-  target`.
-- `verilator/sim.v:59-60` — `reg key_strobe;` then `wire key_strobe = …`,
-  a duplicate declaration; verilator errors out.
-- The `V_SRC` list names `cdp1861.v`, `dma.v`, `rom.v`, which are not part of
-  the design and should be dropped to match `files.qip`.
+Last known-good build: **0 errors**, timing closed (worst slack +0.423 ns),
+19 % of ALMs, 7 % of block RAM, whole flow ~6 minutes.
 
-Lint the design directly (this works today):
+**Do not run `quartus_sh --flow compile`.** The image is amd64 under emulation
+on Apple Silicon, and the qsf's `NUM_PARALLEL_PROCESSORS ALL` makes Quartus fork
+helper processes that crash there — they end up `<defunct>` beside
+`[crashreporter]`, and the parent deadlocks forever on named pipes from the dead
+helpers at ~4 % CPU. It looks like a slow build but never finishes. The script
+passes `--parallel=1` to each stage to avoid this; a healthy build sits at
+~100 % CPU.
+
+`RCAStudioII.qsf` needs `PRE_FLOW_SCRIPT_FILE = quartus_sh:sys/build_id.tcl`;
+without it synthesis dies on the missing generated `build_id.v`.
+
+### Verilator sims (`verilator/`)
+Two targets, both working. `verilator` 5.x and `sdl2` come from Homebrew.
+
 ```sh
-verilator --lint-only -Wall --top-module rcastudioii \
-  rtl/rcastudioii.sv rtl/cdp1802.v rtl/dpram.sv \
-  rtl/pixie/pixie_video_studioii.v rtl/pixie/pixie_video.v
+cd verilator
+make            # interactive SDL/ImGui sim -> ./obj_dir/Vtop
+make headless   # batch sim                 -> ./obj_dir_headless/Vtop
+make clean
+```
+
+Both accept `--bios FILE`, `--cart FILE` (raw `.bin`, flat at `$0400`) and
+`--press KEY@FRAME[:HOLD]`, where KEY is `0`-`9` optionally prefixed `a`/`b`
+for the two keypads. The headless sim adds `--frames`, `--shot`, `--shot-every`,
+`--ascii`, `--vram`, `--frame-log`, `--trace-cpu`, `--trace-from`; see `--help`.
+
+```sh
+./obj_dir/Vtop --cart "../software/carts/TV Arcade I - Space War (USA).bin" --press a1@40:30
+./obj_dir_headless/Vtop --frames 200 --press a5@40:20 --shot 200 --ascii
+```
+
+Keyboard in the GUI: **player A = number row `0`-`9`**, **player B =
+`P Q W E R T Y U I O`**. With no cart the built-in games start on **3/4/5**;
+most cartridges start on **1** or **2**.
+
+**The Makefile does not track RTL edits into `obj_dir`.** If a `.v` change
+appears to do nothing, `rm -rf obj_dir obj_dir_headless` and rebuild — this has
+silently run stale binaries more than once.
+
+Lint:
+```sh
+cd verilator && make lint
 ```
 
 ### Loading software
@@ -217,187 +255,81 @@ same 2 KB as space-separated hex text (6144 bytes).
 
 ## 6. Known defects
 
-Ordered by impact. File:line references are to the current tree.
+Most of the original defect list is fixed — see §10 for what changed. What
+remains, ordered by impact.
 
-### 6.1 CPU — `rtl/cdp1802.v`
+### 6.1 No sound
+`Q` (`rtl/rcastudioii.sv`) is still unused, `rtl/beep.sv` is never instantiated,
+and `RCAStudioII.sv` ties `AUDIO_L`/`AUDIO_R`/`AUDIO_S` to 0. The authentic
+version is an NE555 astable, ~625 Hz, whose pitch decays ~50 % over 0.4 s after
+`Q` rises — that decay is what makes it sound like a Studio II. MAME just uses a
+fixed beeper.
 
-**Interrupts and DMA do not exist.** `INTERRUPT`, `DMA_IN` and `DMA_OUT` states
-are declared (`:95-97`) but nothing ever assigns them to `state_n` — the
-transitions are commented out at `:174-181`. Their case bodies (`:199-211`,
-`:359-414`) contain only commented-out reference code. Consequences:
-- The 60 Hz ISR at `$001C` never runs.
-- `IE` (`:82`) is never initialised or set; it is only ever cleared, in
-  unreachable code.
-- `SC` (`:59`) only ever takes `00` (fetch) and `01` (execute); the 1861 can
-  never see a DMA or interrupt state code.
-- `T` (`:114`) is written but never read back — `RET`/`SAV` need it.
+### 6.2 No ST2 cartridge loader in RTL
+`rtl/rcastudioii.sv` does a flat `ioctl_addr[11:0] + 12'h0400` copy, so only raw
+`.bin` works, and the OSD only offers `F1,bin`. `.st2` files would load their
+256-byte header at `$0400` and every block at the wrong page.
 
-**Missing / wrong instructions**, all falling through to the `default` arm at
-`:257` (a harmless read of `M(R(X))`):
-| Opcode | Mnemonic | Status |
-|--------|----------|--------|
-| `00` | `IDL` | decoded as `LDN R0` — wrong |
-| `70` | `RET` | not implemented; flagged `unsupported` (`:291`). **Used by the BIOS ISR.** |
-| `71` | `DIS` | not implemented |
-| `78` | `SAV` | not implemented. **Used by the BIOS ISR.** |
-| `79` | `MARK` | not implemented |
-| `68` | (reserved on 1802) | decoded as `INP 0` and *writes* `M(R(X))` |
+A **working reference implementation** now exists in
+`refs/rca-studio2/studio2-games/studio2/cpu.c` (`CPU_LoadST2Image`), verified
+against 46 cartridges. Note the page-validity rule it establishes: reject only
+the system ROM (`$00-$03`) and RAM (`$08-$09`) pages plus `$00` as the "unused"
+marker. `docs/cartridge.txt` says the valid targets are "400-7FF, A00-BFF and
+E00-FFF", but `race.st2` pages ROM into **`$0C00-$0DFF`** over the default RAM
+mirror, which is why the memory map lists `$C00-$DFF` as RAM/ROM.
 
-**`WAIT_N` polarity is inverted.** The header comment (`:29-33`) and the
-datasheet both say Clear=1/Wait=1 → Run. The commit block at `:321` gates all
-execution on `if (!WAIT_N && CLEAR_N)` — i.e. it runs only when `WAIT_N` is
-*low*, which the same file calls "Pause". `rcastudioii.sv:147` hardwires
-`WAIT_N = 1'b0`, so the CPU runs by accident. The `CLEAR_N && WAIT_N` arm at
-`:421` is dead.
-
-**Coding issues:**
-- `:167,172,201,205,209` — non-blocking `<=` to `SC` inside a combinational
-  `always @*`, and `SC` is not assigned on every path → inferred latch and
-  sim/synth mismatch.
-- `:231` — `always @(state, I, N)` has an incomplete sensitivity list; the block
-  also reads `Rrd`, `P`, `X`, `ram_q`. Use `always @*`.
-- `:85` — `state` is flopped both synchronously and asynchronously
-  (verilator `SYNCASYNCNET`).
-- `:196,343,360,388,418,422` — `$display` in synthesizable always blocks.
-- Roughly a third of the file is commented-out VHDL/C++ transliterations.
-
-**No cycle accuracy.** One `clk_sys` edge per state, so ~2 clocks per
-instruction at 7.04 MHz ≈ 3.5 M instr/s, versus ~110 k instr/s on real
-hardware — about **32× too fast**. `TPA`/`TPB` are commented out (`:132-148`,
-`:75-76`) despite commit `98b800a` claiming to add them.
-
-### 6.2 Video — `rtl/pixie/pixie_video_studioii.v`
-
-**It is not a CDP1861.** It ignores the CPU entirely and continuously scrapes
-`$0900-$09FF` into a private `frame_buffer[256]` (`:126-137`) over a second
-dpram port. Consequences:
-- `DMAO` is generated (`:99`) but the CPU cannot act on it, so no DMA-OUT cycles
-  ever occur and the CPU never loses the ~35 % of machine cycles the real one
-  spends on display DMA. Game timing is wrong even ignoring §6.1.
-- The display base address is hardwired to `$0900` (`:56`) instead of following
-  `R(0)`. Software that scrolls by adjusting R(0) — which `docs/cartridge.txt`
-  explicitly calls out ("top of screen at `$0900+RB.0`") — will not scroll.
-  Cartridges with a non-zero ST2 video flag cannot work at all.
-- `SC_fetch`/`SC_execute`/`SC_dma`/`SC_interrupt` (`:107-113`) are set but never
-  cleared, so all four latch high after the first few cycles. `DMA_xfer` is
-  computed from `SC_dma` and then never used.
-
-**Display enable is bypassed.** `rcastudioii.sv:67-68` hardwires
-`.disp_on(1'b1), .disp_off(1'b0)`, so `INP 1` / `OUT 1` do nothing and the
-display can never be turned off. The `io_n[0]` version is commented out
-directly above.
-
-**Sync generation is ad-hoc.** `HSync` is a hardcoded window at horizontal
-counter 108–111 (`:300`); `VSync` at lines 252–262 (`:297`); `EFx` and `INT`
-windows (`:294-295`) are approximations rather than the datasheet's 4-line
-display-status pulses. `end_addr`, `hsync_pixel`, `vsync_line` are declared and
-unused. Six `tmp_*` registers are dead.
-
-### 6.3 System glue — `rtl/rcastudioii.sv`
-
-- **No memory decode.** A single 4 KB dpram backs everything (`:232-244`).
-  Address is truncated to `ram_a[11:0]`, ROM and RAM live in the same array, and
-  the only protection is `cpu_wr` allowing writes in `$800-$9FF` (`:231`). The
-  documented mirroring is not implemented; cartridge regions `$0A00-$0BFF` and
-  `$0E00-$0FFF` are not decoded.
-- **The cartridge loader ignores the ST2 format.** `:235` does
-  `ioctl_addr[11:0] + 12'h0400`, a flat copy. `.st2` files load with their
-  256-byte header at `$0400` and every block at the wrong page. Only raw `.bin`
-  works — and the OSD only offers `F1,bin`, so `.st2` cannot even be selected.
-- **No sound.** `Q` (`:137`) is unused; `rtl/beep.sv` is never instantiated;
-  `RCAStudioII.sv:188-190` ties `AUDIO_L`/`AUDIO_R`/`AUDIO_S` to 0.
-- `:93` — `keylatch = cpu_dout[3:0]` is a blocking assignment in a clocked
-  block, and the qualifier `io_n[1] && io_out` is a bit test, so it also latches
-  on `OUT 3`, `OUT 6`, `OUT 7`. Should be `io_n == 3'd2`.
-- `:133` — `EF = {playerB[keylatch], playerA[keylatch], 1'b1, EFx}` indexes a
-  10-bit vector with a 4-bit latch; keys `10-15` read out of range. `EF[1]`
-  (EF2) is tied high, fine, but the whole expression needs a range guard.
-- `:47` — `reg [1:0] SC = 2'b10;` gives an initial value to a net driven by a
-  module output port.
-- `:22-23` — `clk_1m76` and `clk_vid` are inputs that are never used.
-- Keyboard mapping is PS/2 scancode only (`:102-124`); no joystick/gamepad
-  support, no `Clear`/reset key, and the mapping is a straight `1-0` / `Q-P`
-  row split rather than the 3×4 keypad layout MAME uses.
-- ~120 of 337 lines are commented-out dead code.
+### 6.3 No memory decode
+A single 4 KB dpram backs everything. The address is truncated to `ram_a[11:0]`,
+ROM and RAM share the array, and the only protection is `cpu_wr` allowing writes
+in `$800-$9FF`. The documented mirroring is not implemented, and the cartridge
+windows `$0A00-$0BFF`, `$0C00-$0DFF` and `$0E00-$0FFF` are not decoded.
 
 ### 6.4 Top level — `RCAStudioII.sv`
+- `VIDEO_ARX`/`VIDEO_ARY` are 0; should be 4:3 with the usual status-bit
+  selector (the correct version is commented out immediately above).
+- `CLK_VIDEO = clk_vid` (42.24 MHz) with `CE_PIXEL = 1'b1`, but the 1861
+  produces pixels in the 7.04 MHz `clk_sys` domain. `CE_PIXEL` must pulse once
+  per real pixel, or `CLK_VIDEO` should come from `clk_sys`.
+- `clk_1m76` is assigned in an `always` block but declared `wire`, and nothing
+  consumes it. `rcastudioii.sv` still takes `clk_1m76`/`clk_vid` inputs it never
+  uses.
+- No PAL support, no aspect/scanline options, no `Clear` button in the OSD, and
+  the BIOS is not embedded (the core is held in reset until one is loaded).
 
-- `:202-203` — `VIDEO_ARX = 0; VIDEO_ARY = 0`. Should be 4:3, with the usual
-  status-bit selector (the correct version is commented out immediately above).
-- `:331-332` — `CLK_VIDEO = clk_vid` (42.24 MHz) with `CE_PIXEL = 1'b1`, but the
-  pixie produces pixels and syncs in the 7.04 MHz `clk_sys` domain. `CE_PIXEL`
-  must pulse once per real pixel on `CLK_VIDEO`. Either drive `CLK_VIDEO` from
-  `clk_sys`, or generate a ÷6 pixel enable.
-- `:266-279` — `clk_1m76` is assigned in an `always` block but declared `wire`
-  at `:257`; it is also never consumed.
-- No PAL support, no aspect/scanline options, no `Clear` button in the OSD.
+### 6.5 Keypad mapping
+PS/2 scancode only, no joystick/gamepad support and no `Clear`/reset key. The
+mapping is a straight number-row / `P Q W E R T Y U I O` split rather than the
+3x4 keypad layout MAME uses.
 
-### 6.5 Project hygiene
-- `Readme.md` is still the MiSTer template readme.
+### 6.6 Minor
+- `sys/` is shared framework code and must not be edited; the remaining Quartus
+  warnings (unused SDRAM/SDIO pins, open-drain removal) all originate there and
+  are present in every MiSTer core.
 - `RCAStudioII.sdc` has no core-specific constraints beyond `derive_pll_clocks`.
-- `verilator/sim.vcd` (3.9 MB) is committed.
-- `.gitignore` covers neither `refs/` nor `software/`.
 
 ---
 
-## 7. Suggested roadmap
+## 7. Roadmap
 
-Do these in order; each one unblocks the next.
+### 7.1 Sound
+Wire `Q` to a tone generator with the NE555 decay envelope (§6.1).
 
-### 7.1 Replace the CPU with `rtl/cosmac.v`
-Highest leverage change in the repo. `rtl/cosmac.v` already has the complete
-instruction set, `IE`/`T`, interrupt and DMA state handling, and correct `SC`
-encoding. Compare against `refs/cosmac-vhdl/cosmac.vhdl` (the upstream VHDL) —
-the X-HDL translation needs review, particularly around `X`/`Z` literals in the
-opcode `parameter`s, which do not mean "don't care" in Verilog comparisons.
+### 7.2 ST2 loader
+Parse the header during `ioctl_download` — block count at offset 4, page table
+at 64-127 — and write each 256-byte block to `page[i] << 8`. Add
+`F1,st2,bin,rom` to `CONF_STR`. Port from `CPU_LoadST2Image` (§6.2).
 
-Its bus is *not* 1802-pin-compatible: 1 clock per machine cycle, separate
-`data_in`/`data_out`, non-multiplexed address. That is fine for us — just run it
-from a machine-cycle clock enable rather than from `clk_sys` directly.
+### 7.3 Memory decode
+Split ROM / cart / RAM with the documented mirroring and add the `$0A00-$0BFF`,
+`$0C00-$0DFF` and `$0E00-$0FFF` cartridge windows.
 
-The commented-out instantiation at `rtl/rcastudioii.sv:186-203` is a starting
-point but has `.int_req(INT_N)` wired to a signal that does not exist and
-`.wait_req(wait_req)` undeclared.
-
-### 7.2 Build a real CDP1861
-Port `refs/cosmac-vhdl/pixie/` (front end / back end / frame buffer) — the
-partial Verilog translations in `rtl/pixie/pixie_dp_*.v` are already there and
-unused. Cross-check timing against `refs/AVI1861/pld/{frame,line}.pld` and
-`mame/src/devices/video/cdp1861.cpp`.
-
-The front end must assert `DMAO` and consume the bytes the *CPU* delivers during
-DMA-OUT cycles, driven by `SC == 2'b10`. Delete the RAM-scraping path.
-
-### 7.3 Machine-cycle timing
-Run the CPU from a clock enable at 1.7897725 MHz ÷ 8 = 223.7 kHz machine cycles
-(or divide `clk_sys`/32 for 220 kHz). Once DMA steals cycles, game speed should
-fall into place. Validate against `refs/rca-studio2`, which documents its DMA
-timing model.
-
-### 7.4 Proper memory decode
-Split ROM / cart / RAM into separate blocks with the documented mirroring, and
-add the `$0A00-$0BFF` / `$0E00-$0FFF` cartridge windows.
-
-### 7.5 ST2 cartridge loader
-Parse the header during `ioctl_download`: read the block count at offset 4 and
-the page table at 64-127, then write each 256-byte block to
-`page[i] << 8`. Add `F1,st2,bin,rom` to `CONF_STR`. Reference implementations:
-`refs/rca-studio2/Studio2/code/` and `refs/emma_02/src/`.
-
-### 7.6 Sound
-Wire `Q` to a tone generator. `rtl/beep.sv` exists; the authentic version is an
-NE555 astable whose pitch decays ~50 % over 0.4 s after `Q` rises. MAME just
-uses a fixed beeper — the decay is what makes it sound like a Studio II.
-
-### 7.7 Fix the verilator sim, then keep it green
-Fix `Makefile` / `sim.v` (§4), drop the non-design files from `V_SRC`, and add
-a headless regression: run each cart in `software/carts/` for N frames and hash
-the framebuffer. That is the only practical way to catch regressions without
-Quartus.
-
-### 7.8 Polish
+### 7.4 Polish
 Aspect ratio, `CE_PIXEL`, joystick mapping, PAL option, OSD reset, embedded
-BIOS, and a real `Readme.md`.
+BIOS.
+
+### 7.5 Keep the comparison green
+Any RTL change should be re-checked against the reference emulator (§9) before
+committing. The regression is cheap — a few seconds per cartridge.
 
 ---
 
@@ -413,3 +345,106 @@ BIOS, and a real `Readme.md`.
   read because so much of it is commented-out history — git has that.
 - When changing timing or video, state which reference you matched against
   (MAME / Emma 02 / rca-studio2 / AVI1861) in the commit message.
+
+---
+
+## 9. Verifying against the reference emulator
+
+The core is checked frame-by-frame against Paul Robson's C emulator at
+`refs/rca-studio2/studio2-games/studio2`, which was extended for this purpose:
+an ST2 loader, a headless front end (`headless.c`, no SDL), PNG capture, an
+instruction trace and scripted keypresses.
+
+```sh
+cd refs/rca-studio2/studio2-games/studio2
+make headless          # -> ./studio2_headless   (links libc only)
+./studio2_headless --help
+```
+
+Both it and the RTL sim take the same `--frames`, `--press KEY@F[:H]`, `--shot`
+and `--ascii` options, so a comparison is a plain `diff`. The C emulator renders
+32 logical rows; the RTL renders 128 scanlines, so expand each reference row 4x:
+
+```sh
+# reference -> 128 lines
+./studio2_headless --frames 200 --press a5@40:20 --shot 200 --ascii --quiet \
+  | grep -E "^  [.#]+$" | sed 's/^  //' | tr '.' ' ' \
+  | awk '{for(i=0;i<4;i++) print}' > /tmp/c.txt
+
+# RTL -> 128 lines
+cd ../../../../verilator
+./obj_dir_headless/Vtop --frames 200 --press a5@40:20 --shot 200 --ascii \
+  | grep -E "^ *[0-9]+ \|" | sed 's/^ *[0-9]* |//; s/|$//' > /tmp/r.txt
+
+diff /tmp/c.txt /tmp/r.txt        # expect no output
+```
+
+Current score: **18 / 21 pixel-identical** (3 built-in-game frames + 18
+cartridges). The three that differ — `86677b`, `87201`, `Concentration Match` —
+render the same structure and the same number of content lines but different
+game state, because the BIOS updates an RNG seed in the ISR and any timing
+difference deals different cards.
+
+**The reference is authoritative for instruction *order*, not for cycle
+timing.** Its model gives the CPU zero cycles during all 128 display lines
+rather than 6 of every 14, so it runs ~952 instructions/frame where real
+hardware (and the RTL) does **1321**. Do not "fix" the RTL to match 952.
+
+For CPU debugging both sims emit the same trace layout; strip the differing
+first and last columns to diff them:
+
+```sh
+diff <(awk '{$1="";$NF="";print}' c.trace) <(awk '{$1="";$NF="";print}' rtl.trace)
+```
+
+Also useful: `tools/emma02.sh` unpacks Emma 02 (the definitive CDP1802
+multi-system emulator) from its own installer into `refs/emma_02/dist` with no
+build and no system install — handy as a second opinion, and it ships 38 `.st2`
+cartridges including an RCA test cart.
+
+---
+
+## 10. What changed (2026-08-12)
+
+The core went from "puts a picture on screen but most of the machine is
+stubbed" to pixel-identical output. Briefly, so the history is not lost:
+
+**CPU.** Interrupts never fired, for four stacked reasons: the transition into
+`INTERRUPT` was commented out; the commented test used `INT_N == 1` though it is
+active low; `IE` was never initialised (reset leaves it 1); and the `INTERRUPT`
+state never set `X=2`/`P=1`. `WAIT_N`'s run/pause test was inverted and only
+worked because the glue tied it low. `RET`, `DIS`, `SAV`, `MARK` were missing and
+`IDL` decoded as `LDN R0` — the BIOS ISR uses `RET` and `SAV` every frame, and
+`RET` was flagged `unsupported`. `SC` was driven with `<=` inside `always @*`
+and unassigned on most paths, inferring a latch, so the 1861 could never see a
+DMA or interrupt state code.
+
+**Timing.** The CPU ran one state per `clk_sys` (~16x too many instructions per
+frame) and `EXECUTE2` made every memory-reading instruction 3 machine cycles
+instead of 2, so the ISR's cycle-counting DMA sync loop could never lock. It now
+runs from a machine-cycle enable with 2-cycle instructions and lands on 1321
+instructions between interrupts, matching hardware.
+
+**Video.** `pixie_video_studioii.v` was not a 1861 at all — it ignored the CPU
+and scraped `$0900-$09FF` over a second dpram port, so DMA never stole cycles
+and the display base was hardwired. `rtl/pixie/cdp1861.v` replaces it: no frame
+buffer, DMA-driven, timing matched to MAME's `cdp1861` including the
+free-running DMA cadence the ISR synchronises against. Uniform pixel counters
+fixed a 74-pixel-wide active window (the old state machine bumped the horizontal
+counter from seven places and stalled); frames are now exactly 64x128. `INP 1` /
+`OUT 1` actually enable the display, and `INT`/`EF1` are gated on it.
+
+**Glue.** `SC` was a `reg` with an initialiser while driven by the CPU's output
+port, so the video saw a constant "DMA" state code. The keypad latch used a bit
+test so it also latched on `OUT 3/6/7`, with a blocking assignment; `EF` indexed
+the 10-bit player vectors with a 4-bit latch, reading past the end for keys
+10-15.
+
+**Build.** The `.qsf` was missing the `build_id.tcl` pre-flow hook, so synthesis
+could not start. Four core-specific Quartus warnings were cleared (undriven
+`cpu_din` and `LED_USER`, dead `mem_r`, a `casez` overlap). The SDL sim had never
+built on macOS: unquoted `-CFLAGS`, missing SDL2/OpenGL2 ImGui backends, a
+Verilator-4 `verilated_heavy.h`, a `NONE` macro colliding with
+`VerilatedTraceSigDirection::NONE`, internal signals needing `rootp->`, and
+`VGA_WIDTH` of 128 against a 64-pixel display — which is why it looked like
+garbage.

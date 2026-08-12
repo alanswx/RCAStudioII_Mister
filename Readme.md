@@ -1,48 +1,98 @@
 # RCA Studio II for MiSTer
 
-## General description
-This core contains the latest version of framework and will be updated when framework is updated. There will be no releases. This core is only for developers. Besides the framework, core demonstrates the basic usage. New or ported cores should use it as a template.
+A MiSTer FPGA core for the **RCA Studio II** (1977) — the RCA CDP1802
+("COSMAC") based console with CDP1861 "Pixie" video.
 
-It's highly recommended to follow the notes to keep it standardized for easier maintenance and collaboration with other developers.
+![status](https://img.shields.io/badge/status-playable-brightgreen)
 
-## Source structure
+## Status
 
-### Legend:
-* `<core_name>` - you have to use the same name where you see this in this manual. Basically it's your core name.
+Playable. The CDP1802 has the full instruction set the BIOS needs, interrupts
+and DMA, and runs at true machine-cycle timing. The video is a real CDP1861 —
+no frame buffer, fed by DMA through `R(0)` exactly as the hardware does.
 
-### Standard MiSTer core should have following folders:
-* `sys` - the framework. Basically it's prohibited to change any files in this folder. Framework updates may erase any customization in this folder. All MiSTer cores have to include sys folder as is from this core.
-* `rtl` - the actual source of core. It's up to the developer how to organize the inner structure of this folder. Exception is pll folder/files (see below).
-* `releases` - the folder where rbf files should be placed. format of each rbf is: <core_name>_YYYYMMDD.rbf (YYYYMMDD is date code of release).
+Output is **pixel-identical to a reference emulator on 18 of 21 test frames**.
+The three that differ are memory/dice games whose BIOS-updated RNG seed
+diverges, not rendering faults.
 
-### Other standard files:
-* `<core_name>.qpf`- quartus project file. Copy it as is and then modify the line `PROJECT_REVISION = "<core_name>"` according to your core name.
-* `<core_name>.qsf` - quartus settings file. In most cases you don't need to modify anything inside (although you may wont to adjust some settings in quartus - this is fine, but keep changes minimal). You also need to watch this file before you make a commit. Quartus in some conditions may "spit" all settings from different files into this file so it will become large. If you see this, then simply revert it to original file.
-* `<core_name>.srf` - optional file to disable some warnings which are safe to disable and make message list more clean, so you will have less chance to miss some important warnings. You are free to modify it.
-* `<core_name>.sdc` - optional file for constraints in case if core require some special constraints. You are free to modify it.
-* `<core_name>.sv` - glue logic between framework and core. This is where you adapt core specific signals to framework.
-* `files.qip` - list of all core files. You need to edit it manually to add/remove files. Quartus will use this file but can't edit it. If you add files in Quartus IDE, then they will be added to `<core_name>.qsf` which is recommended manually move them to `files.qip`.
-* `clean.bat` - windows batch file to clean the whole project from temporary files. In most cases you don't need to modify it.
-* `.gitignore` - list of files should be ignored by git, so temporary files wont be included in commits.
-* `jtag.cdf` - it will be produced when you compile the core. By clicking it in Quartus IDE, you will launch programmer where you can send the core to MiSTer over USB blaster cable (see manual for DE10-nano how to connect it). This file normally is not present on cleaned project and not included in commits.
+Not yet implemented: **sound**, the **`.st2` cartridge loader** (raw `.bin`
+only), full **memory decode/mirroring**, and PAL.
 
-### PLL:
-Framework implies use of at least one PLL in the core. Framework doesn't contain this PLL but requires it to be placed in `rtl` folder, so `pll` folder and `pll.v`, `pll.qip` files must be present, however PLL settings are up to the core.
+## Installing
 
-### Verilog Macros
+Copy a release from `releases/` to `/media/fat/_Console/` on your MiSTer.
 
-The following macros can be defined and will affect the framework features:
+The BIOS is **not** embedded. Load it from the OSD each boot:
 
-Macro          |   Effect
----------------|---------------------------------
-ARCADE_SYS     | Disables the UART and OSD status
-DEBUG_NOHDMI   | Disable HDMI-related modules. Speeds up compilation but only analogue/direct video is available
-DUAL_SDRAM     | Changes configuration of FPGA pins to work with dual SDRAM I/O boards
-USE_DDRAM      | Enables DDRAM ports of emu instance
-USE_SDRAM      | Enables SDRAM ports of emu instance
-USE_FB         | Allows to use framebuffer from the core
+| OSD slot | File | Loads at |
+|----------|------|----------|
+| `Load Bios` | `.rom` (2 KB, md5 `b37205bf19b197682f00619d05da194b`) | `$0000` |
+| `Load Cartridge` | `.bin` (512 or 1024 bytes) | `$0400` |
 
+The core is held in reset until a BIOS is loaded.
 
-# Quartus version
-Cores must be developed in **Quartus v17.0.x**. It's recommended to have updates, so it will be **v17.0.2**. Newer versions won't give any benefits to FPGA used in MiSTer, however they will introduce incompatibilities in project settings and it will make harder to maintain the core and collaborate with others. **So please stick to good old 17.0.x version.** You may use either Lite or Standard license.
+## Controls
 
+The Studio II has two 10-key keypads.
+
+| | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| **Player A** | `0` | `1` | `2` | `3` | `4` | `5` | `6` | `7` | `8` | `9` |
+| **Player B** | `P` | `Q` | `W` | `E` | `R` | `T` | `Y` | `U` | `I` | `O` |
+
+With no cartridge the BIOS built-in games start on **3**, **4** or **5**. Most
+cartridges start on **1** or **2**.
+
+## Building
+
+Quartus **17.0.x** only. If you do not have it installed, the build runs in the
+`raetro/quartus:mister` container:
+
+```sh
+tools/quartus-build.sh          # full build -> output_files/RCAStudioII.rbf
+tools/quartus-build.sh map      # analysis & synthesis only
+tools/quartus-build.sh clean
+```
+
+Resource use is modest: 19 % of ALMs, 7 % of block RAM, 3 of 6 PLLs, timing
+closed with +0.423 ns worst-case slack.
+
+## Simulators
+
+Two Verilator sims live in `verilator/` — an interactive SDL/ImGui one and a
+headless one used for regression testing. Both take the same options.
+
+```sh
+cd verilator
+make            # interactive -> ./obj_dir/Vtop
+make headless   # batch       -> ./obj_dir_headless/Vtop
+
+./obj_dir/Vtop --cart "../software/carts/TV Arcade I - Space War (USA).bin" --press a1@40:30
+./obj_dir_headless/Vtop --frames 200 --press a5@40:20 --shot 200 --ascii
+```
+
+`--press KEY@FRAME[:HOLD]` scripts a keypress; `KEY` is `0`-`9`, optionally
+prefixed `a`/`b` to pick the keypad. The headless sim also does PNG capture,
+CPU instruction tracing and VRAM dumps — see `--help`.
+
+## Documentation
+
+- `CLAUDE.md` — the working document: hardware reference the RTL must match,
+  source layout, build notes, remaining defects, roadmap, and how the core is
+  verified against a reference emulator.
+- `docs/` — hardware notes (memory map, I/O, video, cartridge format) scraped
+  from the classicgaming Studio 2 technical pages.
+
+## Credits
+
+- Core by Alan Steremberg.
+- CDP1861 timing cross-checked against MAME's `cdp1861` device.
+- Verified against Paul Robson's Studio II emulator (`refs/rca-studio2`), and
+  Emma 02 (etxmato) used as a second reference.
+
+## Licence
+
+GPL-2.0-or-later; see the file headers. Note `rtl/cosmac.v` and
+`rtl/reference/cosmac.vhdl` are Eric Smith's GPL-3.0 code — compatible with
+"GPL-2-or-later", but any release containing them is effectively GPL-3. They are
+reference only and are not compiled into the core.
