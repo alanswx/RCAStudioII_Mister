@@ -96,9 +96,9 @@ Instructions below are from the original RCA manuals — the text ones at
 [Digit Press](https://www.digitpress.com/library/manuals/rcastudio2/index.html)
 and the scanned ones in `docs/*.zip`. Nothing here is guessed.
 
-Scans for **Fun with Numbers, Math Fun, Biorhythm and Star Wars** are in `docs/`
-but are not written up yet; consult them directly, or use the measured table
-above.
+Manuals are in `docs/` as PDFs and scan zips. Cartridges with **no** manual
+available — Pinball, TV Bingo, Concentration Match, TV School House I and II,
+and the unidentified `86677b`/`87201` — are only in the measured table above.
 
 Every manual begins **"Press CLEAR"**. CLEAR is the Studio II's console reset
 button (see `docs/RCA_Studio_II_Service_Manual.pdf`, Figure 1); press **F3**, or
@@ -206,6 +206,36 @@ but curves are harder to hit well — and if the batter doesn't swing, a curve i
 more likely to be called a ball, a straight pitch a strike. The computer calls
 balls and strikes. Hit type shows in the lower left: `F` foul, `1` single,
 `2` double, `3` triple, `H` home run, `W` walk, `O` out.
+
+#### Star Wars
+
+**CLEAR**, then on keyboard A: **1** one player, **2** two players, **3**
+advanced one player (the computer scores automatically once it has escaped).
+Then answer `SPEED 1 2 3?` — **1** slow, **2** medium, **3** fast. In one-player
+games use keyboard A; in two-player either keyboard may pick the speed, and
+whichever one does starts as the chaser.
+
+Steer with **2/4/6/8** on your own keyboard. The catch is that the mapping
+**inverts with your role**: when you are being chased (you are the small ship)
+**2** is up, **8** down, **4** left, **6** right; when you are the pursuer (you
+are the viewfinder) **2** moves the enemy *down*, **8** up, **4** right, **6**
+left. First to destroy nine ships wins.
+
+#### TV Arcade II — Fun with Numbers
+
+**CLEAR**, then key **1** on keyboard A. A Mastermind variant: the computer picks
+a secret 3-digit number and you get 20 guesses, entered **on keyboard B**.
+
+Turns left show at the lower left, your guess right-of-centre, and the clue at
+the lower right — briefly, so read it quickly. Clues total 000–006: `000` no
+digit correct, `001` a digit correct but misplaced, `002` one correct and placed
+(or two correct but both misplaced), `006` you got it. Digits can repeat, and
+`0` counts.
+
+#### TV Mystic Series — Biorhythm
+
+**CLEAR**, then key **0** on keyboard A. Enter the birth date on keyboard B,
+then the start date on keyboard B.
 
 #### TV Casino Series — Blackjack
 
