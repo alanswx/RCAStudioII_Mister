@@ -2,6 +2,14 @@
 //
 //  CDP1861 "Pixie" video display controller.
 //
+//  Written 2026 by Alan Steremberg, replacing pixie_video_studioii.v by
+//  Jason Coombes (JasonA-dev) with additions by Flandango, whose module
+//  interface and Studio II integration this keeps.
+//
+//  Scanline windows and the DMA cadence follow MAME's cdp1861 device by
+//  Curt Coder (BSD-3-Clause); behaviour checked against Paul Robson's Studio II
+//  emulator.
+//
 //  This program is free software; you can redistribute it and/or modify it
 //  under the terms of the GNU General Public License as published by the Free
 //  Software Foundation; either version 2 of the License, or (at your option)

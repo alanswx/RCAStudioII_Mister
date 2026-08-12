@@ -1,5 +1,10 @@
 //============================================================================
 //
+//  RCA Studio II core glue: CPU + CDP1861 + RAM + keypad.
+//
+//  Original implementation by Jason Coombes (JasonA-dev), 2022, with MiSTer
+//  framework integration by Flandango. Extended 2026 by Alan Steremberg.
+//
 //  This program is free software; you can redistribute it and/or modify it
 //  under the terms of the GNU General Public License as published by the Free
 //  Software Foundation; either version 2 of the License, or (at your option)

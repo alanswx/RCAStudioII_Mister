@@ -85,10 +85,43 @@ CPU instruction tracing and VRAM dumps — see `--help`.
 
 ## Credits
 
-- Core by Alan Steremberg.
-- CDP1861 timing cross-checked against MAME's `cdp1861` device.
-- Verified against Paul Robson's Studio II emulator (`refs/rca-studio2`), and
-  Emma 02 (etxmato) used as a second reference.
+### Core
+
+- **Jason Coombes** ([@JasonA-dev](https://github.com/JasonA-dev)) — original
+  author and by far the largest contributor. Created the core in June 2022 and
+  developed it through March 2025: the first CDP1802 and CDP1861 Verilog, the
+  keypad, the memory map and the Verilator simulation harness this work builds
+  on.
+- **Flandango** ([@Flandango](https://github.com/Flandango)) — MiSTer framework
+  compatibility and early Pixie video work (September 2022).
+- **Alan Steremberg** ([@alanswx](https://github.com/alanswx)) — 1802
+  interrupts, DMA and machine-cycle timing; the DMA-driven CDP1861; the
+  reference-emulator comparison harness (August 2026).
+
+### Emulators and hardware references
+
+This core would not be correct without other people's work. In particular:
+
+- **Paul Robson** — his C Studio II emulator (`refs/studio2-games`, 2013) is the
+  reference the RTL is checked against frame by frame, and the source of the
+  homebrew test software. The ST2 loader and headless harness added for this
+  project are extensions of his emulator.
+- **Curt Coder** and the **MAME team** — MAME's `cdp1861` device and `studio2`
+  driver (BSD-3-Clause). The 1861's scanline windows and, critically, the
+  free-running DMA cadence the BIOS interrupt routine synchronises against were
+  taken from `cdp1861.cpp`; without it the display could not lock.
+- **Marcel van Tongeren** ([Emma 02](https://www.emma02.hobby-site.com/)) — the
+  definitive CDP1802 multi-system emulator, used as an independent second
+  opinion, and the source of a large `.st2` test corpus.
+- **Andrew Modla** ([@ajavamind](https://github.com/ajavamind)) — `rca-studio2`,
+  documenting precise CDP1802 DMA timing.
+- **Eric Smith** ([@brouhaha](https://github.com/brouhaha)) — his GPL-3 COSMAC
+  VHDL 1802 and Pixie implementation, long the reference for a correct 1802.
+- **dmadole** — AVI1861, a CPLD drop-in replacement for the 1861, useful as
+  cycle-exact hardware truth.
+- **kanpapa** — `cosmac_mbc`, a COSMAC MicroBoard with Pixie video.
+- The **classicgaming Studio 2 technical pages** (via the Internet Archive), the
+  source of everything in `docs/`.
 
 ## Licence
 

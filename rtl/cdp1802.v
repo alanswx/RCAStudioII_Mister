@@ -1,5 +1,11 @@
 //============================================================================
 //
+//  CDP1802 "COSMAC" CPU.
+//
+//  Original implementation by Jason Coombes (JasonA-dev), 2022.
+//  Extended 2026 by Alan Steremberg: interrupts, DMA-OUT, RET/DIS/SAV/MARK/IDL,
+//  and machine-cycle timing (2 cycles per instruction, 3 for long branch/skip).
+//
 //  This program is free software; you can redistribute it and/or modify it
 //  under the terms of the GNU General Public License as published by the Free
 //  Software Foundation; either version 2 of the License, or (at your option)

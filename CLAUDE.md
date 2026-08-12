@@ -9,6 +9,12 @@ Guidance for working in this repo. Read this before changing RTL.
 A MiSTer FPGA core for the **RCA Studio II** (1977), an RCA CDP1802 ("COSMAC")
 based console with CDP1861 "Pixie" video.
 
+Originally written by **Jason Coombes** (JasonA-dev) from June 2022, with MiSTer
+framework integration by **Flandango**. The 2026 interrupt/DMA/timing and video
+work is by **Alan Steremberg**. Credit for the emulators and hardware references
+this core is built and checked against is in §11 — read it before assuming any
+timing number here was derived from first principles.
+
 **State of the core: playable.** The CPU has the full instruction set the BIOS
 needs, interrupts and DMA; the video is a real CDP1861 driven by DMA, not a RAM
 scraper. Frames are **pixel-identical to the reference emulator on 18 of 21**
@@ -448,3 +454,31 @@ Verilator-4 `verilated_heavy.h`, a `NONE` macro colliding with
 `VerilatedTraceSigDirection::NONE`, internal signals needing `rootp->`, and
 `VGA_WIDTH` of 128 against a 64-pixel display — which is why it looked like
 garbage.
+
+---
+
+## 11. Credit where it is due
+
+The core is Jason Coombes' (JasonA-dev, June 2022 - March 2025) — the first
+CDP1802 and CDP1861 Verilog, the keypad, the memory map and the Verilator
+harness. Flandango did the MiSTer framework integration and early Pixie work.
+Everything in §10 is a modification of their design, not a rewrite from scratch:
+the module boundaries, the `files.qip` layout and the sim structure are theirs.
+
+The accuracy work depends entirely on other people's emulators:
+
+| Who | What | How it was used here |
+|-----|------|----------------------|
+| **Paul Robson** | C Studio II emulator, `refs/studio2-games` (2013) | The frame-by-frame reference (§9). The ST2 loader and headless harness added there are extensions of his code. Also the homebrew test software. |
+| **Curt Coder** / MAME | `cdp1861.cpp`, `studio2.cpp` (BSD-3-Clause) | Scanline windows, and the free-running DMA cadence (`2*8` start, `8*8` active, `6*8` wait) the BIOS ISR synchronises against. Without this the display cannot lock — it was the last blocker. |
+| **Marcel van Tongeren** | Emma 02 | Independent second opinion; `tools/emma02.sh` unpacks it. Ships 38 `.st2` carts including an RCA test cartridge. |
+| **Andrew Modla** | `ajavamind/rca-studio2` | CDP1802 DMA timing documentation. |
+| **Eric Smith** | `brouhaha/cosmac` VHDL 1802 + Pixie (GPL-3) | The long-standing reference for a correct 1802; `rtl/cosmac.v` is its X-HDL translation. |
+| **dmadole** | AVI1861 CPLD 1861 replacement | Cycle-exact hardware truth for 1861 sync/DMA. |
+| **kanpapa** | `cosmac_mbc` | Secondary HDL reference. |
+
+`docs/` is scraped from the classicgaming Studio 2 technical pages (via the
+Internet Archive).
+
+When changing timing or video, say which reference you matched against in the
+commit message — MAME, Emma 02, rca-studio2 or AVI1861 (§8).
