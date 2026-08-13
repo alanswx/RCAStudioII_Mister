@@ -271,26 +271,13 @@ version is an NE555 astable, ~625 Hz, whose pitch decays ~50 % over 0.4 s after
 `Q` rises — that decay is what makes it sound like a Studio II. MAME just uses a
 fixed beeper.
 
-### 6.2 No ST2 cartridge loader in RTL
-`rtl/rcastudioii.sv` does a flat `ioctl_addr[11:0] + 12'h0400` copy, so only raw
-`.bin` works, and the OSD only offers `F1,bin`. `.st2` files would load their
-256-byte header at `$0400` and every block at the wrong page.
-
-A **working reference implementation** now exists in
-`refs/rca-studio2/studio2-games/studio2/cpu.c` (`CPU_LoadST2Image`), verified
-against 46 cartridges. Note the page-validity rule it establishes: reject only
-the system ROM (`$00-$03`) and RAM (`$08-$09`) pages plus `$00` as the "unused"
-marker. `docs/cartridge.txt` says the valid targets are "400-7FF, A00-BFF and
-E00-FFF", but `race.st2` pages ROM into **`$0C00-$0DFF`** over the default RAM
-mirror, which is why the memory map lists `$C00-$DFF` as RAM/ROM.
-
-### 6.3 No memory decode
+### 6.2 No memory decode
 A single 4 KB dpram backs everything. The address is truncated to `ram_a[11:0]`,
 ROM and RAM share the array, and the only protection is `cpu_wr` allowing writes
 in `$800-$9FF`. The documented mirroring is not implemented, and the cartridge
 windows `$0A00-$0BFF`, `$0C00-$0DFF` and `$0E00-$0FFF` are not decoded.
 
-### 6.4 Top level — `RCAStudioII.sv`
+### 6.3 Top level — `RCAStudioII.sv`
 - `VIDEO_ARX`/`VIDEO_ARY` are 0; should be 4:3 with the usual status-bit
   selector (the correct version is commented out immediately above).
 - `CLK_VIDEO = clk_vid` (42.24 MHz) with `CE_PIXEL = 1'b1`, but the 1861
@@ -302,12 +289,12 @@ windows `$0A00-$0BFF`, `$0C00-$0DFF` and `$0E00-$0FFF` are not decoded.
 - No PAL support, no aspect/scanline options, no `Clear` button in the OSD, and
   the BIOS is not embedded (the core is held in reset until one is loaded).
 
-### 6.5 Keypad mapping
+### 6.4 Keypad mapping
 PS/2 scancode only, no joystick/gamepad support. The
 mapping is a straight number-row / `P Q W E R T Y U I O` split rather than the
 3x4 keypad layout MAME uses.
 
-### 6.7 Minor
+### 6.5 Minor
 - `sys/` is shared framework code and must not be edited; the remaining Quartus
   warnings (unused SDRAM/SDIO pins, open-drain removal) all originate there and
   are present in every MiSTer core.
@@ -320,19 +307,14 @@ mapping is a straight number-row / `P Q W E R T Y U I O` split rather than the
 ### 7.1 Sound
 Wire `Q` to a tone generator with the NE555 decay envelope (§6.1).
 
-### 7.2 ST2 loader
-Parse the header during `ioctl_download` — block count at offset 4, page table
-at 64-127 — and write each 256-byte block to `page[i] << 8`. Add
-`F1,st2,bin,rom` to `CONF_STR`. Port from `CPU_LoadST2Image` (§6.2).
-
-### 7.3 Memory decode
+### 7.2 Memory decode
 Split ROM / cart / RAM with the documented mirroring and add the `$0A00-$0BFF`,
 `$0C00-$0DFF` and `$0E00-$0FFF` cartridge windows.
 
-### 7.4 Polish
+### 7.3 Polish
 Aspect ratio, `CE_PIXEL`, joystick mapping, PAL option, embedded BIOS.
 
-### 7.5 Keep the comparison green
+### 7.4 Keep the comparison green
 Any RTL change should be re-checked against the reference emulator (§9) before
 committing. The regression is cheap — a few seconds per cartridge.
 
@@ -410,6 +392,24 @@ cartridges including an RCA test cart.
 ---
 
 ## 10. What changed (2026-08-12)
+
+**ST2 cartridge loader, in RTL.** `rtl/rcastudioii.sv` now parses the paged
+`.st2` format during `ioctl_download`, so it works on the FPGA and not just in a
+host-side loader. Triggered by the `RCA2` magic in the first four bytes rather
+than the file extension, so a mis-named file still loads; the OSD extension index
+(`ioctl_index[7:6]`) is only a hint. The page table at header offsets 64-127 is
+latched into a 64-byte array as it streams past, then each 256-byte block is
+written to `page << 8`.
+
+Page validity follows the C reference, **not** `docs/cartridge.txt`: reject only
+the system ROM (`$00-$03`) and RAM (`$08-$09`) pages, plus `$00` as the unused
+marker. `$0C`/`$0D` are legal — `race.st2` pages ROM over the default RAM mirror
+there.
+
+Verified the strongest way available: for the five TOSEC titles that exist in
+both formats, loading the `.st2` gives **byte-identical output to the `.bin`**.
+The `.bin` regression is unchanged at 18/21.
+
 
 **CLEAR key.** Added, mapped to **F1** and an OSD "Clear" button, folded into
 `reset` (which drives the 1802's `CLEAR_N`). `docs/RCA_Studio_II_Service_Manual.pdf`

@@ -207,7 +207,7 @@ localparam CONF_STR = {
 	"RCA-StudioII;;",
 	"-;",	
 	"F0,rom,Load Bios;",
-	"F1,bin,Load Cartridge;",
+	"F1,ST2BINROM,Load Cartridge;",
 	"-;",
 //	"O[122:121],Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
 //	"O[2],TV Mode,NTSC,PAL;",
@@ -302,7 +302,7 @@ wire download_reset = download_reset_cnt != 0;
 always @(posedge CLK_50M) begin
 	if(ioctl_download || status[0] || buttons[1] || RESET ) download_reset_cnt <= 8'd255;
 	else if(download_reset_cnt != 0) download_reset_cnt <= download_reset_cnt - 8'd1;
-	if(ioctl_download && ioctl_index == 0 && ioctl_addr == 24'd100) rom_loaded <= 1'b1;
+	if(ioctl_download && ioctl_index[5:0] == 0 && ioctl_addr == 24'd100) rom_loaded <= 1'b1;
 end
 
 reg rom_loaded = 0;

@@ -257,12 +257,71 @@ reg cpu_wr;
 //reg clk_mem;
 //assign clk_mem = ioctl_download ? clk_vid : clk_sys;
 assign cpu_wr = (ram_a[11:0] >= 12'h800 && ram_a[11:0] < 12'hA00) ? ram_wr : 1'b0;
+
+////////////////// CARTRIDGE LOADER /////////////////////////////////////////
+//
+// Raw .bin/.rom images are a flat copy to $0400. .st2 images are paged: a
+// 256-byte header followed by 256-byte blocks, each block's target page taken
+// from the table at header offsets 64-127 (docs/cartridge.txt).
+//
+// The format is detected from the "RCA2" magic in the first four bytes rather
+// than the file extension, so a mis-named file still loads correctly. The OSD
+// extension index (ioctl_index[7:6], 0 = ST2 in the CONF_STR list) is kept only
+// as a hint for the case where a header-less file is picked as .st2.
+//
+// Reference implementation, verified against 46 cartridges:
+// refs/rca-studio2/studio2-games/studio2/cpu.c  CPU_LoadST2Image().
+
+wire        bios_dl = ioctl_download && (ioctl_index[5:0] == 6'd0);
+wire        cart_dl = ioctl_download && (ioctl_index[5:0] == 6'd1);
+
+reg  [2:0]  st2_magic;                  // running match on "RCA"
+reg         st2_mode;                   // "RCA2" seen: treat as paged
+reg  [7:0]  st2_page [0:63];            // page table, header offsets 64..127
+
+always @(posedge clk_sys) begin
+	if (!ioctl_download) begin
+		st2_magic <= 3'b000;
+		st2_mode  <= 1'b0;
+	end
+	else if (cart_dl && ioctl_wr) begin
+		case (ioctl_addr[15:0])
+			16'd0: st2_magic[0] <=  (ioctl_dout == 8'h52);                    // 'R'
+			16'd1: st2_magic[1] <=  (ioctl_dout == 8'h43) & st2_magic[0];     // 'C'
+			16'd2: st2_magic[2] <=  (ioctl_dout == 8'h41) & st2_magic[1];     // 'A'
+			16'd3: st2_mode     <=  (ioctl_dout == 8'h32) & st2_magic[2];     // '2'
+			default: ;
+		endcase
+		if (ioctl_addr >= 16'd64 && ioctl_addr < 16'd128)
+			st2_page[ioctl_addr[5:0]] <= ioctl_dout;
+	end
+end
+
+// Byte at ioctl_addr belongs to block (addr>>8)-1; its page comes from the table.
+wire  [5:0] st2_blk   = ioctl_addr[13:8] - 6'd1;
+wire  [7:0] st2_pg    = st2_page[st2_blk];
+
+// A page is loadable if it is cartridge space inside the 4k bank we model: not the
+// system ROM ($00-$03), not RAM ($08-$09), and below $10. $0C/$0D ARE legal --
+// race.st2 pages ROM over the default RAM mirror there, which is why the memory
+// map calls $C00-$DFF "RAM/ROM". $00 is also the format's "unused block" marker.
+wire        st2_pg_ok = (st2_pg[7:4] == 4'h0) && (st2_pg[3:0] > 4'h3)
+                        && (st2_pg[3:0] != 4'h8) && (st2_pg[3:0] != 4'h9);
+
+wire        st2_data  = ioctl_addr >= 16'd256;          // past the header
+wire [11:0] cart_a    = st2_mode ? {st2_pg[3:0], ioctl_addr[7:0]}
+                                 : (ioctl_addr[11:0] + 12'h400);
+wire        cart_we   = cart_dl && ioctl_wr && (!st2_mode || (st2_data && st2_pg_ok));
+
+wire [11:0] dl_a  = bios_dl ? ioctl_addr[11:0] : cart_a;
+wire        dl_we = bios_dl ? ioctl_wr : cart_we;
+
 dpram #(8, 12) dpram
 (
 	.clock(clk_sys),
 	.ram_cs(1'b1),
-	.address_a(ioctl_download ? ioctl_addr[11:0] + (ioctl_index > 0 ? 12'h0400 : 12'h0 ) : ram_a[11:0]),
-	.wren_a(ioctl_wr | cpu_wr),
+	.address_a(ioctl_download ? dl_a : ram_a[11:0]),
+	.wren_a(dl_we | cpu_wr),
 	.data_a(ioctl_download ? ioctl_dout : ram_d),
 	.q_a(ram_q),
 

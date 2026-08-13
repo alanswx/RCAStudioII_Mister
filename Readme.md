@@ -15,8 +15,7 @@ Output is **pixel-identical to a reference emulator on 18 of 21 test frames**.
 The three that differ are memory/dice games whose BIOS-updated RNG seed
 diverges, not rendering faults.
 
-Not yet implemented: **sound**, the **`.st2` cartridge loader** (raw `.bin`
-only), full **memory decode/mirroring**, and PAL.
+Not yet implemented: **sound**, full **memory decode/mirroring**, and PAL.
 
 ## Installing
 
@@ -27,7 +26,7 @@ The BIOS is **not** embedded. Load it from the OSD each boot:
 | OSD slot | File | Loads at |
 |----------|------|----------|
 | `Load Bios` | `.rom` (2 KB, md5 `b37205bf19b197682f00619d05da194b`) | `$0000` |
-| `Load Cartridge` | `.bin` (512 or 1024 bytes) | `$0400` |
+| `Load Cartridge` | `.st2`, `.bin`, `.rom` | `.bin`/`.rom` flat at `$0400`; `.st2` paged per its header |
 
 The core is held in reset until a BIOS is loaded.
 
