@@ -42,7 +42,8 @@ module rcastudioii
 	output reg         VBlank,
 	output reg         VSync,
 	output reg         video_de,
-	output             video
+	output             video,
+	output             audio
 );
 
 ////////////////// VIDEO //////////////////////////////////////////////////////////////////
@@ -257,6 +258,58 @@ reg cpu_wr;
 //reg clk_mem;
 //assign clk_mem = ioctl_download ? clk_vid : clk_sys;
 assign cpu_wr = (ram_a[11:0] >= 12'h800 && ram_a[11:0] < 12'hA00) ? ram_wr : 1'b0;
+
+
+////////////////// SOUND ////////////////////////////////////////////////////
+//
+// The Studio II beeper is an NE555 astable gated by the 1802's Q line (SEQ/REQ).
+// Per docs/sound.txt the control pin is tied to 0V through a 10uF electrolytic,
+// which decays the pitch to about half over ~0.4s -- that droop is the "warpy"
+// power-up sound, and it is what makes it recognisable. MAME just uses a fixed
+// 300Hz beeper and flags the discrete circuit as unimplemented, so this follows
+// the hardware description instead.
+//
+// ce_pix is the 1861 pixel rate (~1.76MHz), which is also the CPU clock, so:
+//   625Hz  -> half period 1.76e6/(2*625) ~= 1408 ticks
+//   312Hz  -> 2816 ticks
+//   0.4s   -> ~704000 ticks, so step the half period every ~500; 512 is close
+//             enough and is a free shift.
+
+localparam [15:0] SND_HALF_MIN = 16'd1408;   // ~625 Hz, freshly gated on
+localparam [15:0] SND_HALF_MAX = 16'd2816;   // ~312 Hz, fully decayed
+
+reg [15:0] snd_half;
+reg [15:0] snd_cnt;
+reg  [8:0] snd_decay;
+reg        snd_out;
+
+always @(posedge clk_sys) begin
+	if (reset) begin
+		snd_half  <= SND_HALF_MIN;
+		snd_cnt   <= 16'd0;
+		snd_decay <= 9'd0;
+		snd_out   <= 1'b0;
+	end
+	else if (ce_pix) begin
+		if (!Q) begin                                  // gated off: recharge, output idle
+			snd_half  <= SND_HALF_MIN;
+			snd_cnt   <= 16'd0;
+			snd_decay <= 9'd0;
+			snd_out   <= 1'b0;
+		end
+		else begin
+			snd_decay <= snd_decay + 1'b1;
+			if (&snd_decay && (snd_half < SND_HALF_MAX)) snd_half <= snd_half + 1'b1;
+			if (snd_cnt >= snd_half) begin
+				snd_cnt <= 16'd0;
+				snd_out <= ~snd_out;
+			end
+			else snd_cnt <= snd_cnt + 1'b1;
+		end
+	end
+end
+
+assign audio = snd_out;
 
 ////////////////// CARTRIDGE LOADER /////////////////////////////////////////
 //

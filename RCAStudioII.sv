@@ -184,10 +184,12 @@ assign VGA_F1 = 0;
 assign VGA_SCALER = 0;
 assign HDMI_FREEZE = 0;
 
-assign AUDIO_S = 0;
-assign AUDIO_L = 0;
-assign AUDIO_R = 0;
-assign AUDIO_MIX = 0;
+// Beeper: a square wave gated by the 1802's Q line, generated in rcastudioii.sv.
+wire audio;
+assign AUDIO_S   = 1'b1;                                   // signed samples
+assign AUDIO_L   = audio ? 16'sd6000 : -16'sd6000;
+assign AUDIO_R   = AUDIO_L;
+assign AUDIO_MIX = 2'd0;
 
 assign LED_DISK = 0;
 assign LED_POWER = 0;
@@ -339,7 +341,8 @@ rcastudioii rcastudio
 	.VBlank(VBlank),
 	.VSync(VSync),
   	.video_de(),
-	.video(video)
+	.video(video),
+	.audio(audio)
 );
 
 assign CLK_VIDEO = clk_vid;

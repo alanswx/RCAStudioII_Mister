@@ -264,20 +264,13 @@ same 2 KB as space-separated hex text (6144 bytes).
 Most of the original defect list is fixed — see §10 for what changed. What
 remains, ordered by impact.
 
-### 6.1 No sound
-`Q` (`rtl/rcastudioii.sv`) is still unused, `rtl/beep.sv` is never instantiated,
-and `RCAStudioII.sv` ties `AUDIO_L`/`AUDIO_R`/`AUDIO_S` to 0. The authentic
-version is an NE555 astable, ~625 Hz, whose pitch decays ~50 % over 0.4 s after
-`Q` rises — that decay is what makes it sound like a Studio II. MAME just uses a
-fixed beeper.
-
-### 6.2 No memory decode
+### 6.1 No memory decode
 A single 4 KB dpram backs everything. The address is truncated to `ram_a[11:0]`,
 ROM and RAM share the array, and the only protection is `cpu_wr` allowing writes
 in `$800-$9FF`. The documented mirroring is not implemented, and the cartridge
 windows `$0A00-$0BFF`, `$0C00-$0DFF` and `$0E00-$0FFF` are not decoded.
 
-### 6.3 Top level — `RCAStudioII.sv`
+### 6.2 Top level — `RCAStudioII.sv`
 - `VIDEO_ARX`/`VIDEO_ARY` are 0; should be 4:3 with the usual status-bit
   selector (the correct version is commented out immediately above).
 - `CLK_VIDEO = clk_vid` (42.24 MHz) with `CE_PIXEL = 1'b1`, but the 1861
@@ -289,12 +282,12 @@ windows `$0A00-$0BFF`, `$0C00-$0DFF` and `$0E00-$0FFF` are not decoded.
 - No PAL support, no aspect/scanline options, no `Clear` button in the OSD, and
   the BIOS is not embedded (the core is held in reset until one is loaded).
 
-### 6.4 Keypad mapping
+### 6.3 Keypad mapping
 PS/2 scancode only, no joystick/gamepad support. The
 mapping is a straight number-row / `P Q W E R T Y U I O` split rather than the
 3x4 keypad layout MAME uses.
 
-### 6.5 Minor
+### 6.4 Minor
 - `sys/` is shared framework code and must not be edited; the remaining Quartus
   warnings (unused SDRAM/SDIO pins, open-drain removal) all originate there and
   are present in every MiSTer core.
@@ -304,17 +297,14 @@ mapping is a straight number-row / `P Q W E R T Y U I O` split rather than the
 
 ## 7. Roadmap
 
-### 7.1 Sound
-Wire `Q` to a tone generator with the NE555 decay envelope (§6.1).
-
-### 7.2 Memory decode
+### 7.1 Memory decode
 Split ROM / cart / RAM with the documented mirroring and add the `$0A00-$0BFF`,
 `$0C00-$0DFF` and `$0E00-$0FFF` cartridge windows.
 
-### 7.3 Polish
+### 7.2 Polish
 Aspect ratio, `CE_PIXEL`, joystick mapping, PAL option, embedded BIOS.
 
-### 7.4 Keep the comparison green
+### 7.3 Keep the comparison green
 Any RTL change should be re-checked against the reference emulator (§9) before
 committing. The regression is cheap — a few seconds per cartridge.
 
@@ -392,6 +382,20 @@ cartridges including an RCA test cart.
 ---
 
 ## 10. What changed (2026-08-12)
+
+**Sound.** The beeper is implemented: a square wave gated by the 1802's Q line,
+with the pitch decay `docs/sound.txt` describes (NE555 astable whose control pin
+sits on a 10uF cap, drooping to about half pitch over ~0.4s -- the "warpy"
+power-up sound). ~625Hz fresh, ~312Hz fully decayed, recharging whenever Q drops.
+MAME uses a flat 300Hz beeper and marks the discrete circuit unimplemented, so
+this follows the hardware description instead.
+
+Q itself was verified against the reference emulator before wiring anything up,
+by logging every edge in both (`--trace-q`, in both simulators). On the built-in
+Addition game they agree on edge count, on beep durations (3, 3, 2 frames) and
+exactly on the third beep's frames; the small offset on the first two is the
+usual instruction-rate phase difference. Measured output is ~580-600Hz.
+
 
 **ST2 cartridge loader, in RTL.** `rtl/rcastudioii.sv` now parses the paged
 `.st2` format during `ioctl_download`, so it works on the FPGA and not just in a

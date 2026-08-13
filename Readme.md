@@ -15,7 +15,7 @@ Output is **pixel-identical to a reference emulator on 18 of 21 test frames**.
 The three that differ are memory/dice games whose BIOS-updated RNG seed
 diverges, not rendering faults.
 
-Not yet implemented: **sound**, full **memory decode/mirroring**, and PAL.
+Not yet implemented: full **memory decode/mirroring**, and PAL.
 
 ## Installing
 

@@ -396,6 +396,7 @@ static void usage(const char* argv0) {
 "    --trace-from F       only start the CPU trace at frame F\n"
 "\n"
 "  Misc\n"
+"    --trace-q            log every Q (beeper) edge with its frame number\n"
 "    --frame-log          print one line per frame (frame, size, hash)\n"
 "    --quiet              suppress per-frame progress\n"
 "    --help\n", argv0);
@@ -426,6 +427,11 @@ int main(int argc, char** argv) {
     bool want_ppm = false, want_ascii = false, want_vram = false;
     bool shot_last = false, frame_log = false, quiet = false;
     long trace_cpu = 0, trace_from = 0;
+    bool trace_q = false;
+    // Q gates the Studio II's beeper; track its edges so the core can be compared
+    // against the reference emulator's Q even though AUDIO_L/R are still tied off.
+    bool q_prev = false; long q_edges = 0, q_on_frames = 0; long q_last_chg = 0;
+    bool a_prev = false; long a_edges = 0;   // beeper output transitions
     std::set<long> shots, dumps;
     std::vector<KeyEvent> keys;
 
@@ -454,6 +460,7 @@ int main(int argc, char** argv) {
         else if (a == "--ppm")        want_ppm = true;
         else if (a == "--ascii")      want_ascii = true;
         else if (a == "--vram")       want_vram = true;
+        else if (a == "--trace-q")    trace_q = true;
         else if (a == "--frame-log")  frame_log = true;
         else if (a == "--quiet")      quiet = true;
         else if (a == "--press") {
@@ -570,6 +577,19 @@ int main(int argc, char** argv) {
         // Sample video on the rising edge (ce_pix is tied high in sim.v)
         bool boundary = fg.clock(top->VGA_VS, top->VGA_HS, top->VGA_DE,
                                  top->VGA_R != 0);
+
+        {
+            bool a_now = top->rootp->top__DOT__audio != 0;
+            if (a_now != a_prev) { a_prev = a_now; a_edges++; }
+            bool q_now = CPU(Q) != 0;
+            if (q_now != q_prev) {
+                if (q_prev) q_on_frames += (fg.frame - q_last_chg);
+                q_last_chg = fg.frame;
+                q_prev = q_now;
+                q_edges++;
+                if (trace_q) printf("Q %d frame %ld  (audio edges so far %ld)\n", q_now ? 1 : 0, (long)fg.frame, a_edges);
+            }
+        }
 
         if (boundary && fg.complete) {
             long f = fg.frame - 1;   // the frame that just finished

@@ -33,7 +33,7 @@ module top(
 );
    
    // Core inputs/outputs
-   wire [7:0] audio;
+   wire audio;   // 1-bit beeper, gated by the 1802's Q line
    wire [3:0] led/*verilator public_flat*/;
 
    wire VSync, HSync;
@@ -53,7 +53,7 @@ module top(
    assign VGA_B = video ? 'hFF : 'h00;
     
    // MAP OUTPUTS
-   assign AUDIO_L = {audio,audio};
+   assign AUDIO_L = audio ? 16'sd6000 : -16'sd6000;
    assign AUDIO_R = AUDIO_L;
 
 wire ce_pix = 1'b1;
@@ -101,7 +101,8 @@ rcastudioii rcastudio
 
 	.video_de(video_de),
 
-	.video(video)
+	.video(video),
+	.audio(audio)
 );
 
 endmodule
