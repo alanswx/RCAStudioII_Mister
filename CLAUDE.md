@@ -395,9 +395,10 @@ cartridges including an RCA test cart.
 
 **ST2 cartridge loader, in RTL.** `rtl/rcastudioii.sv` now parses the paged
 `.st2` format during `ioctl_download`, so it works on the FPGA and not just in a
-host-side loader. Triggered by the `RCA2` magic in the first four bytes rather
-than the file extension, so a mis-named file still loads; the OSD extension index
-(`ioctl_index[7:6]`) is only a hint. The page table at header offsets 64-127 is
+host-side loader. Triggered purely by the `RCA2` magic in the first four bytes —
+the OSD extension index is deliberately not used, since a valid `.st2` always
+carries the magic and going on the magic alone means a mis-named file still
+loads. `CONF_STR` is `"F1,ST2BINROM"` so the browser offers all three. The page table at header offsets 64-127 is
 latched into a 64-byte array as it streams past, then each 256-byte block is
 written to `page << 8`.
 

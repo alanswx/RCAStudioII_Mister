@@ -264,10 +264,11 @@ assign cpu_wr = (ram_a[11:0] >= 12'h800 && ram_a[11:0] < 12'hA00) ? ram_wr : 1'b
 // 256-byte header followed by 256-byte blocks, each block's target page taken
 // from the table at header offsets 64-127 (docs/cartridge.txt).
 //
-// The format is detected from the "RCA2" magic in the first four bytes rather
-// than the file extension, so a mis-named file still loads correctly. The OSD
-// extension index (ioctl_index[7:6], 0 = ST2 in the CONF_STR list) is kept only
-// as a hint for the case where a header-less file is picked as .st2.
+// The format is detected purely from the "RCA2" magic in the first four bytes.
+// The OSD extension index (ioctl_index[7:6]) is deliberately NOT used: a valid
+// .st2 always carries the magic, so the extension adds nothing, and going on the
+// magic alone means a mis-named or mis-picked file still loads correctly. The
+// CONF_STR entry "F1,ST2BINROM" exists so the file browser offers all three.
 //
 // Reference implementation, verified against 46 cartridges:
 // refs/rca-studio2/studio2-games/studio2/cpu.c  CPU_LoadST2Image().
