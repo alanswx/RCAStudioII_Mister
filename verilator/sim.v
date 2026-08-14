@@ -7,6 +7,7 @@ module top(
    input clk_24,
    input [11:0]  inputs/*verilator public_flat*/,
    input [31:0]  joystick_0/*verilator public_flat*/,
+   input [2:0]   joy_override/*verilator public_flat*/,
 
    output [7:0] VGA_R/*verilator public_flat*/,
    output [7:0] VGA_G/*verilator public_flat*/,
@@ -105,7 +106,8 @@ rcastudioii rcastudio
 	.video(video),
 	.audio(audio),
 	.joystick_0(joystick_0),
-	.joystick_1(32'd0)
+	.joystick_1(32'd0),
+	.joy_override(joy_override)
 );
 
 endmodule

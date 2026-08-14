@@ -282,19 +282,7 @@ windows `$0A00-$0BFF`, `$0C00-$0DFF` and `$0E00-$0FFF` are not decoded.
 - No PAL support, no aspect/scanline options, no `Clear` button in the OSD, and
   the BIOS is not embedded (the core is held in reset until one is loaded).
 
-### 6.3 Joystick mapping for the built-in games
-Gamepads work via a per-cartridge profile chosen from a CRC16 of the image
-(§10). With no cartridge there is nothing to CRC, so all five BIOS built-ins
-share one profile -- currently `FREEWAY`, which is wrong for Bowling and for
-Doodles/Patterns. `MAP_BOWLING` is defined but unreachable for that reason.
-
-The built-ins are selected by a keypress after reset rather than by a cartridge,
-so fixing this needs a different signal: watch which key starts them (A1 Doodles,
-A2 Patterns, A3 Freeway, A4 Bowling, A5 Addition) and switch profile on that. The
-mapping is a straight number-row / `P Q W E R T Y U I O` split rather than the
-3x4 keypad layout MAME uses.
-
-### 6.4 Minor
+### 6.3 Minor
 - `sys/` is shared framework code and must not be edited; the remaining Quartus
   warnings (unused SDRAM/SDIO pins, open-drain removal) all originate there and
   are present in every MiSTer core.
@@ -396,6 +384,12 @@ profiles. This is necessary rather than ornamental: the Studio II has no
 joystick, so each game chose its own keys -- Tennis moves the racquet on 2/8 but
 uses 4/5/6 for racquet size, and Space War fires on keypad A while steering on
 keypad B. Presses are OR'd with the keyboard. Unknown cartridges get `CROSS`.
+
+The five BIOS built-ins have no cartridge to CRC, so they are told apart by the
+key that starts them (A1 Doodles, A2 Patterns, A3 Freeway, A4 Bowling, A5
+Addition), latching on the first press after reset only -- those keys are reused
+during play. An OSD "Joystick" setting overrides the whole thing, since the table
+can only be as good as its entries.
 
 Eight cartridges are mapped explicitly; ten are deliberately left on the default
 because they are number-entry games a stick cannot drive, or are unidentified.

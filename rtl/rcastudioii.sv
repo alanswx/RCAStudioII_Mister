@@ -37,6 +37,7 @@ module rcastudioii
 	input       [10:0] ps2_key,
 	input       [31:0] joystick_0,
 	input       [31:0] joystick_1,
+	input        [2:0] joy_override,   // OSD: 0 = auto, else the profile to force
 	input  reg         ce_pix,
 
 	output reg         HBlank,
@@ -194,18 +195,50 @@ always @(posedge clk_sys) begin
 			16'hD0DA: map_profile <= MAP_CROSS;    // Speedway + Tag (USA)
 			16'hD13E: map_profile <= MAP_CROSS;    // Star Wars
 			16'h3CDC: map_profile <= MAP_CROSS;    // Gunfighter + Moonship Battle
-			16'hFFFF: map_profile <= MAP_FREEWAY;  // no cartridge: BIOS built-ins
 			default:  map_profile <= MAP_CROSS;    // unknown cart: the common case
 		endcase
 	end
 end
+
+// ---- built-in games -------------------------------------------------------
+// With no cartridge there is nothing to CRC, so the five BIOS games are told
+// apart by the key that starts them (service manual pp.7-8): A1 Doodles,
+// A2 Patterns, A3 Freeway, A4 Bowling, A5 Addition. Only the *first* such press
+// after reset counts -- those keys are reused during play (A5 rolls the ball in
+// Bowling, for instance). Detection reads the keyboard vector rather than the
+// joystick-merged one, both because you pick the game before a profile exists
+// and to keep this out of the joystick combinational path.
+
+wire       no_cart = (cart_crc == 16'hFFFF);
+reg        builtin_sel;
+reg  [2:0] builtin_profile;
+
+always @(posedge clk_sys) begin
+	if (reset) begin
+		builtin_sel     <= 1'b0;
+		builtin_profile <= MAP_NONE;
+	end
+	else if (no_cart && !builtin_sel) begin
+		if      (playerA[1]) begin builtin_profile <= MAP_CROSS;   builtin_sel <= 1'b1; end  // Doodles
+		else if (playerA[2]) begin builtin_profile <= MAP_CROSS;   builtin_sel <= 1'b1; end  // Patterns
+		else if (playerA[3]) begin builtin_profile <= MAP_FREEWAY; builtin_sel <= 1'b1; end  // Freeway
+		else if (playerA[4]) begin builtin_profile <= MAP_BOWLING; builtin_sel <= 1'b1; end  // Bowling
+		else if (playerA[5]) begin builtin_profile <= MAP_NONE;    builtin_sel <= 1'b1; end  // Addition: digits
+	end
+end
+
+// ---- effective profile: OSD override wins over auto-detection ---------------
+wire [2:0] auto_profile = no_cart ? builtin_profile : map_profile;
+// OSD list is Auto, Cross, Paddle, Space War, Freeway, Bowling, Baseball -- and after
+// Auto those line up 1:1 with MAP_CROSS..MAP_BASEBALL, so no adjustment is needed.
+wire [2:0] profile      = (joy_override == 3'd0) ? auto_profile : joy_override;
 
 // ---- profile -> keypad presses ---------------------------------------------
 reg [9:0] joyA, joyB;
 always @* begin
 	joyA = 10'd0;
 	joyB = 10'd0;
-	case (map_profile)
+	case (profile)
 	MAP_CROSS: begin
 		if (joystick_0[3]) joyA[2] = 1'b1;   if (joystick_0[2]) joyA[8] = 1'b1;
 		if (joystick_0[1]) joyA[4] = 1'b1;   if (joystick_0[0]) joyA[6] = 1'b1;

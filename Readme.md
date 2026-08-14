@@ -117,14 +117,30 @@ a guess:
 These three are also the ones whose frames diverge from the reference emulator,
 so treat them as untested rather than working.
 
-#### Known limitation: the built-in games
+#### Built-in games
 
-With no cartridge inserted there is nothing to CRC, so all five BIOS games share
-one profile. It is set to `FREEWAY`, which is right for Freeway but wrong for
-Bowling (which wants `BOWLING`) and for Doodles and Patterns (which want
-`CROSS`). `BOWLING` is defined but currently unreachable for exactly this reason.
-Fixing it needs a different signal than the cartridge CRC — the built-ins are
-chosen by a keypress after reset, not by a cartridge.
+There is no cartridge to CRC, so the five BIOS games are told apart by the key
+that starts them — only the first such press after reset counts, since those keys
+get reused during play (`A5` rolls the ball in Bowling):
+
+| Game | Start | Profile |
+|------|-------|---------|
+| Doodles | `A1` | `CROSS` |
+| Patterns | `A2` | `CROSS` |
+| Freeway | `A3` | `FREEWAY` |
+| Bowling | `A4` | `BOWLING` |
+| Addition | `A5` | none — the answers are digits |
+
+#### Overriding it
+
+The table can only be as good as its entries, and an unknown cartridge falls back
+to `CROSS`, which is a guess. So the OSD has a **Joystick** setting:
+
+`Auto` (default) · `Cross` · `Paddle` · `Space War` · `Freeway` · `Bowling` · `Baseball`
+
+`Auto` uses the detection above; anything else forces that profile regardless of
+the cartridge. Useful for the unmapped titles, for a homebrew `.st2` the table has
+never seen, or simply if you prefer different controls.
 
 #### Adding a cartridge
 

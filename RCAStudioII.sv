@@ -212,6 +212,8 @@ localparam CONF_STR = {
 	"F1,ST2BINROM,Load Cartridge;",
 	"J1,Fire;",
 	"-;",
+	"O[4:2],Joystick,Auto,Cross,Paddle,Space War,Freeway,Bowling,Baseball;",
+	"-;",
 //	"O[122:121],Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
 //	"O[2],TV Mode,NTSC,PAL;",
 	"-;",
@@ -348,7 +350,8 @@ rcastudioii rcastudio
 	.video(video),
 	.audio(audio),
 	.joystick_0(joystick_0),
-	.joystick_1(joystick_1)
+	.joystick_1(joystick_1),
+	.joy_override(status[4:2])
 );
 
 assign CLK_VIDEO = clk_vid;

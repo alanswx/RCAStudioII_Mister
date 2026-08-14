@@ -328,7 +328,7 @@ static void dump_state(FILE* f, long frame, const FrameGrabber& fg, bool with_vr
     fprintf(f, "-- Cartridge mapping --\n");
     {
         static const char* pn[] = {"NONE","CROSS","PADDLE","SPACEWAR","FREEWAY","BOWLING","BASEBALL"};
-        int pr = top->rootp->top__DOT__rcastudio__DOT__map_profile;
+        int pr = top->rootp->top__DOT__rcastudio__DOT__profile;
         fprintf(f, "  cart CRC16 %04X  ->  profile %d (%s)\n",
                 top->rootp->top__DOT__rcastudio__DOT__cart_crc, pr,
                 (pr >= 0 && pr < 7) ? pn[pr] : "?");
@@ -395,6 +395,8 @@ static void usage(const char* argv0) {
 "    --dump-file FILE     write dumps here instead of stdout\n"
 "\n"
 "  Input\n"
+"    --joy-map N          OSD joystick override: 0 auto, 1 cross, 2 paddle,\n"
+"                         3 spacewar, 4 freeway, 5 bowling, 6 baseball\n"
 "    --joy MASK@F[:H]     drive joystick 0 with MASK (bit0 right, 1 left, 2 down,\n"
 "                         3 up, 4 fire) at frame F for H frames.\n"
 "    --press KEY@F[:H]    press KEY at frame F, hold H frames (default 4).\n"
@@ -439,6 +441,7 @@ int main(int argc, char** argv) {
     long trace_cpu = 0, trace_from = 0;
     bool trace_q = false;
     uint32_t joy_mask = 0; long joy_from = -1, joy_to = -1;
+    uint8_t  joy_override = 0;   // applied once top exists
     // Q gates the Studio II's beeper; track its edges so the core can be compared
     // against the reference emulator's Q even though AUDIO_L/R are still tied off.
     bool q_prev = false; long q_edges = 0, q_on_frames = 0; long q_last_chg = 0;
@@ -480,6 +483,7 @@ int main(int argc, char** argv) {
             joy_mask = (uint32_t)strtoul(t.substr(0,at).c_str(), nullptr, 0);
             joy_from = atol(rest.c_str()); joy_to = joy_from + hold;
         }
+        else if (a == "--joy-map")    joy_override = (uint8_t)atoi(next("--joy-map"));
         else if (a == "--trace-q")    trace_q = true;
         else if (a == "--frame-log")  frame_log = true;
         else if (a == "--quiet")      quiet = true;
@@ -533,6 +537,7 @@ int main(int argc, char** argv) {
 
     Verilated::commandArgs(argc, argv);
     top = new Vtop();
+    top->joy_override = joy_override;
 
     IoctlDriver io;
     io.add(bios, 0);
