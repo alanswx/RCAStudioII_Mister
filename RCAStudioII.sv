@@ -35,8 +35,7 @@ module emu
 	//Must be based on CLK_VIDEO
 	output        CE_PIXEL,
 
-	//Video aspect ratio for HDMI. Most retro systems have ratio 4:3.
-	//if VIDEO_ARX[12] or VIDEO_ARY[12] is set then [11:0] contains scaled size instead of aspect ratio.
+	//Video aspect ratio for HDMI.
 	output [12:0] VIDEO_ARX,
 	output [12:0] VIDEO_ARY,
 
@@ -197,12 +196,11 @@ assign BUTTONS = 0;
 
 //////////////////////////////////////////////////////////////////////
 
-// Aspect ratio should be 4:3 by default, and allow the OSD selection to override
-// it for full-screen or custom scaling. This matches the status bit selector used
-// elsewhere in MiSTer and keeps the direct-video path aligned with the frame output.
+// Studio II drawn image (excluding all borders and blanking) aspect 
+// is close to (but not exactly) 13:8.
 wire [1:0] ar = status[122:121];
-wire [11:0] arx_in = (!ar) ? 12'd4 : (ar - 1'd1);
-wire [11:0] ary_in = (!ar) ? 12'd3 : 12'd0;
+wire [11:0] arx_in = (!ar) ? 12'd13 : (ar - 1'd1);
+wire [11:0] ary_in = (!ar) ? 12'd8 : 12'd0;
 
 wire        vga_de_freak;
 wire [12:0] video_arx_freak;
@@ -236,7 +234,7 @@ localparam CONF_STR = {
 	"F0,rom,Load Bios;",
 	"F1,ST2BINROM,Load Cartridge;",
 	"-;",
-//	"O[122:121],Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
+	"O[122:121],Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
 //	"O[2],TV Mode,NTSC,PAL;",
 	"-;",
 //	"T[0],Reset;",
