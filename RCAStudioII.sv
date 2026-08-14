@@ -220,8 +220,10 @@ localparam CONF_STR = {
 	// A0..B9 are direct per-key bindings (see rtl/rcastudioii.sv); jn gives
 	// defaults to the first three only, so the direct keys stay unbound until
 	// the user maps them deliberately.
-	"J1,Fire,Start,Select,A0,A1,A2,A3,A4,A5,A6,A7,A8,A9,B0,B1,B2,B3,B4,B5,B6,B7,B8,B9;",
-	"jn,A,Start,Select;",
+	// Fire/Extra mirror the MPT-02 joystick, the closest thing to an official
+	// Studio II controller: fire on 5, a second button on 0.
+	"J1,Fire,Extra,Start,Select,A0,A1,A2,A3,A4,A5,A6,A7,A8,A9,B0,B1,B2,B3,B4,B5,B6,B7,B8,B9;",
+	"jn,A,B,Start,Select;",
 	"V,v",`BUILD_DATE
 };
 
@@ -305,7 +307,7 @@ wire ce_pix = (ce_cnt == 2'd0);
 
 // Select on the gamepad is CLEAR, same as F3 and the OSD button: every RCA
 // manual begins "Press CLEAR", so it belongs on the pad next to Start.
-wire joy_clear = joystick_0[6] | joystick_1[6];
+wire joy_clear = joystick_0[7] | joystick_1[7];
 
 wire reset = RESET | status[0] | status[1] | clear_key | joy_clear | buttons[1] | ioctl_download | download_reset | ~rom_loaded;
 

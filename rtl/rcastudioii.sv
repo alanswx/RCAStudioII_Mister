@@ -152,8 +152,14 @@ reg  [9:0] playerB = 10'h0;
 //
 // Key numbers come from the RCA manuals (see Readme "How to play"), not guesses.
 // MiSTer joystick bits, per the CONF_STR "J1,..." list in RCAStudioII.sv:
-//   [0]=right [1]=left [2]=down [3]=up   [4]=Fire   [5]=Start   [6]=Select(CLEAR,
-//   folded into reset by the top level)   [16:7]=A0..A9   [26:17]=B0..B9.
+//   [0]=right [1]=left [2]=down [3]=up   [4]=Fire   [5]=Extra   [6]=Start
+//   [7]=Select(CLEAR, folded into reset by the top level)
+//   [17:8]=A0..A9   [27:18]=B0..B9.
+// Fire/Extra mirror the MPT-02 joystick (the Soundic/Hanimex Studio III
+// machines' swappable keypad controller): fire on 5, a second button on 0.
+// Extra only presses 0 in the profiles where 0 is documented and safe --
+// CROSS (the MPT-02's own layout) and PADDLE (0 pauses Tennis) -- never in
+// HOMEBREW, where A0 restarts Invaders.
 // A0..B9 are direct per-key bindings with no default mapping: they are inert
 // until the user binds them in Define Buttons, and then they always work, on
 // top of whatever profile is active.
@@ -278,13 +284,15 @@ function automatic [9:0] map_padA(input [3:0] prof, input [31:0] j);
 	begin
 		k = 10'd0;
 		case (prof)
-		MAP_CROSS: begin
+		MAP_CROSS: begin                     // the MPT-02 joystick layout
 			if (j[3]) k[2] = 1'b1;   if (j[2]) k[8] = 1'b1;
 			if (j[1]) k[4] = 1'b1;   if (j[0]) k[6] = 1'b1;
 			if (j[4]) k[5] = 1'b1;
+			if (j[5]) k[0] = 1'b1;           // Extra
 		end
 		MAP_PADDLE: begin                    // racquet moves on 2/8 only
 			if (j[3]) k[2] = 1'b1;   if (j[2]) k[8] = 1'b1;
+			if (j[5]) k[0] = 1'b1;           // Extra: 0 pauses/resumes Tennis
 		end
 		MAP_SPACEWAR:                        // fire
 			if (j[4]) k[2] = 1'b1;
@@ -328,13 +336,15 @@ function automatic [9:0] map_padB(input [3:0] prof, input [31:0] j);
 	begin
 		k = 10'd0;
 		case (prof)
-		MAP_CROSS: begin
+		MAP_CROSS: begin                     // the MPT-02 joystick layout
 			if (j[3]) k[2] = 1'b1;   if (j[2]) k[8] = 1'b1;
 			if (j[1]) k[4] = 1'b1;   if (j[0]) k[6] = 1'b1;
 			if (j[4]) k[5] = 1'b1;
+			if (j[5]) k[0] = 1'b1;           // Extra
 		end
 		MAP_PADDLE: begin
 			if (j[3]) k[2] = 1'b1;   if (j[2]) k[8] = 1'b1;
+			if (j[5]) k[0] = 1'b1;           // Extra: 0 pauses/resumes Tennis
 		end
 		MAP_SPACEWAR: begin                  // steering
 			if (j[1]) k[4] = 1'b1;   if (j[0]) k[6] = 1'b1;
@@ -377,11 +387,11 @@ reg [9:0] directA, directB;
 integer dk;
 always @* begin
 	for (dk = 0; dk < 10; dk = dk + 1) begin
-		directA[dk] = joystick_0[7+dk]  | joystick_1[7+dk];
-		directB[dk] = joystick_0[17+dk] | joystick_1[17+dk];
+		directA[dk] = joystick_0[8+dk]  | joystick_1[8+dk];
+		directB[dk] = joystick_0[18+dk] | joystick_1[18+dk];
 	end
 end
-wire       start_press = joystick_0[5] | joystick_1[5];
+wire       start_press = joystick_0[6] | joystick_1[6];
 wire [9:0] start_keys  = start_press ? (10'd1 << start_key) : 10'd0;
 
 wire [9:0] joyA = map_padA(profile, joystick_0) | directA | start_keys;

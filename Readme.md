@@ -70,19 +70,28 @@ keyboard, so both work at once.
 
 #### Profiles
 
-| Profile | Up | Down | Left | Right | Fire |
-|---------|----|------|------|-------|------|
-| `CROSS` | `2` | `8` | `4` | `6` | `5` |
-| `PADDLE` | `2` | `8` | — | — | — |
-| `SPACEWAR` | — | — | `B4` | `B6` | `A2` |
-| `FREEWAY` | `A2` throttle | `A8` brake | `B4` | `B6` | — |
-| `BOWLING` | `A2` hook | `A8` hook | — | — | `A5` roll |
-| `BASEBALL` | `B2` curve | `B8` curve | — | — | `A5` bat / `B5` pitch |
-| `HOMEBREW` | `2` | `8` | `4` | `6` | `B0` |
-| `HB2P` | `2` | `8` | `4` | `6` | `0` (own pad) |
+| Profile | Up | Down | Left | Right | Fire | Extra |
+|---------|----|------|------|-------|------|-------|
+| `CROSS` | `2` | `8` | `4` | `6` | `5` | `0` |
+| `PADDLE` | `2` | `8` | — | — | — | `0` pause |
+| `SPACEWAR` | — | — | `B4` | `B6` | `A2` | — |
+| `FREEWAY` | `A2` throttle | `A8` brake | `B4` | `B6` | — | — |
+| `BOWLING` | `A2` hook | `A8` hook | — | — | `A5` roll | — |
+| `BASEBALL` | `B2` curve | `B8` curve | — | — | `A5` bat / `B5` pitch | — |
+| `HOMEBREW` | `2` | `8` | `4` | `6` | `B0` | — |
+| `HB2P` | `2` | `8` | `4` | `6` | `0` (own pad) | — |
 
 `CROSS` applies to both keypads (joystick 1 drives keypad B). Every mapping comes
-from the RCA manuals, not guesswork. `HOMEBREW` is for Paul Robson's games, which
+from the RCA manuals, not guesswork.
+
+`CROSS` is also, it turns out, the closest thing to an *official* mapping: the
+Soundic **Victory Home TV Programmer** and Hanimex **Jeu TV Programmable** —
+both MPT-02 Studio III machines — had detachable keypads that could be swapped
+for joysticks, mapped exactly this way: cross on `2/4/6/8`, fire on `5`, and a
+second button on `0`. That second button is the gamepad's **Extra**. It only
+presses `0` where `0` is documented and harmless — `CROSS`, and `PADDLE` where
+`0` pauses Tennis — never in `HOMEBREW`, where `A0` restarts Invaders; bind
+B0/A0 directly if a game needs more. `HOMEBREW` is for Paul Robson's games, which
 all fire or start on `0`; it is also 8-way — a held diagonal presses the corner
 key (`1/3/7/9`), which is how Berzerk moves diagonally. Fire lands on `B0`, never
 `A0`, because `A0` restarts Invaders. `HB2P` is the two-player variant (Hockey,

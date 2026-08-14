@@ -408,6 +408,12 @@ Berzerk, fire on B0 — never A0, which restarts Invaders) and `MAP_HB2P`
 (Hockey/Combat: cross + own-pad 0). The profile field is 4 bits internally; the
 OSD override stays 3.
 
+**Extra button (MPT-02).** The Soundic/Hanimex MPT-02 Studio III machines had
+swappable joysticks with the official mapping: cross on 2/4/6/8, fire 5, second
+button 0. Fire/Extra mirror that; Extra presses same-pad 0 in CROSS and PADDLE
+only (0 pauses Tennis) — never HOMEBREW, where A0 restarts Invaders. J-list
+bits: 4=Fire 5=Extra 6=Start 7=Select, A0..A9=17:8, B0..B9=27:18.
+
 **OSD fixed.** The Joystick option did nothing because `J1,Fire;` sat mid-list:
 Main's menu draw pass skips `J` entries but its selection pass counts anything
 `>= 'A'`, so every row after it acted on the previous entry. Non-OSD entries
