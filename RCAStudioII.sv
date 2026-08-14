@@ -197,17 +197,43 @@ assign BUTTONS = 0;
 
 //////////////////////////////////////////////////////////////////////
 
-//wire [1:0] ar = status[122:121];
+// Aspect ratio should be 4:3 by default, and allow the OSD selection to override
+// it for full-screen or custom scaling. This matches the status bit selector used
+// elsewhere in MiSTer and keeps the direct-video path aligned with the frame output.
+wire [1:0] ar = status[122:121];
+wire [11:0] arx_in = (!ar) ? 12'd4 : (ar - 1'd1);
+wire [11:0] ary_in = (!ar) ? 12'd3 : 12'd0;
 
-//assign VIDEO_ARX = (!ar) ? 12'd4 : (ar - 1'd1);
-//assign VIDEO_ARY = (!ar) ? 12'd3 : 12'd0;
-assign VIDEO_ARX = 12'd0;
-assign VIDEO_ARY = 12'd0;
+wire        vga_de_freak;
+wire [12:0] video_arx_freak;
+wire [12:0] video_ary_freak;
+
+video_freak video_freak_inst
+(
+    .CLK_VIDEO(clk_vid),
+    .CE_PIXEL(ce_pix),
+    .VGA_VS(VSync),
+    .HDMI_WIDTH(HDMI_WIDTH),
+    .HDMI_HEIGHT(HDMI_HEIGHT),
+    .VGA_DE(vga_de_freak),
+    .VIDEO_ARX(video_arx_freak),
+    .VIDEO_ARY(video_ary_freak),
+    .VGA_DE_IN(~(HBlank | VBlank)),
+    .ARX(arx_in),
+    .ARY(ary_in),
+    .CROP_SIZE(12'd0),
+    .CROP_OFF(5'd0),
+    .SCALE(3'd0)
+);
+
+assign VIDEO_ARX = video_arx_freak;
+assign VIDEO_ARY = video_ary_freak;
 
 `include "build_id.v" 
 localparam CONF_STR = {
 	"RCA-StudioII;;",
-	"-;",	"F0,rom,Load Bios;",
+	"-;",	
+	"F0,rom,Load Bios;",
 	"F1,ST2BINROM,Load Cartridge;",
 	"-;",
 //	"O[122:121],Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
@@ -339,7 +365,7 @@ rcastudioii rcastudio
 	.HSync(HSync),
 	.VBlank(VBlank),
 	.VSync(VSync),
-	  	.video_de(),
+	.video_de(),
 	.video(video),
 	.audio(audio)
 );
@@ -347,22 +373,24 @@ rcastudioii rcastudio
 assign CLK_VIDEO = clk_vid;
 assign CE_PIXEL = ce_pix;
 
-`ifndef MISTER_DIRECT_VIDEO
-assign VGA_DE = ~(HBlank | VBlank);
+// common sync / DE (same in both modes)
+assign VGA_DE = vga_de_freak;
 assign VGA_HS = HSync;
 assign VGA_VS = VSync;
-assign VGA_R = video ? 8'hFF : 8'h00;
-assign VGA_G = video ? 8'hFF : 8'h00;
-assign VGA_B = video ? 8'hFF : 8'h00;
+
+// color/luma/chroma mapping
+`ifdef MISTER_DIRECT_VIDEO
+  // Direct video: luma -> Green, chroma -> Red
+  // Studio II is monochrome so chroma is 0. If you later add chroma generation,
+  // put it on VGA_R here.
+  assign VGA_R = 8'h00;                    // chroma (unused for mono)
+  assign VGA_G = video ? 8'hFF : 8'h00;    // luma (brightness)
+  assign VGA_B = 8'h00;
 `else
-// Direct video mode: luma -> Green, chroma -> Red. Studio II is monochrome so
-// chroma is zeroed; adapters expect luma on green and chroma on red.
-assign VGA_DE = ~(HBlank | VBlank);
-assign VGA_HS = HSync;
-assign VGA_VS = VSync;
-assign VGA_R = 8'h00;                      // chroma (unused for mono)
-assign VGA_G = video ? 8'hFF : 8'h00;     // luma
-assign VGA_B = 8'h00;
+  // Default VGA: drive full monochrome to all channels for VGA/HDMI viewers
+  assign VGA_R = video ? 8'hFF : 8'h00;
+  assign VGA_G = video ? 8'hFF : 8'h00;
+  assign VGA_B = video ? 8'hFF : 8'h00;
 `endif
 
 //reg  [26:0] act_cnt;
