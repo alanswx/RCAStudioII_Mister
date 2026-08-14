@@ -210,7 +210,6 @@ localparam CONF_STR = {
 	"-;",	
 	"F0,rom,Load Bios;",
 	"F1,ST2BINROM,Load Cartridge;",
-	"J1,Fire;",
 	"-;",
 	"O[4:2],Joystick,Auto,Cross,Paddle,Space War,Freeway,Bowling,Baseball;",
 	"-;",
@@ -220,7 +219,11 @@ localparam CONF_STR = {
 //	"T[0],Reset;",
 	"T[1],Clear;",
 	"R[0],Reset and close OSD;",
-	"V,v",`BUILD_DATE 
+	// Non-OSD entries (J/jn/V) must sit below every menu row: the menu's selection
+	// pass counts any entry starting >= 'A' (Main menu.cpp), but its drawing pass
+	// skips J -- a J placed mid-string shifts every row after it off by one.
+	"J1,Fire;",
+	"V,v",`BUILD_DATE
 };
 
 wire forced_scandoubler;
