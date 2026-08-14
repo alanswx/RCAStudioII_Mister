@@ -109,27 +109,29 @@ always @(posedge clk_sys) begin
 
 	if(old_state != ps2_key[10]) begin
 		case(code)
-			'h45: playerA[0]  <= pressed; // 12'b000000000001; // Keypad1 0
-			'h16: playerA[1]  <= pressed; // 12'b000000000010; // Keypad1 1
-			'h1E: playerA[2]  <= pressed; // 12'b000000000100; // Keypad1 2
-			'h26: playerA[3]  <= pressed; // 12'b000000001000; // Keypad1 3
-			'h25: playerA[4]  <= pressed; // 12'b000000010000; // Keypad1 4
-			'h2E: playerA[5]  <= pressed; // 12'b000000100000; // Keypad1 5
-			'h36: playerA[6]  <= pressed; // 12'b000001000000; // Keypad1 6
-			'h3D: playerA[7]  <= pressed; // 12'b000010000000; // Keypad1 7
-			'h3E: playerA[8]  <= pressed; // 12'b000100000000; // Keypad1 8
-			'h46: playerA[9]  <= pressed; // 12'b001000000000; // Keypad1 9
-
-			'h4D: playerB[0]  <= pressed; // 12'b000000000001; // Keypad2 P 
-			'h15: playerB[1]  <= pressed; // 12'b000000000010; // Keypad2 Q
-			'h1D: playerB[2]  <= pressed; // 12'b000000000100; // Keypad2 W
-			'h24: playerB[3]  <= pressed; // 12'b000000001000; // Keypad2 E
-			'h2D: playerB[4]  <= pressed; // 12'b000000010000; // Keypad2 R
-			'h2C: playerB[5]  <= pressed; // 12'b000000100000; // Keypad2 T
-			'h35: playerB[6]  <= pressed; // 12'b000001000000; // Keypad2 Y
-			'h3C: playerB[7]  <= pressed; // 12'b000010000000; // Keypad2 U
-			'h43: playerB[8]  <= pressed; // 12'b000100000000; // Keypad2 I
-			'h44: playerB[9]  <= pressed; // 12'b001000000000; // Keypad2 O
+			// Keypad A
+			'h16: playerA[1] <= pressed; // 1 → 1
+			'h1E: playerA[2] <= pressed; // 2 → 2
+			'h26: playerA[3] <= pressed; // 3 → 3
+			'h15: playerA[4] <= pressed; // Q → 4
+			'h1D: playerA[5] <= pressed; // W → 5
+			'h24: playerA[6] <= pressed; // E → 6
+			'h1C: playerA[7] <= pressed; // A → 7
+			'h1B: playerA[8] <= pressed; // S → 8
+			'h23: playerA[9] <= pressed; // D → 9
+			'h22: playerA[0] <= pressed; // X → 0
+		
+			// Keypad B
+			'h3D: playerB[1] <= pressed; // 7 → 1
+			'h3E: playerB[2] <= pressed; // 8 → 2
+			'h46: playerB[3] <= pressed; // 9 → 3
+			'h3C: playerB[4] <= pressed; // U → 4
+			'h43: playerB[5] <= pressed; // I → 5
+			'h44: playerB[6] <= pressed; // O → 6
+			'h3B: playerB[7] <= pressed; // J → 7
+			'h42: playerB[8] <= pressed; // K → 8
+			'h4B: playerB[9] <= pressed; // L → 9
+			'h41: playerB[0] <= pressed; // , → 0
 		endcase
 	end
 end
