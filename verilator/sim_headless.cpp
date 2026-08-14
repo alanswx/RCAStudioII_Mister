@@ -396,9 +396,12 @@ static void usage(const char* argv0) {
 "\n"
 "  Input\n"
 "    --joy-map N          OSD joystick override: 0 auto, 1 cross, 2 paddle,\n"
-"                         3 spacewar, 4 freeway, 5 bowling, 6 baseball\n"
+"                         3 spacewar, 4 freeway, 5 bowling, 6 baseball, 7 homebrew\n"
 "    --joy MASK@F[:H]     drive joystick 0 with MASK (bit0 right, 1 left, 2 down,\n"
-"                         3 up, 4 fire) at frame F for H frames.\n"
+"                         3 up, 4 fire, 5 start, 16:7 A0..A9, 26:17 B0..B9)\n"
+"                         at frame F for H frames.\n"
+"    --joy2 MASK@F[:H]    same, joystick 1\n"
+"    --players N          OSD Players setting: 0 auto, 1 one player, 2 two\n"
 "    --press KEY@F[:H]    press KEY at frame F, hold H frames (default 4).\n"
 "                         KEY is a0..a9 (player A) or b0..b9 (player B),\n"
 "                         or a raw hex PS/2 scancode like 0x16.\n"
@@ -441,7 +444,9 @@ int main(int argc, char** argv) {
     long trace_cpu = 0, trace_from = 0;
     bool trace_q = false;
     uint32_t joy_mask = 0; long joy_from = -1, joy_to = -1;
+    uint32_t joy2_mask = 0; long joy2_from = -1, joy2_to = -1;
     uint8_t  joy_override = 0;   // applied once top exists
+    uint8_t  players_mode = 0;
     // Q gates the Studio II's beeper; track its edges so the core can be compared
     // against the reference emulator's Q even though AUDIO_L/R are still tied off.
     bool q_prev = false; long q_edges = 0, q_on_frames = 0; long q_last_chg = 0;
@@ -483,6 +488,16 @@ int main(int argc, char** argv) {
             joy_mask = (uint32_t)strtoul(t.substr(0,at).c_str(), nullptr, 0);
             joy_from = atol(rest.c_str()); joy_to = joy_from + hold;
         }
+        else if (a == "--joy2") {
+            std::string t = next("--joy2");
+            size_t at = t.find('@'); if (at == std::string::npos) { fprintf(stderr,"error: --joy2 needs MASK@FRAME\n"); exit(1); }
+            int hold = 4; std::string rest = t.substr(at+1);
+            size_t co = rest.find(':');
+            if (co != std::string::npos) { hold = atoi(rest.c_str()+co+1); rest = rest.substr(0,co); }
+            joy2_mask = (uint32_t)strtoul(t.substr(0,at).c_str(), nullptr, 0);
+            joy2_from = atol(rest.c_str()); joy2_to = joy2_from + hold;
+        }
+        else if (a == "--players")    players_mode = (uint8_t)atoi(next("--players"));
         else if (a == "--joy-map")    joy_override = (uint8_t)atoi(next("--joy-map"));
         else if (a == "--trace-q")    trace_q = true;
         else if (a == "--frame-log")  frame_log = true;
@@ -538,6 +553,7 @@ int main(int argc, char** argv) {
     Verilated::commandArgs(argc, argv);
     top = new Vtop();
     top->joy_override = joy_override;
+    top->players = players_mode;
 
     IoctlDriver io;
     io.add(bios, 0);
@@ -561,6 +577,7 @@ int main(int argc, char** argv) {
         // --- rising edge ---
         io.tick();
         top->joystick_0 = (fg.frame >= joy_from && fg.frame < joy_to) ? joy_mask : 0;
+        top->joystick_1 = (fg.frame >= joy2_from && fg.frame < joy2_to) ? joy2_mask : 0;
 
         // Key events scheduled for this frame
         auto range = key_sched.equal_range(fg.frame);

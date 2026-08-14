@@ -24,8 +24,6 @@
 module rcastudioii
 (
 	input              clk_sys,
-	input              clk_1m76,
-	input              clk_vid,
 	input              reset,
 	
 	input wire         ioctl_download,
@@ -38,6 +36,9 @@ module rcastudioii
 	input       [31:0] joystick_0,
 	input       [31:0] joystick_1,
 	input        [2:0] joy_override,   // OSD: 0 = auto, else the profile to force
+	input        [1:0] players,        // OSD: 0 = auto, 1 = one player, 2 = two players
+	input        [9:0] osk_a,          // on-screen keypad presses for keypad A (bit = key)
+	input        [9:0] osk_b,          // and for keypad B
 	input  reg         ce_pix,
 
 	output reg         HBlank,
@@ -150,17 +151,29 @@ reg  [9:0] playerB = 10'h0;
 // in a table below; the result selects one of a few profiles.
 //
 // Key numbers come from the RCA manuals (see Readme "How to play"), not guesses.
-// MiSTer joystick bits: [0]=right [1]=left [2]=down [3]=up [4]=fire1 [5]=fire2.
+// MiSTer joystick bits, per the CONF_STR "J1,..." list in RCAStudioII.sv:
+//   [0]=right [1]=left [2]=down [3]=up   [4]=Fire   [5]=Start   [6]=Select(CLEAR,
+//   folded into reset by the top level)   [16:7]=A0..A9   [26:17]=B0..B9.
+// A0..B9 are direct per-key bindings with no default mapping: they are inert
+// until the user binds them in Define Buttons, and then they always work, on
+// top of whatever profile is active.
 
-localparam [2:0] MAP_NONE     = 3'd0;   // keypad only
-localparam [2:0] MAP_CROSS    = 3'd1;   // 2/8/4/6 + 5 fire, both pads
-localparam [2:0] MAP_PADDLE   = 3'd2;   // up/down only (Tennis, Squash)
-localparam [2:0] MAP_SPACEWAR = 3'd3;   // fire A2, steer B4/B6
-localparam [2:0] MAP_FREEWAY  = 3'd4;   // steer B4/B6, throttle A2, brake A8
-localparam [2:0] MAP_BOWLING  = 3'd5;   // roll A5, hook A2/A8
-localparam [2:0] MAP_BASEBALL = 3'd6;   // bat A5; pitch B5 straight, B2/B8 curve
+// The profile is 4 bits internally; the OSD override (joy_override) is 3, so
+// only the first seven are forceable from the menu. MAP_HB2P exists solely for
+// the two-player homebrews, which the CRC table selects on its own.
+localparam [3:0] MAP_NONE     = 4'd0;   // keypad only
+localparam [3:0] MAP_CROSS    = 4'd1;   // 2/8/4/6 + 5 fire, both pads
+localparam [3:0] MAP_PADDLE   = 4'd2;   // up/down only (Tennis, Squash)
+localparam [3:0] MAP_SPACEWAR = 4'd3;   // fire A2, steer B4/B6
+localparam [3:0] MAP_FREEWAY  = 4'd4;   // steer B4/B6, throttle A2, brake A8
+localparam [3:0] MAP_BOWLING  = 4'd5;   // roll A5, hook A2/A8
+localparam [3:0] MAP_BASEBALL = 4'd6;   // bat A5; pitch B5 straight, B2/B8 curve
+localparam [3:0] MAP_HOMEBREW = 4'd7;   // Paul Robson's 1P games: 8-way on pad A
+                                        // (diagonals are keys 1/3/7/9), fire B0
+localparam [3:0] MAP_HB2P     = 4'd8;   // 2P homebrew (Hockey, Combat): cross
+                                        // plus fire-on-0, each player's own pad
 
-reg [2:0] map_profile = MAP_NONE;
+reg [3:0] map_profile = MAP_NONE;
 
 // ---- CRC16-CCITT over the cartridge image, computed during ioctl_download ----
 // Seed on the first byte and hold the result after the download ends -- clearing
@@ -184,18 +197,35 @@ end
 
 // ---- CRC -> profile ---------------------------------------------------------
 // Add a cartridge by printing its CRC (tools/cart-crc.sh) and adding a line.
+// start_key is what the gamepad's Start button presses on keypad A -- the key
+// the manual says begins the headline game (Readme "How to play"). Every
+// measured cartridge starts from keypad A, so Start only ever lands there.
+// Most carts start on 1, so that is both the default and the no-cart value.
+reg [3:0] start_key = 4'd1;
 always @(posedge clk_sys) begin
 	if (dl_done) begin
 		case (cart_crc)
-			16'h977C: map_profile <= MAP_SPACEWAR; // TV Arcade I - Space War
-			16'h88FB: map_profile <= MAP_PADDLE;   // TV Arcade III - Tennis + Squash
-			16'hF837: map_profile <= MAP_BASEBALL; // TV Arcade IV - Baseball
-			16'hD3E2: map_profile <= MAP_CROSS;    // Pinball
-			16'hE153: map_profile <= MAP_CROSS;    // Speedway + Tag (Europe)
-			16'hD0DA: map_profile <= MAP_CROSS;    // Speedway + Tag (USA)
-			16'hD13E: map_profile <= MAP_CROSS;    // Star Wars
-			16'h3CDC: map_profile <= MAP_CROSS;    // Gunfighter + Moonship Battle
-			default:  map_profile <= MAP_CROSS;    // unknown cart: the common case
+			16'h977C: begin map_profile <= MAP_SPACEWAR; start_key <= 4'd1; end // TV Arcade I - Space War
+			16'h88FB: begin map_profile <= MAP_PADDLE;   start_key <= 4'd2; end // TV Arcade III - Tennis + Squash (2 = Tennis)
+			16'hF837: begin map_profile <= MAP_BASEBALL; start_key <= 4'd0; end // TV Arcade IV - Baseball
+			16'hD3E2: begin map_profile <= MAP_CROSS;    start_key <= 4'd1; end // Pinball
+			16'hE153: begin map_profile <= MAP_CROSS;    start_key <= 4'd1; end // Speedway + Tag (Europe)
+			16'hD0DA: begin map_profile <= MAP_CROSS;    start_key <= 4'd1; end // Speedway + Tag (USA)
+			16'hD13E: begin map_profile <= MAP_CROSS;    start_key <= 4'd1; end // Star Wars
+			16'h3CDC: begin map_profile <= MAP_CROSS;    start_key <= 4'd1; end // Gunfighter + Moonship Battle
+			// Paul Robson's homebrew (refs/studio2-games): all use 0 to fire or
+			// start, so CROSS's fire-on-5 is wrong for every one of them. Both
+			// the .st2 and its .bin conversion are listed -- the CRC covers the
+			// file as downloaded, header and all, so the formats hash apart.
+			16'hFBEF, 16'h2B4D: begin map_profile <= MAP_HOMEBREW; start_key <= 4'd5; end // Asteroids
+			16'hAEC7, 16'hE080: begin map_profile <= MAP_HOMEBREW; start_key <= 4'd5; end // Berzerk
+			16'h188E, 16'hD87F: begin map_profile <= MAP_HB2P;     start_key <= 4'd1; end // Combat (G? code, then B0)
+			16'h4F55, 16'hD5DE: begin map_profile <= MAP_HB2P;     start_key <= 4'd1; end // Hockey (1 = hockey)
+			16'h5AC5, 16'h2D86: begin map_profile <= MAP_HOMEBREW; start_key <= 4'd0; end // Invaders (0 = restart)
+			16'hDFCF, 16'h8551: begin map_profile <= MAP_HOMEBREW; start_key <= 4'd0; end // Kaboom
+			16'h5359, 16'hE00A: begin map_profile <= MAP_HOMEBREW; start_key <= 4'd0; end // Pacman
+			16'hE45F, 16'h1280: begin map_profile <= MAP_HOMEBREW; start_key <= 4'd6; end // Scramble
+			default:  begin map_profile <= MAP_CROSS;    start_key <= 4'd1; end // unknown cart: the common case
 		endcase
 	end
 end
@@ -211,7 +241,7 @@ end
 
 wire       no_cart = (cart_crc == 16'hFFFF);
 reg        builtin_sel;
-reg  [2:0] builtin_profile;
+reg  [3:0] builtin_profile;
 
 always @(posedge clk_sys) begin
 	if (reset) begin
@@ -228,49 +258,135 @@ always @(posedge clk_sys) begin
 end
 
 // ---- effective profile: OSD override wins over auto-detection ---------------
-wire [2:0] auto_profile = no_cart ? builtin_profile : map_profile;
-// OSD list is Auto, Cross, Paddle, Space War, Freeway, Bowling, Baseball -- and after
-// Auto those line up 1:1 with MAP_CROSS..MAP_BASEBALL, so no adjustment is needed.
-wire [2:0] profile      = (joy_override == 3'd0) ? auto_profile : joy_override;
+wire [3:0] auto_profile = no_cart ? builtin_profile : map_profile;
+// OSD list is Auto, Cross, Paddle, Space War, Freeway, Bowling, Baseball,
+// Homebrew -- after Auto those line up 1:1 with MAP_CROSS..MAP_HOMEBREW, so no
+// adjustment is needed. MAP_HB2P is CRC-selected only.
+wire [3:0] profile      = (joy_override == 3'd0) ? auto_profile : {1'b0, joy_override};
 
 // ---- profile -> keypad presses ---------------------------------------------
-reg [9:0] joyA, joyB;
+// Each profile is two halves: the keys it lands on keypad A and on keypad B.
+// Which stick drives the B half is the Players setting. One player runs the
+// whole machine from stick 0 (Space War fires on pad A and steers on pad B);
+// two players get one stick per pad. Auto keeps each profile's natural
+// default, which is exactly the behaviour the joystick regression verified:
+// the asymmetric single-player profiles (Space War, Freeway, Bowling) act as
+// one-player, the symmetric ones (Cross, Paddle, Baseball) as two.
+
+function automatic [9:0] map_padA(input [3:0] prof, input [31:0] j);
+	reg [9:0] k;
+	begin
+		k = 10'd0;
+		case (prof)
+		MAP_CROSS: begin
+			if (j[3]) k[2] = 1'b1;   if (j[2]) k[8] = 1'b1;
+			if (j[1]) k[4] = 1'b1;   if (j[0]) k[6] = 1'b1;
+			if (j[4]) k[5] = 1'b1;
+		end
+		MAP_PADDLE: begin                    // racquet moves on 2/8 only
+			if (j[3]) k[2] = 1'b1;   if (j[2]) k[8] = 1'b1;
+		end
+		MAP_SPACEWAR:                        // fire
+			if (j[4]) k[2] = 1'b1;
+		MAP_FREEWAY: begin                   // throttle/brake
+			if (j[3]) k[2] = 1'b1;   if (j[2]) k[8] = 1'b1;
+		end
+		MAP_BOWLING: begin                   // roll straight, or hook up/down
+			if (j[4]) k[5] = 1'b1;
+			if (j[3]) k[2] = 1'b1;   if (j[2]) k[8] = 1'b1;
+		end
+		MAP_BASEBALL:                        // bat
+			if (j[4]) k[5] = 1'b1;
+		MAP_HOMEBREW: begin
+			// 8-way: a held diagonal is its corner key (Berzerk moves on
+			// 1/3/7/9), a cardinal is the cross. The corner keys are unused
+			// in the 4-way homebrews, so a passing diagonal is harmless.
+			case (j[3:0])
+			4'b1010: k[1] = 1'b1;            // up+left
+			4'b1001: k[3] = 1'b1;            // up+right
+			4'b0110: k[7] = 1'b1;            // down+left
+			4'b0101: k[9] = 1'b1;            // down+right
+			default: begin
+				if (j[3]) k[2] = 1'b1;   if (j[2]) k[8] = 1'b1;
+				if (j[1]) k[4] = 1'b1;   if (j[0]) k[6] = 1'b1;
+			end
+			endcase
+		end
+		MAP_HB2P: begin                      // own pad: cross + fire on 0
+			if (j[3]) k[2] = 1'b1;   if (j[2]) k[8] = 1'b1;
+			if (j[1]) k[4] = 1'b1;   if (j[0]) k[6] = 1'b1;
+			if (j[4]) k[0] = 1'b1;
+		end
+		default: ;
+		endcase
+		map_padA = k;
+	end
+endfunction
+
+function automatic [9:0] map_padB(input [3:0] prof, input [31:0] j);
+	reg [9:0] k;
+	begin
+		k = 10'd0;
+		case (prof)
+		MAP_CROSS: begin
+			if (j[3]) k[2] = 1'b1;   if (j[2]) k[8] = 1'b1;
+			if (j[1]) k[4] = 1'b1;   if (j[0]) k[6] = 1'b1;
+			if (j[4]) k[5] = 1'b1;
+		end
+		MAP_PADDLE: begin
+			if (j[3]) k[2] = 1'b1;   if (j[2]) k[8] = 1'b1;
+		end
+		MAP_SPACEWAR: begin                  // steering
+			if (j[1]) k[4] = 1'b1;   if (j[0]) k[6] = 1'b1;
+		end
+		MAP_FREEWAY: begin                   // steering
+			if (j[1]) k[4] = 1'b1;   if (j[0]) k[6] = 1'b1;
+		end
+		MAP_BASEBALL: begin                  // pitch
+			if (j[4]) k[5] = 1'b1;
+			if (j[3]) k[2] = 1'b1;   if (j[2]) k[8] = 1'b1;
+		end
+		MAP_HOMEBREW: begin
+			// Fire is 0 on the right pad -- never A0, which restarts Invaders.
+			// The cross is repeated here because Pacman reads "down" on B8;
+			// pad B directions are unused in the other one-player homebrews.
+			if (j[4]) k[0] = 1'b1;
+			if (j[3]) k[2] = 1'b1;   if (j[2]) k[8] = 1'b1;
+			if (j[1]) k[4] = 1'b1;   if (j[0]) k[6] = 1'b1;
+		end
+		MAP_HB2P: begin                      // own pad: cross + fire on 0
+			if (j[3]) k[2] = 1'b1;   if (j[2]) k[8] = 1'b1;
+			if (j[1]) k[4] = 1'b1;   if (j[0]) k[6] = 1'b1;
+			if (j[4]) k[0] = 1'b1;
+		end
+		default: ;                           // Bowling: keypad B unused
+		endcase
+		map_padB = k;
+	end
+endfunction
+
+wire profile_1p = (profile == MAP_SPACEWAR) || (profile == MAP_FREEWAY) ||
+                  (profile == MAP_BOWLING)  || (profile == MAP_NONE) ||
+                  (profile == MAP_HOMEBREW);
+wire one_player = (players == 2'd1) || ((players == 2'd0) && profile_1p);
+
+// Direct A0..A9/B0..B9 bindings and Start work from either stick: MiSTer maps
+// each input device independently, so a binding only exists where the user
+// made one. Start presses the cartridge's start key on keypad A.
+reg [9:0] directA, directB;
+integer dk;
 always @* begin
-	joyA = 10'd0;
-	joyB = 10'd0;
-	case (profile)
-	MAP_CROSS: begin
-		if (joystick_0[3]) joyA[2] = 1'b1;   if (joystick_0[2]) joyA[8] = 1'b1;
-		if (joystick_0[1]) joyA[4] = 1'b1;   if (joystick_0[0]) joyA[6] = 1'b1;
-		if (joystick_0[4]) joyA[5] = 1'b1;
-		if (joystick_1[3]) joyB[2] = 1'b1;   if (joystick_1[2]) joyB[8] = 1'b1;
-		if (joystick_1[1]) joyB[4] = 1'b1;   if (joystick_1[0]) joyB[6] = 1'b1;
-		if (joystick_1[4]) joyB[5] = 1'b1;
+	for (dk = 0; dk < 10; dk = dk + 1) begin
+		directA[dk] = joystick_0[7+dk]  | joystick_1[7+dk];
+		directB[dk] = joystick_0[17+dk] | joystick_1[17+dk];
 	end
-	MAP_PADDLE: begin                        // racquet moves on 2/8 only
-		if (joystick_0[3]) joyA[2] = 1'b1;   if (joystick_0[2]) joyA[8] = 1'b1;
-		if (joystick_1[3]) joyB[2] = 1'b1;   if (joystick_1[2]) joyB[8] = 1'b1;
-	end
-	MAP_SPACEWAR: begin                      // fire on pad A, steering on pad B
-		if (joystick_0[4]) joyA[2] = 1'b1;
-		if (joystick_0[1]) joyB[4] = 1'b1;   if (joystick_0[0]) joyB[6] = 1'b1;
-	end
-	MAP_FREEWAY: begin                       // steer on B, throttle/brake on A
-		if (joystick_0[1]) joyB[4] = 1'b1;   if (joystick_0[0]) joyB[6] = 1'b1;
-		if (joystick_0[3]) joyA[2] = 1'b1;   if (joystick_0[2]) joyA[8] = 1'b1;
-	end
-	MAP_BOWLING: begin                       // roll straight, or hook up/down
-		if (joystick_0[4]) joyA[5] = 1'b1;
-		if (joystick_0[3]) joyA[2] = 1'b1;   if (joystick_0[2]) joyA[8] = 1'b1;
-	end
-	MAP_BASEBALL: begin                      // bat on A, pitch on B
-		if (joystick_0[4]) joyA[5] = 1'b1;
-		if (joystick_1[4]) joyB[5] = 1'b1;
-		if (joystick_1[3]) joyB[2] = 1'b1;   if (joystick_1[2]) joyB[8] = 1'b1;
-	end
-	default: ;
-	endcase
 end
+wire       start_press = joystick_0[5] | joystick_1[5];
+wire [9:0] start_keys  = start_press ? (10'd1 << start_key) : 10'd0;
+
+wire [9:0] joyA = map_padA(profile, joystick_0) | directA | start_keys;
+wire [9:0] joyB = (one_player ? map_padB(profile, joystick_0)
+                              : map_padB(profile, joystick_1)) | directB;
 
 ////////////////// CPU //////////////////////////////////////////////////////////////////
 
@@ -278,8 +394,8 @@ end
 // guard the index: keylatch 10-15 used to read off the end of the 10-bit playerA/playerB vectors.
 wire  [3:0] EF;
 wire        key_valid = (keylatch < 4'd10);
-wire  [9:0] padA = playerA | joyA;
-wire  [9:0] padB = playerB | joyB;
+wire  [9:0] padA = playerA | joyA | osk_a;
+wire  [9:0] padB = playerB | joyB | osk_b;
 assign EF = {key_valid & padB[keylatch], key_valid & padA[keylatch], 1'b1, EFx};
 
 // The Studio II has no input port that returns data -- the keypads are read through EF3/EF4,

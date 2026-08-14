@@ -197,24 +197,19 @@ assign BUTTONS = 0;
 
 //////////////////////////////////////////////////////////////////
 
-//wire [1:0] ar = status[122:121];
-
-//assign VIDEO_ARX = (!ar) ? 12'd4 : (ar - 1'd1);
-//assign VIDEO_ARY = (!ar) ? 12'd3 : 12'd0;
-assign VIDEO_ARX = 12'd0;
-assign VIDEO_ARY = 12'd0;
-
-`include "build_id.v" 
+`include "build_id.v"
 localparam CONF_STR = {
 	"RCA-StudioII;;",
 	"-;",	
 	"F0,rom,Load Bios;",
 	"F1,ST2BINROM,Load Cartridge;",
 	"-;",
-	"O[4:2],Joystick,Auto,Cross,Paddle,Space War,Freeway,Bowling,Baseball;",
+	"O[4:2],Joystick,Auto,Cross,Paddle,Space War,Freeway,Bowling,Baseball,Homebrew;",
+	"O[8:7],Players,Auto,1,2;",
+	"O[10:9],Stick Keypad,Off,Pad A,Pad B;",
 	"-;",
-//	"O[122:121],Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
-//	"O[2],TV Mode,NTSC,PAL;",
+	"O[122:121],Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
+	"O[6:5],Scale,Normal,V-Integer,Narrower HV-Integer,Wider HV-Integer;",
 	"-;",
 //	"T[0],Reset;",
 	"T[1],Clear;",
@@ -222,15 +217,22 @@ localparam CONF_STR = {
 	// Non-OSD entries (J/jn/V) must sit below every menu row: the menu's selection
 	// pass counts any entry starting >= 'A' (Main menu.cpp), but its drawing pass
 	// skips J -- a J placed mid-string shifts every row after it off by one.
-	"J1,Fire;",
+	// A0..B9 are direct per-key bindings (see rtl/rcastudioii.sv); jn gives
+	// defaults to the first three only, so the direct keys stay unbound until
+	// the user maps them deliberately.
+	"J1,Fire,Start,Select,A0,A1,A2,A3,A4,A5,A6,A7,A8,A9,B0,B1,B2,B3,B4,B5,B6,B7,B8,B9;",
+	"jn,A,Start,Select;",
 	"V,v",`BUILD_DATE
 };
 
 wire forced_scandoubler;
+wire  [21:0] gamma_bus;
 wire   [1:0] buttons;
 wire [127:0] status;
 wire  [10:0] ps2_key;
 wire  [31:0] joystick_0, joystick_1;
+wire  [15:0] joystick_l_analog_0, joystick_r_analog_0;
+wire  [15:0] joystick_l_analog_1, joystick_r_analog_1;
 
 // CLEAR is the Studio II's console button. On real hardware it drives the 1802's
 // CLEAR pin and resets the CDP1861: MAME's studio2 machine_reset() does exactly
@@ -256,7 +258,7 @@ hps_io #(.CONF_STR(CONF_STR)) hps_io
 	.clk_sys(clk_sys),
 	.HPS_BUS(HPS_BUS),
 	.EXT_BUS(),
-	.gamma_bus(),
+	.gamma_bus(gamma_bus),
 
 	.forced_scandoubler(forced_scandoubler),
 
@@ -272,13 +274,16 @@ hps_io #(.CONF_STR(CONF_STR)) hps_io
 	
 	.ps2_key(ps2_key),
 	.joystick_0(joystick_0),
-	.joystick_1(joystick_1)
+	.joystick_1(joystick_1),
+	.joystick_l_analog_0(joystick_l_analog_0),
+	.joystick_r_analog_0(joystick_r_analog_0),
+	.joystick_l_analog_1(joystick_l_analog_1),
+	.joystick_r_analog_1(joystick_r_analog_1)
 );
 
 ///////////////////////   CLOCKS   ///////////////////////////////
 
 wire clk_sys;
-wire clk_1m76;
 wire clk_vid;
 pll pll
 (
@@ -288,23 +293,21 @@ pll pll
 	.outclk_1(clk_vid)
 );
 
-reg [1:0] div;
-always @(posedge clk_sys) begin
-	if(reset) begin
-		div <= 2'b0;
-		clk_1m76 <= 1'b0;
-	end
-	else begin
-		if(div == 2'd1) begin
-			clk_1m76 <= ~clk_1m76;
-			div <= 2'd0;
-		end
-		else div <= div + 1'b1;
-	end
-end
+// The CDP1861 emits one pixel per CPU clock: 1.7897725 MHz nominal, 1.760229 MHz
+// here (clk_sys/4, and the real Studio II's RC oscillator was tuned by eye anyway).
+// This enable IS the machine's timebase -- the CPU divides it by 8 into machine
+// cycles -- so it must not be tied high: that ran the whole console 4x too fast
+// on hardware (240 Hz frames, 4x beeper pitch), though the Verilator regression
+// never saw it because frame-relative behaviour is unchanged.
+reg [1:0] ce_cnt = 2'd0;
+always @(posedge clk_sys) ce_cnt <= ce_cnt + 2'd1;
+wire ce_pix = (ce_cnt == 2'd0);
 
-//wire reset = ioctl_download;
-wire reset = RESET | status[0] | status[1] | clear_key | buttons[1] | ioctl_download | download_reset | ~rom_loaded;
+// Select on the gamepad is CLEAR, same as F3 and the OSD button: every RCA
+// manual begins "Press CLEAR", so it belongs on the pad next to Start.
+wire joy_clear = joystick_0[6] | joystick_1[6];
+
+wire reset = RESET | status[0] | status[1] | clear_key | joy_clear | buttons[1] | ioctl_download | download_reset | ~rom_loaded;
 
 // reset after download
 reg [7:0] download_reset_cnt;
@@ -320,20 +323,15 @@ reg rom_loaded = 0;
 
 //////////////////////////////////////////////////////////////////
 
-//wire [1:0] col = status[4:3];
-
 wire HBlank;
 wire HSync;
 wire VBlank;
 wire VSync;
-wire ce_pix = 1'b1;
 wire video;
 
 rcastudioii rcastudio
 (
 	.clk_sys(clk_sys),
-	.clk_1m76(clk_1m76),
-	.clk_vid(clk_vid),
 	.reset(reset),
 	
 	.ioctl_download(ioctl_download),
@@ -354,18 +352,120 @@ rcastudioii rcastudio
 	.audio(audio),
 	.joystick_0(joystick_0),
 	.joystick_1(joystick_1),
-	.joy_override(status[4:2])
+	.joy_override(status[4:2]),
+	.players(status[8:7]),
+	.osk_a(osk_a),
+	.osk_b(osk_b)
 );
 
-assign CLK_VIDEO = clk_vid;
-assign CE_PIXEL = ce_pix;
+assign CLK_VIDEO = clk_sys;
 
-assign VGA_DE = ~(HBlank | VBlank);
-assign VGA_HS = HSync;
-assign VGA_VS = VSync;
-assign VGA_R = video ? 8'hFF : 8'h00;
-assign VGA_G = video ? 8'hFF : 8'h00;
-assign VGA_B = video ? 8'hFF : 8'h00;
+wire [7:0] mono = video ? 8'hFF : 8'h00;
+
+////////////////// On-screen keypad (Jaguar core's numstick, via ColecoAdam) ////
+//
+// Nudge an analog stick and hold ~0.5s to press a key: right stick is the 1-9
+// grid, left stick is 0. The OSD picks which Studio II keypad the presses land
+// on. The sticks belong to gamepad 0, except that pad B in a two-player game
+// belongs to gamepad 1 -- the same ownership rule as the digital mapping.
+// Geometry is sized for the 64x128 active area; cycle counts are for the
+// 7.04MHz clk_sys (hold ~0.5s, press ~75ms, recenter ~20ms).
+
+wire [1:0] osk_mode   = status[10:9];   // 0 off, 1 pad A, 2 pad B
+wire       osk_use_j1 = (osk_mode == 2'd2) && (status[8:7] == 2'd2);
+wire [15:0] osk_l = osk_use_j1 ? joystick_l_analog_1 : joystick_l_analog_0;
+wire [15:0] osk_r = osk_use_j1 ? joystick_r_analog_1 : joystick_r_analog_0;
+
+wire [11:0] osk_press;
+wire  [7:0] osk_vr, osk_vg, osk_vb;
+
+numstick #(
+	.HOLD_CYCLES     (3520000),   // ~0.5s  @ 7.04MHz
+	.PRESS_CYCLES    (528000),    // ~75ms
+	.RECENTER_CYCLES (141000),    // ~20ms
+	.DEFAULT_ACTIVE_W(64),
+	.DEFAULT_ACTIVE_H(128),
+	.CELL_W          (18),
+	.CELL_H          (12),
+	.CELL_GAP        (1),
+	.BOX_PAD         (2),
+	.STACK_GAP       (4),
+	.BORDER_THICKNESS(1)
+) numstick
+(
+	.clk_sys  (clk_sys),
+	.ce_pix   (ce_pix),
+	.reset    (reset),
+	.enable   (osk_mode != 2'd0),
+	.hblank   (HBlank),
+	.vblank   (VBlank),
+	.in_r     (mono),
+	.in_g     (mono),
+	.in_b     (mono),
+	.stick_l_x($signed(osk_l[7:0])),
+	.stick_l_y($signed(osk_l[15:8])),
+	.stick_r_x($signed(osk_r[7:0])),
+	.stick_r_y($signed(osk_r[15:8])),
+	.keypad_press(osk_press),
+	.out_r    (osk_vr),
+	.out_g    (osk_vg),
+	.out_b    (osk_vb)
+);
+
+// numstick's one-hot runs bit0='1'..bit8='9', bit9='0'; reorder to key number.
+wire [9:0] osk_keys = {osk_press[8:0], osk_press[9]};
+wire [9:0] osk_a = (osk_mode == 2'd1) ? osk_keys : 10'd0;
+wire [9:0] osk_b = (osk_mode == 2'd2) ? osk_keys : 10'd0;
+
+// video_mixer gives analog outputs a scandoubler (15.7kHz native -> 31kHz when
+// forced) and the OSD gamma control; video_freak provides aspect ratio and the
+// integer scaling modes on top of the HDMI scaler.
+wire       vga_de;
+wire       freeze_sync;
+
+video_mixer #(.LINE_LENGTH(140), .GAMMA(1)) video_mixer
+(
+	.CLK_VIDEO(CLK_VIDEO),
+	.CE_PIXEL(CE_PIXEL),
+	.ce_pix(ce_pix),
+	.scandoubler(forced_scandoubler),
+	.hq2x(1'b0),
+	.gamma_bus(gamma_bus),
+	.R(osk_vr),
+	.G(osk_vg),
+	.B(osk_vb),
+	.HSync(HSync),
+	.VSync(VSync),
+	.HBlank(HBlank),
+	.VBlank(VBlank),
+	.HDMI_FREEZE(HDMI_FREEZE),
+	.freeze_sync(freeze_sync),
+	.VGA_R(VGA_R),
+	.VGA_G(VGA_G),
+	.VGA_B(VGA_B),
+	.VGA_VS(VGA_VS),
+	.VGA_HS(VGA_HS),
+	.VGA_DE(vga_de)
+);
+
+wire [1:0] ar = status[122:121];
+video_freak video_freak
+(
+	.CLK_VIDEO(CLK_VIDEO),
+	.CE_PIXEL(CE_PIXEL),
+	.VGA_VS(VGA_VS),
+	.HDMI_WIDTH(HDMI_WIDTH),
+	.HDMI_HEIGHT(HDMI_HEIGHT),
+	.VGA_DE(VGA_DE),
+	.VIDEO_ARX(VIDEO_ARX),
+	.VIDEO_ARY(VIDEO_ARY),
+	.VGA_DE_IN(vga_de),
+	.ARX((!ar) ? 12'd4 : (ar - 1'd1)),
+	.ARY((!ar) ? 12'd3 : 12'd0),
+	.CROP_SIZE(12'd0),
+	.CROP_OFF(5'd0),
+	.SCALE({1'b0, status[6:5]})
+);
 
 //reg  [26:0] act_cnt;
 //always @(posedge clk_sys) act_cnt <= act_cnt + 1'd1; 

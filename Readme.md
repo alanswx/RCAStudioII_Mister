@@ -78,21 +78,39 @@ keyboard, so both work at once.
 | `FREEWAY` | `A2` throttle | `A8` brake | `B4` | `B6` | — |
 | `BOWLING` | `A2` hook | `A8` hook | — | — | `A5` roll |
 | `BASEBALL` | `B2` curve | `B8` curve | — | — | `A5` bat / `B5` pitch |
+| `HOMEBREW` | `2` | `8` | `4` | `6` | `B0` |
+| `HB2P` | `2` | `8` | `4` | `6` | `0` (own pad) |
 
 `CROSS` applies to both keypads (joystick 1 drives keypad B). Every mapping comes
-from the RCA manuals, not guesswork.
+from the RCA manuals, not guesswork. `HOMEBREW` is for Paul Robson's games, which
+all fire or start on `0`; it is also 8-way — a held diagonal presses the corner
+key (`1/3/7/9`), which is how Berzerk moves diagonally. Fire lands on `B0`, never
+`A0`, because `A0` restarts Invaders. `HB2P` is the two-player variant (Hockey,
+Combat): the plain cross plus fire-on-`0`, on each player's own pad. It is chosen
+by CRC only — the OSD override list stops at `Homebrew`.
 
 #### Which cartridges are mapped
 
-| Cartridge | Profile |
-|-----------|---------|
-| TV Arcade I – Space War | `SPACEWAR` |
-| TV Arcade III – Tennis / Squash | `PADDLE` |
-| TV Arcade IV – Baseball | `BASEBALL` |
-| TV Arcade Series – Gunfighter / Moonship Battle | `CROSS` |
-| TV Arcade Series – Speedway / Tag (USA and Europe) | `CROSS` |
-| Star Wars | `CROSS` |
-| Pinball | `CROSS` |
+| Cartridge | Profile | Start key |
+|-----------|---------|-----------|
+| TV Arcade I – Space War | `SPACEWAR` | `A1` |
+| TV Arcade III – Tennis / Squash | `PADDLE` | `A2` (Tennis) |
+| TV Arcade IV – Baseball | `BASEBALL` | `A0` |
+| TV Arcade Series – Gunfighter / Moonship Battle | `CROSS` | `A1` |
+| TV Arcade Series – Speedway / Tag (USA and Europe) | `CROSS` | `A1` |
+| Star Wars | `CROSS` | `A1` |
+| Pinball | `CROSS` | `A1` |
+
+Paul Robson's homebrew games are mapped too — both the `.st2` and its flat
+`.bin` conversion, which hash differently because the CRC covers the file as
+downloaded:
+
+| Homebrew | Profile | Start key |
+|----------|---------|-----------|
+| Asteroids, Berzerk | `HOMEBREW` | `A5` (starts each level) |
+| Invaders, Kaboom, Pacman | `HOMEBREW` | `A0` |
+| Scramble | `HOMEBREW` | `A6` (starts each level) |
+| Hockey, Combat | `HB2P` | `A1` (game select) |
 
 #### Which are deliberately *not* mapped
 
@@ -136,11 +154,44 @@ get reused during play (`A5` rolls the ball in Bowling):
 The table can only be as good as its entries, and an unknown cartridge falls back
 to `CROSS`, which is a guess. So the OSD has a **Joystick** setting:
 
-`Auto` (default) · `Cross` · `Paddle` · `Space War` · `Freeway` · `Bowling` · `Baseball`
+`Auto` (default) · `Cross` · `Paddle` · `Space War` · `Freeway` · `Bowling` · `Baseball` · `Homebrew`
 
 `Auto` uses the detection above; anything else forces that profile regardless of
 the cartridge. Useful for the unmapped titles, for a homebrew `.st2` the table has
 never seen, or simply if you prefer different controls.
+
+#### Start, Select, and the Players setting
+
+**Start** presses the cartridge's start key (the tables above; `A1` for anything
+unknown, which is what most cartridges use). **Select** is **CLEAR**, the console
+reset — every RCA manual begins "Press CLEAR".
+
+The **Players** OSD setting decides which stick drives keypad B's half of the
+profile. `1` runs everything from gamepad 0 — Space War steers and fires from
+one stick, and a `CROSS` game mirrors the stick onto both pads. `2` gives each
+gamepad its own keypad. `Auto` (default) keeps each profile's natural
+arrangement: the single-player profiles (`SPACEWAR`, `FREEWAY`, `BOWLING`,
+`HOMEBREW`) act as one-player, the symmetric ones (`CROSS`, `PADDLE`,
+`BASEBALL`, `HB2P`) as two.
+
+#### Binding any key directly
+
+The button list also carries **A0–A9** and **B0–B9** — all twenty keypad keys as
+individual buttons, plus Select for CLEAR (21 inputs). None of them has a
+default binding, so they are inert until you map one in *Define buttons*; after
+that they work on top of whatever profile is active. This is the escape hatch
+when a profile does not fit: bind exactly the keys the game wants to whatever
+buttons you like, no keyboard needed.
+
+#### On-screen keypad (analog sticks)
+
+The OSD's **Stick Keypad** setting (`Off` · `Pad A` · `Pad B`) overlays the
+Jaguar core's numstick, via the Coleco Adam: nudge the **right stick** for a
+1–9 grid, the **left stick** for `0`, hold ~half a second and the key is
+pressed. Presses land on the keypad the OSD names. The sticks belong to
+gamepad 0, except that Pad B in a two-player game belongs to gamepad 1. It is
+the slowest input, but reaches every key with no keyboard and no setup —
+number-entry games included.
 
 #### Adding a cartridge
 
