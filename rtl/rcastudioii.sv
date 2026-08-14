@@ -539,8 +539,13 @@ assign cpu_wr = (ram_a[11:0] >= 12'h800 && ram_a[11:0] < 12'hA00) ? ram_wr : 1'b
 //   0.4s   -> ~704000 ticks, so step the half period every ~500; 512 is close
 //             enough and is a free shift.
 
-localparam [15:0] SND_HALF_MIN = 16'd1408;   // ~625 Hz, freshly gated on
-localparam [15:0] SND_HALF_MAX = 16'd2816;   // ~312 Hz, fully decayed
+// Measured from refvideo/ rather than taken from docs/sound.txt, whose component
+// values do not give a sane frequency. Spectral analysis of the Star Wars direct
+// capture puts the fundamental at 545-549 Hz across every beep (the obvious
+// zero-crossing answer, ~1570 Hz, is the harmonics -- a 555's asymmetric duty
+// cycle gives strong even harmonics, and the TV audio path thins the fundamental).
+localparam [15:0] SND_HALF_MIN = 16'd1609;   // ~547 Hz, freshly gated on
+localparam [15:0] SND_HALF_MAX = 16'd3218;   // ~274 Hz, fully decayed
 
 reg [15:0] snd_half;
 reg [15:0] snd_cnt;

@@ -541,7 +541,7 @@ garbage.
 
 ---
 
-## 11. Credit where it is due
+## 12. Credit where it is due
 
 The core is Jason Coombes' (JasonA-dev, June 2022 - March 2025) — the first
 CDP1802 and CDP1861 Verilog, the keypad, the memory map and the Verilator

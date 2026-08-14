@@ -411,6 +411,17 @@ cards), **2** doubles — double the bet, exactly one more card — and **0** st
 Dealer draws on 16 or less and stands on 17, except a soft 17. A natural
 blackjack pays 2 to 1, an ordinary win 1 to 1, a tie returns your bet.
 
+## Accuracy
+
+Checked against captures of real hardware in `refvideo/`:
+
+- **Speed** — beep length is a CPU-timed loop, so it measures CPU speed directly.
+  Real hardware's Star Wars beeps are 115–130 ms; this core's are 117 ms.
+- **Beeper pitch** — 547 Hz, measured from the spectrum of a direct capture
+  (545–549 Hz across every beep) rather than taken from the hardware notes,
+  whose component values do not give a sane frequency.
+- Frames are pixel-identical to a reference emulator on 18 of 21 test cases.
+
 ## Building
 
 Quartus **17.0.x** only. If you do not have it installed, the build runs in the

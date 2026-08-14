@@ -56,3 +56,6 @@ verilator/obj_dir_headless/
 verilator/out/
 build_id.v
 output_files/
+
+# hardware capture videos used for accuracy checks (large, local reference)
+refvideo/
