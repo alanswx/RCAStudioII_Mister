@@ -282,8 +282,10 @@ windows `$0A00-$0BFF`, `$0C00-$0DFF` and `$0E00-$0FFF` are not decoded.
 - No PAL support, no aspect/scanline options, no `Clear` button in the OSD, and
   the BIOS is not embedded (the core is held in reset until one is loaded).
 
-### 6.3 Keypad mapping
-PS/2 scancode only, no joystick/gamepad support. The
+### 6.3 No joystick support
+PS/2 scancode only. The keypad layout itself is now a proper 3x4 block matching
+the console (contributed by Elle Ball, @meauxdal), but nothing maps a gamepad to
+it. The
 mapping is a straight number-row / `P Q W E R T Y U I O` split rather than the
 3x4 keypad layout MAME uses.
 

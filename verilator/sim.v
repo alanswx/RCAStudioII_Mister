@@ -6,6 +6,7 @@ module top(
    input clk_48 /*verilator public_flat*/,
    input clk_24,
    input [11:0]  inputs/*verilator public_flat*/,
+   input [31:0]  joystick_0/*verilator public_flat*/,
 
    output [7:0] VGA_R/*verilator public_flat*/,
    output [7:0] VGA_G/*verilator public_flat*/,
@@ -33,7 +34,7 @@ module top(
 );
    
    // Core inputs/outputs
-   wire audio;   // 1-bit beeper, gated by the 1802's Q line
+wire audio;   // 1-bit beeper, gated by the 1802's Q line
    wire [3:0] led/*verilator public_flat*/;
 
    wire VSync, HSync;
@@ -102,7 +103,9 @@ rcastudioii rcastudio
 	.video_de(video_de),
 
 	.video(video),
-	.audio(audio)
+	.audio(audio),
+	.joystick_0(joystick_0),
+	.joystick_1(32'd0)
 );
 
 endmodule

@@ -35,6 +35,8 @@ module rcastudioii
 	input        [7:0] ioctl_dout,
 
 	input       [10:0] ps2_key,
+	input       [31:0] joystick_0,
+	input       [31:0] joystick_1,
 	input  reg         ce_pix,
 
 	output reg         HBlank,
@@ -138,13 +140,114 @@ end
 reg  [9:0] playerA = 10'h0;
 reg  [9:0] playerB = 10'h0;
 
+
+////////////////// JOYSTICK -> KEYPAD ///////////////////////////////////////
+//
+// The Studio II has no joystick: every game is played on the 10-key pads, and
+// each one picks its own keys. So a gamepad can only work if the mapping follows
+// the cartridge. A CRC16 of the image is taken while it downloads and looked up
+// in a table below; the result selects one of a few profiles.
+//
+// Key numbers come from the RCA manuals (see Readme "How to play"), not guesses.
+// MiSTer joystick bits: [0]=right [1]=left [2]=down [3]=up [4]=fire1 [5]=fire2.
+
+localparam [2:0] MAP_NONE     = 3'd0;   // keypad only
+localparam [2:0] MAP_CROSS    = 3'd1;   // 2/8/4/6 + 5 fire, both pads
+localparam [2:0] MAP_PADDLE   = 3'd2;   // up/down only (Tennis, Squash)
+localparam [2:0] MAP_SPACEWAR = 3'd3;   // fire A2, steer B4/B6
+localparam [2:0] MAP_FREEWAY  = 3'd4;   // steer B4/B6, throttle A2, brake A8
+localparam [2:0] MAP_BOWLING  = 3'd5;   // roll A5, hook A2/A8
+localparam [2:0] MAP_BASEBALL = 3'd6;   // bat A5; pitch B5 straight, B2/B8 curve
+
+reg [2:0] map_profile = MAP_NONE;
+
+// ---- CRC16-CCITT over the cartridge image, computed during ioctl_download ----
+// Seed on the first byte and hold the result after the download ends -- clearing
+// it whenever ioctl_download is low would wipe the CRC before it could be used.
+reg [15:0] cart_crc = 16'hFFFF;
+reg        dl_d;
+wire       dl_done = dl_d & ~ioctl_download;      // falling edge: download finished
+
+always @(posedge clk_sys) begin
+	integer i;
+	reg [15:0] c;
+	dl_d <= ioctl_download;
+	if (cart_dl && ioctl_wr) begin
+		c = (ioctl_addr == 0) ? 16'hFFFF : cart_crc;
+		c = c ^ {ioctl_dout, 8'h00};
+		for (i = 0; i < 8; i = i + 1)
+			c = c[15] ? ((c << 1) ^ 16'h1021) : (c << 1);
+		cart_crc <= c;
+	end
+end
+
+// ---- CRC -> profile ---------------------------------------------------------
+// Add a cartridge by printing its CRC (tools/cart-crc.sh) and adding a line.
+always @(posedge clk_sys) begin
+	if (dl_done) begin
+		case (cart_crc)
+			16'h977C: map_profile <= MAP_SPACEWAR; // TV Arcade I - Space War
+			16'h88FB: map_profile <= MAP_PADDLE;   // TV Arcade III - Tennis + Squash
+			16'hF837: map_profile <= MAP_BASEBALL; // TV Arcade IV - Baseball
+			16'hD3E2: map_profile <= MAP_CROSS;    // Pinball
+			16'hE153: map_profile <= MAP_CROSS;    // Speedway + Tag (Europe)
+			16'hD0DA: map_profile <= MAP_CROSS;    // Speedway + Tag (USA)
+			16'hD13E: map_profile <= MAP_CROSS;    // Star Wars
+			16'h3CDC: map_profile <= MAP_CROSS;    // Gunfighter + Moonship Battle
+			16'hFFFF: map_profile <= MAP_FREEWAY;  // no cartridge: BIOS built-ins
+			default:  map_profile <= MAP_CROSS;    // unknown cart: the common case
+		endcase
+	end
+end
+
+// ---- profile -> keypad presses ---------------------------------------------
+reg [9:0] joyA, joyB;
+always @* begin
+	joyA = 10'd0;
+	joyB = 10'd0;
+	case (map_profile)
+	MAP_CROSS: begin
+		if (joystick_0[3]) joyA[2] = 1'b1;   if (joystick_0[2]) joyA[8] = 1'b1;
+		if (joystick_0[1]) joyA[4] = 1'b1;   if (joystick_0[0]) joyA[6] = 1'b1;
+		if (joystick_0[4]) joyA[5] = 1'b1;
+		if (joystick_1[3]) joyB[2] = 1'b1;   if (joystick_1[2]) joyB[8] = 1'b1;
+		if (joystick_1[1]) joyB[4] = 1'b1;   if (joystick_1[0]) joyB[6] = 1'b1;
+		if (joystick_1[4]) joyB[5] = 1'b1;
+	end
+	MAP_PADDLE: begin                        // racquet moves on 2/8 only
+		if (joystick_0[3]) joyA[2] = 1'b1;   if (joystick_0[2]) joyA[8] = 1'b1;
+		if (joystick_1[3]) joyB[2] = 1'b1;   if (joystick_1[2]) joyB[8] = 1'b1;
+	end
+	MAP_SPACEWAR: begin                      // fire on pad A, steering on pad B
+		if (joystick_0[4]) joyA[2] = 1'b1;
+		if (joystick_0[1]) joyB[4] = 1'b1;   if (joystick_0[0]) joyB[6] = 1'b1;
+	end
+	MAP_FREEWAY: begin                       // steer on B, throttle/brake on A
+		if (joystick_0[1]) joyB[4] = 1'b1;   if (joystick_0[0]) joyB[6] = 1'b1;
+		if (joystick_0[3]) joyA[2] = 1'b1;   if (joystick_0[2]) joyA[8] = 1'b1;
+	end
+	MAP_BOWLING: begin                       // roll straight, or hook up/down
+		if (joystick_0[4]) joyA[5] = 1'b1;
+		if (joystick_0[3]) joyA[2] = 1'b1;   if (joystick_0[2]) joyA[8] = 1'b1;
+	end
+	MAP_BASEBALL: begin                      // bat on A, pitch on B
+		if (joystick_0[4]) joyA[5] = 1'b1;
+		if (joystick_1[4]) joyB[5] = 1'b1;
+		if (joystick_1[3]) joyB[2] = 1'b1;   if (joystick_1[2]) joyB[8] = 1'b1;
+	end
+	default: ;
+	endcase
+end
+
 ////////////////// CPU //////////////////////////////////////////////////////////////////
 
 // EF4=player B, EF3=player A, EF2 unused (high), EF1=1861 display status. Only keys 0-9 exist, so
 // guard the index: keylatch 10-15 used to read off the end of the 10-bit playerA/playerB vectors.
 wire  [3:0] EF;
 wire        key_valid = (keylatch < 4'd10);
-assign EF = {key_valid & playerB[keylatch], key_valid & playerA[keylatch], 1'b1, EFx};
+wire  [9:0] padA = playerA | joyA;
+wire  [9:0] padB = playerB | joyB;
+assign EF = {key_valid & padB[keylatch], key_valid & padA[keylatch], 1'b1, EFx};
 
 // The Studio II has no input port that returns data -- the keypads are read through EF3/EF4,
 // and INP 1 only toggles the display, discarding the byte. Tie the CPU's input bus off

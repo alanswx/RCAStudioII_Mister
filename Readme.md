@@ -36,15 +36,44 @@ The Studio II has two 10-key keypads. The left one is player A (read through
 `EF3`), the right is player B (`EF4`); software scans them by writing the key
 number to `OUT 2` and testing the flags — see `docs/keyboard.txt`.
 
-| | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
+Each keypad is laid out on the host keyboard the way it sits on the console —
+a 3x4 block — so the shapes match rather than the digits:
+
+```
+   Player A (left)        Player B (right)
+    1  2  3                7  8  9
+    Q  W  E                U  I  O
+    A  S  D                J  K  L
+       X                      ,
+```
+
+| Keypad key | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 0 |
 |---|---|---|---|---|---|---|---|---|---|---|
-| **Player A** | `0` | `1` | `2` | `3` | `4` | `5` | `6` | `7` | `8` | `9` |
-| **Player B** | `P` | `Q` | `W` | `E` | `R` | `T` | `Y` | `U` | `I` | `O` |
+| **Player A** | `1` | `2` | `3` | `Q` | `W` | `E` | `A` | `S` | `D` | `X` |
+| **Player B** | `7` | `8` | `9` | `U` | `I` | `O` | `J` | `K` | `L` | `,` |
 
 **CLEAR** — the console reset button every manual asks for — is **F3**, or
 **Clear** in the OSD.
 
 With no cartridge, the five BIOS built-in games are selected with keys **1**–**5** on keyboard A — see below.
+
+### Joystick
+
+A gamepad works, but the Studio II has no joystick — every game invents its own
+keypad controls — so a fixed mapping cannot work. The core takes a CRC16 of the
+cartridge as it loads and picks a profile from a table in `rtl/rcastudioii.sv`:
+
+| Profile | Mapping | Used by |
+|---------|---------|---------|
+| `CROSS` | up/down/left/right → **2/8/4/6**, fire → **5**, both pads | Star Wars, Speedway, Tag, Gunfighter, Moonship, Pinball, and the default for unknown carts |
+| `PADDLE` | up/down → **2/8** only | Tennis, Squash |
+| `SPACEWAR` | fire → **A2**, left/right → **B4/B6** | Space War (steering really is on the other keypad) |
+| `FREEWAY` | left/right → **B4/B6**, up → **A2** throttle, down → **A8** brake | BIOS built-ins |
+| `BOWLING` | fire → **A5** roll, up/down → **A2/A8** hook | — |
+| `BASEBALL` | bat **A5**; pitch **B5** straight, **B2/B8** curve | Baseball |
+
+Every mapping comes from the RCA manuals, not guesswork. To add a cartridge,
+print its CRC with `tools/cart-crc.sh` and add a line to the `cart_crc` case.
 
 ### Per-cartridge
 
@@ -301,6 +330,8 @@ CPU instruction tracing and VRAM dumps — see `--help`.
   on.
 - **Flandango** ([@Flandango](https://github.com/Flandango)) — MiSTer framework
   compatibility and early Pixie video work (September 2022).
+- **Elle Ball** ([@meauxdal](https://github.com/meauxdal)) — the 3x4 keypad
+  layout, so the host keys sit the way the console's keypads do (August 2026).
 - **Alan Steremberg** ([@alanswx](https://github.com/alanswx)) — 1802
   interrupts, DMA and machine-cycle timing; the DMA-driven CDP1861; the
   reference-emulator comparison harness (August 2026).

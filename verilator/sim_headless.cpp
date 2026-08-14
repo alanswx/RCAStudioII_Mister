@@ -274,8 +274,8 @@ struct IoctlDriver {
 // Keypad injection
 // ---------------------------------------------------------------------------
 // PS/2 set-2 scancodes, matching the table in rtl/rcastudioii.sv.
-static const uint8_t PS2_A[10] = { 0x45,0x16,0x1E,0x26,0x25,0x2E,0x36,0x3D,0x3E,0x46 };
-static const uint8_t PS2_B[10] = { 0x4D,0x15,0x1D,0x24,0x2D,0x2C,0x35,0x3C,0x43,0x44 };
+static const uint8_t PS2_A[10] = { 0x22,0x16,0x1E,0x26,0x15,0x1D,0x24,0x1C,0x1B,0x23 };   // keypad A, 3x4 layout: X=0, 123 / QWE / ASD
+static const uint8_t PS2_B[10] = { 0x41,0x3D,0x3E,0x46,0x3C,0x43,0x44,0x3B,0x42,0x4B };   // keypad B, 3x4 layout: ,=0, 789 / UIO / JKL
 
 struct KeyEvent {
     long frame;
@@ -325,6 +325,14 @@ static void dump_state(FILE* f, long frame, const FrameGrabber& fg, bool with_vr
         if (i % 8 == 7) fprintf(f, "\n");
     }
 
+    fprintf(f, "-- Cartridge mapping --\n");
+    {
+        static const char* pn[] = {"NONE","CROSS","PADDLE","SPACEWAR","FREEWAY","BOWLING","BASEBALL"};
+        int pr = top->rootp->top__DOT__rcastudio__DOT__map_profile;
+        fprintf(f, "  cart CRC16 %04X  ->  profile %d (%s)\n",
+                top->rootp->top__DOT__rcastudio__DOT__cart_crc, pr,
+                (pr >= 0 && pr < 7) ? pn[pr] : "?");
+    }
     fprintf(f, "-- Pixie / video --\n");
     fprintf(f, "  display_enabled %d  dma_cnt %d  vcount %d  hcount %d\n",
             PIX(display_enabled), PIX(dma_cnt), PIX(vcount), PIX(hcount));
@@ -387,6 +395,8 @@ static void usage(const char* argv0) {
 "    --dump-file FILE     write dumps here instead of stdout\n"
 "\n"
 "  Input\n"
+"    --joy MASK@F[:H]     drive joystick 0 with MASK (bit0 right, 1 left, 2 down,\n"
+"                         3 up, 4 fire) at frame F for H frames.\n"
 "    --press KEY@F[:H]    press KEY at frame F, hold H frames (default 4).\n"
 "                         KEY is a0..a9 (player A) or b0..b9 (player B),\n"
 "                         or a raw hex PS/2 scancode like 0x16.\n"
@@ -428,6 +438,7 @@ int main(int argc, char** argv) {
     bool shot_last = false, frame_log = false, quiet = false;
     long trace_cpu = 0, trace_from = 0;
     bool trace_q = false;
+    uint32_t joy_mask = 0; long joy_from = -1, joy_to = -1;
     // Q gates the Studio II's beeper; track its edges so the core can be compared
     // against the reference emulator's Q even though AUDIO_L/R are still tied off.
     bool q_prev = false; long q_edges = 0, q_on_frames = 0; long q_last_chg = 0;
@@ -460,6 +471,15 @@ int main(int argc, char** argv) {
         else if (a == "--ppm")        want_ppm = true;
         else if (a == "--ascii")      want_ascii = true;
         else if (a == "--vram")       want_vram = true;
+        else if (a == "--joy") {
+            std::string t = next("--joy");
+            size_t at = t.find('@'); if (at == std::string::npos) { fprintf(stderr,"error: --joy needs MASK@FRAME\n"); exit(1); }
+            int hold = 4; std::string rest = t.substr(at+1);
+            size_t co = rest.find(':');
+            if (co != std::string::npos) { hold = atoi(rest.c_str()+co+1); rest = rest.substr(0,co); }
+            joy_mask = (uint32_t)strtoul(t.substr(0,at).c_str(), nullptr, 0);
+            joy_from = atol(rest.c_str()); joy_to = joy_from + hold;
+        }
         else if (a == "--trace-q")    trace_q = true;
         else if (a == "--frame-log")  frame_log = true;
         else if (a == "--quiet")      quiet = true;
@@ -535,6 +555,7 @@ int main(int argc, char** argv) {
 
         // --- rising edge ---
         io.tick();
+        top->joystick_0 = (fg.frame >= joy_from && fg.frame < joy_to) ? joy_mask : 0;
 
         // Key events scheduled for this frame
         auto range = key_sched.equal_range(fg.frame);

@@ -210,6 +210,7 @@ localparam CONF_STR = {
 	"-;",	
 	"F0,rom,Load Bios;",
 	"F1,ST2BINROM,Load Cartridge;",
+	"J1,Fire;",
 	"-;",
 //	"O[122:121],Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
 //	"O[2],TV Mode,NTSC,PAL;",
@@ -224,6 +225,7 @@ wire forced_scandoubler;
 wire   [1:0] buttons;
 wire [127:0] status;
 wire  [10:0] ps2_key;
+wire  [31:0] joystick_0, joystick_1;
 
 // CLEAR is the Studio II's console button. On real hardware it drives the 1802's
 // CLEAR pin and resets the CDP1861: MAME's studio2 machine_reset() does exactly
@@ -263,7 +265,9 @@ hps_io #(.CONF_STR(CONF_STR)) hps_io
 	.buttons(buttons),
 	.status(status),
 	
-	.ps2_key(ps2_key)
+	.ps2_key(ps2_key),
+	.joystick_0(joystick_0),
+	.joystick_1(joystick_1)
 );
 
 ///////////////////////   CLOCKS   ///////////////////////////////
@@ -342,7 +346,9 @@ rcastudioii rcastudio
 	.VSync(VSync),
   	.video_de(),
 	.video(video),
-	.audio(audio)
+	.audio(audio),
+	.joystick_0(joystick_0),
+	.joystick_1(joystick_1)
 );
 
 assign CLK_VIDEO = clk_vid;
