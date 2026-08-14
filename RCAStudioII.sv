@@ -125,6 +125,19 @@ module emu
 	output  [7:0] DDRAM_BE,
 	output        DDRAM_WE,
 
+	//SDRAM interface with lower latency
+	output        SDRAM_CLK,
+	output        SDRAM_CKE,
+	output [12:0] SDRAM_A,
+	output  [1:0] SDRAM_BA,
+	inout  [15:0] SDRAM_DQ,
+	output        SDRAM_DQML,
+	output        SDRAM_DQMH,
+	output        SDRAM_nCS,
+	output        SDRAM_nCAS,
+	output        SDRAM_nRAS,
+	output        SDRAM_nWE,
+
 `ifdef MISTER_DUAL_SDRAM
 	//Secondary SDRAM
 	//Set all output SDRAM_* signals to Z ASAP if SDRAM2_EN is 0
@@ -194,8 +207,7 @@ assign VIDEO_ARY = 12'd0;
 `include "build_id.v" 
 localparam CONF_STR = {
 	"RCA-StudioII;;",
-	"-;",	
-	"F0,rom,Load Bios;",
+	"-;",	"F0,rom,Load Bios;",
 	"F1,ST2BINROM,Load Cartridge;",
 	"-;",
 //	"O[122:121],Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
@@ -204,9 +216,6 @@ localparam CONF_STR = {
 //	"T[0],Reset;",
 	"T[1],Clear;",
 	"R[0],Reset and close OSD;",
-	// Non-OSD entries (J/jn/V) must sit below every menu row: the menu's selection
-	// pass counts any entry starting >= 'A' (Main menu.cpp), but its drawing pass
-	// skips J -- a J placed mid-string shifts every row after it off by one.
 	"V,v",`BUILD_DATE 
 };
 
@@ -321,7 +330,7 @@ rcastudioii rcastudio
 	.ioctl_index(ioctl_index),
 	.ioctl_wr(ioctl_wr),
 	.ioctl_addr(ioctl_addr),
-	.ioctl_dout(rcastudio_dout),
+	.ioctl_dout(ioctl_data),
 
 	.ps2_key(ps2_key),
 	.ce_pix(ce_pix),
