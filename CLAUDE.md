@@ -282,10 +282,15 @@ windows `$0A00-$0BFF`, `$0C00-$0DFF` and `$0E00-$0FFF` are not decoded.
 - No PAL support, no aspect/scanline options, no `Clear` button in the OSD, and
   the BIOS is not embedded (the core is held in reset until one is loaded).
 
-### 6.3 No joystick support
-PS/2 scancode only. The keypad layout itself is now a proper 3x4 block matching
-the console (contributed by Elle Ball, @meauxdal), but nothing maps a gamepad to
-it. The
+### 6.3 Joystick mapping for the built-in games
+Gamepads work via a per-cartridge profile chosen from a CRC16 of the image
+(§10). With no cartridge there is nothing to CRC, so all five BIOS built-ins
+share one profile -- currently `FREEWAY`, which is wrong for Bowling and for
+Doodles/Patterns. `MAP_BOWLING` is defined but unreachable for that reason.
+
+The built-ins are selected by a keypress after reset rather than by a cartridge,
+so fixing this needs a different signal: watch which key starts them (A1 Doodles,
+A2 Patterns, A3 Freeway, A4 Bowling, A5 Addition) and switch profile on that. The
 mapping is a straight number-row / `P Q W E R T Y U I O` split rather than the
 3x4 keypad layout MAME uses.
 
@@ -384,6 +389,27 @@ cartridges including an RCA test cart.
 ---
 
 ## 10. What changed (2026-08-12)
+
+**Joystick support, mapped per cartridge.** A CRC16 of the image is taken during
+`ioctl_download` and looked up at the end of the transfer to pick one of six
+profiles. This is necessary rather than ornamental: the Studio II has no
+joystick, so each game chose its own keys -- Tennis moves the racquet on 2/8 but
+uses 4/5/6 for racquet size, and Space War fires on keypad A while steering on
+keypad B. Presses are OR'd with the keyboard. Unknown cartridges get `CROSS`.
+
+Eight cartridges are mapped explicitly; ten are deliberately left on the default
+because they are number-entry games a stick cannot drive, or are unidentified.
+See the Readme for the breakdown and the reasoning.
+
+Verified by equivalence rather than inspection: driving the stick produces
+byte-identical frames to the matching keypress and both differ from no input,
+including the asymmetric Space War case where fire lands on keypad A and steering
+on keypad B.
+
+**3x4 keypad layout** contributed by Elle Ball (@meauxdal), cherry-picked from
+their fork -- no PR was opened. Player A's layout matches the C reference
+emulator's table exactly, which helps the comparison harness.
+
 
 **Sound.** The beeper is implemented: a square wave gated by the 1802's Q line,
 with the pitch decay `docs/sound.txt` describes (NE555 astable whose control pin

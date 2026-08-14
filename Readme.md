@@ -59,21 +59,79 @@ With no cartridge, the five BIOS built-in games are selected with keys **1**–*
 
 ### Joystick
 
-A gamepad works, but the Studio II has no joystick — every game invents its own
-keypad controls — so a fixed mapping cannot work. The core takes a CRC16 of the
-cartridge as it loads and picks a profile from a table in `rtl/rcastudioii.sv`:
+A gamepad works, but not through a fixed mapping. The Studio II has no joystick —
+every game invents its own keypad controls — so Tennis moves the racquet on
+**2/8** while using **4/5/6** to pick racquet *size*, and Space War fires on
+keypad **A** but steers on keypad **B**. One mapping cannot serve both.
 
-| Profile | Mapping | Used by |
-|---------|---------|---------|
-| `CROSS` | up/down/left/right → **2/8/4/6**, fire → **5**, both pads | Star Wars, Speedway, Tag, Gunfighter, Moonship, Pinball, and the default for unknown carts |
-| `PADDLE` | up/down → **2/8** only | Tennis, Squash |
-| `SPACEWAR` | fire → **A2**, left/right → **B4/B6** | Space War (steering really is on the other keypad) |
-| `FREEWAY` | left/right → **B4/B6**, up → **A2** throttle, down → **A8** brake | BIOS built-ins |
-| `BOWLING` | fire → **A5** roll, up/down → **A2/A8** hook | — |
-| `BASEBALL` | bat **A5**; pitch **B5** straight, **B2/B8** curve | Baseball |
+So the core takes a **CRC16 of the cartridge as it loads** and selects a profile
+from a table in `rtl/rcastudioii.sv`. Joystick presses are OR'd with the
+keyboard, so both work at once.
 
-Every mapping comes from the RCA manuals, not guesswork. To add a cartridge,
-print its CRC with `tools/cart-crc.sh` and add a line to the `cart_crc` case.
+#### Profiles
+
+| Profile | Up | Down | Left | Right | Fire |
+|---------|----|------|------|-------|------|
+| `CROSS` | `2` | `8` | `4` | `6` | `5` |
+| `PADDLE` | `2` | `8` | — | — | — |
+| `SPACEWAR` | — | — | `B4` | `B6` | `A2` |
+| `FREEWAY` | `A2` throttle | `A8` brake | `B4` | `B6` | — |
+| `BOWLING` | `A2` hook | `A8` hook | — | — | `A5` roll |
+| `BASEBALL` | `B2` curve | `B8` curve | — | — | `A5` bat / `B5` pitch |
+
+`CROSS` applies to both keypads (joystick 1 drives keypad B). Every mapping comes
+from the RCA manuals, not guesswork.
+
+#### Which cartridges are mapped
+
+| Cartridge | Profile |
+|-----------|---------|
+| TV Arcade I – Space War | `SPACEWAR` |
+| TV Arcade III – Tennis / Squash | `PADDLE` |
+| TV Arcade IV – Baseball | `BASEBALL` |
+| TV Arcade Series – Gunfighter / Moonship Battle | `CROSS` |
+| TV Arcade Series – Speedway / Tag (USA and Europe) | `CROSS` |
+| Star Wars | `CROSS` |
+| Pinball | `CROSS` |
+
+#### Which are deliberately *not* mapped
+
+Ten cartridges fall through to the `CROSS` default. That is intentional for most
+of them, and a joystick simply cannot express what they need:
+
+**Number-entry games** — the input *is* a digit, so a four-way stick has nothing
+sensible to say. Use the keypad:
+
+- TV Arcade II – Fun with Numbers (3-digit guesses)
+- TV Casino Series – Blackjack (bet `1`–`9`/`0`, hit `1`, double `2`, stand `0`)
+- TV Casino Series – TV Bingo
+- TV Mystic Series – Biorhythm (birth and start dates)
+- TV School House I, and II – Math Fun (arithmetic answers)
+- Concentration Match (grid squares chosen by number)
+
+**Unidentified** — no manual and no confirmed controls, so any mapping would be
+a guess:
+
+- `86677b (Europe)`, `87201 (Europe)`, Demonstration Cartridge
+
+These three are also the ones whose frames diverge from the reference emulator,
+so treat them as untested rather than working.
+
+#### Known limitation: the built-in games
+
+With no cartridge inserted there is nothing to CRC, so all five BIOS games share
+one profile. It is set to `FREEWAY`, which is right for Freeway but wrong for
+Bowling (which wants `BOWLING`) and for Doodles and Patterns (which want
+`CROSS`). `BOWLING` is defined but currently unreachable for exactly this reason.
+Fixing it needs a different signal than the cartridge CRC — the built-ins are
+chosen by a keypress after reset, not by a cartridge.
+
+#### Adding a cartridge
+
+```sh
+tools/cart-crc.sh "software/carts/Some Game.bin"
+```
+then add one line to the `cart_crc` case in `rtl/rcastudioii.sv`.
 
 ### Per-cartridge
 
