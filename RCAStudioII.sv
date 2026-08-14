@@ -125,19 +125,6 @@ module emu
 	output  [7:0] DDRAM_BE,
 	output        DDRAM_WE,
 
-	//SDRAM interface with lower latency
-	output        SDRAM_CLK,
-	output        SDRAM_CKE,
-	output [12:0] SDRAM_A,
-	output  [1:0] SDRAM_BA,
-	inout  [15:0] SDRAM_DQ,
-	output        SDRAM_DQML,
-	output        SDRAM_DQMH,
-	output        SDRAM_nCS,
-	output        SDRAM_nCAS,
-	output        SDRAM_nRAS,
-	output        SDRAM_nWE,
-
 `ifdef MISTER_DUAL_SDRAM
 	//Secondary SDRAM
 	//Set all output SDRAM_* signals to Z ASAP if SDRAM2_EN is 0
@@ -170,7 +157,7 @@ module emu
 	input         OSD_STATUS
 );
 
-///////// Default values for ports not used in this core /////////
+///// Default values for ports not used in this core /////////
 
 assign ADC_BUS  = 'Z;
 assign USER_OUT = '1;
@@ -195,7 +182,7 @@ assign LED_DISK = 0;
 assign LED_POWER = 0;
 assign BUTTONS = 0;
 
-//////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////
 
 //wire [1:0] ar = status[122:121];
 
@@ -217,6 +204,9 @@ localparam CONF_STR = {
 //	"T[0],Reset;",
 	"T[1],Clear;",
 	"R[0],Reset and close OSD;",
+	// Non-OSD entries (J/jn/V) must sit below every menu row: the menu's selection
+	// pass counts any entry starting >= 'A' (Main menu.cpp), but its drawing pass
+	// skips J -- a J placed mid-string shifts every row after it off by one.
 	"V,v",`BUILD_DATE 
 };
 
@@ -331,7 +321,7 @@ rcastudioii rcastudio
 	.ioctl_index(ioctl_index),
 	.ioctl_wr(ioctl_wr),
 	.ioctl_addr(ioctl_addr),
-	.ioctl_dout(ioctl_data),
+	.ioctl_dout(rcastudio_dout),
 
 	.ps2_key(ps2_key),
 	.ce_pix(ce_pix),
@@ -340,7 +330,7 @@ rcastudioii rcastudio
 	.HSync(HSync),
 	.VBlank(VBlank),
 	.VSync(VSync),
-  	.video_de(),
+	  	.video_de(),
 	.video(video),
 	.audio(audio)
 );
@@ -348,12 +338,23 @@ rcastudioii rcastudio
 assign CLK_VIDEO = clk_vid;
 assign CE_PIXEL = ce_pix;
 
+`ifndef MISTER_DIRECT_VIDEO
 assign VGA_DE = ~(HBlank | VBlank);
 assign VGA_HS = HSync;
 assign VGA_VS = VSync;
 assign VGA_R = video ? 8'hFF : 8'h00;
 assign VGA_G = video ? 8'hFF : 8'h00;
 assign VGA_B = video ? 8'hFF : 8'h00;
+`else
+// Direct video mode: luma -> Green, chroma -> Red. Studio II is monochrome so
+// chroma is zeroed; adapters expect luma on green and chroma on red.
+assign VGA_DE = ~(HBlank | VBlank);
+assign VGA_HS = HSync;
+assign VGA_VS = VSync;
+assign VGA_R = 8'h00;                      // chroma (unused for mono)
+assign VGA_G = video ? 8'hFF : 8'h00;     // luma
+assign VGA_B = 8'h00;
+`endif
 
 //reg  [26:0] act_cnt;
 //always @(posedge clk_sys) act_cnt <= act_cnt + 1'd1; 
