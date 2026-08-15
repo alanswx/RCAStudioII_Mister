@@ -229,109 +229,48 @@ end
 // start_key is the keypad-A digit that the gamepad Start button presses.
 // Default / no-cart = 1 (most common).
 
-reg [3:0] map_profile = MAP_8WAY;
-reg [3:0] start_key   = 4'd1;
+reg [3:0] start_key = 4'd1;
 
 always @(posedge clk_sys) begin
 	if (dl_done) begin
-		// default – built-in games or unknown CRC
-		map_profile <= MAP_8WAY;
-		start_key   <= 4'd1;
+		case (cart_crc)
+			// Space War
+			16'h977C, 16'h45B5: begin map_profile <= MAP_SPACEWAR; start_key <= 4'd1; end
 
-		unique case (cart_crc)
+			// Tennis/Squash
+			16'h88FB: begin map_profile <= MAP_CROSS; start_key <= 4'd2; end
 
-			// ------------------------------------------------------------------ MAP_SPACEWAR, Start=1
-			16'h977C,                       // TV Arcade I - Space War (USA)
-			16'h45B5: begin                 // spacewar.st2
-				map_profile <= MAP_SPACEWAR;
-				start_key   <= 4'd1;
-			end
+			// Pinball / Speedway / Star Wars
+			16'hD3E2, 16'h92BA,
+			16'hE153, 16'hD0DA, 16'h8404,
+			16'hD13E, 16'h03E6: begin map_profile <= MAP_CROSS; start_key <= 4'd1; end
 
-			// ------------------------------------------------------------------ MAP_CROSS, Start=2
-			16'h88FB: begin                 // TV Arcade III – Tennis + Squash
-				map_profile <= MAP_CROSS;
-				start_key   <= 4'd2;
-			end
+			// Baseball
+			16'hF837, 16'h2526: begin map_profile <= MAP_BASEBALL; start_key <= 4'd0; end
 
-			// ------------------------------------------------------------------ MAP_CROSS, Start=1
-			16'hD3E2,                       // Pinball (Europe)
-			16'h92BA,                       // pinball.st2
-			16'hE153,                       // Speedway + Tag (Europe)
-			16'hD0DA,                       // Speedway + Tag (USA)
-			16'h8404,                       // speedway.st2
-			16'hD13E,                       // Star Wars
-			16'h03E6: begin                 // star-wars.st2
-				map_profile <= MAP_CROSS;
-				start_key   <= 4'd1;
-			end
+			// Gunfighter
+			16'h3CDC, 16'h043E: begin map_profile <= MAP_GUNFIGHTER; start_key <= 4'd1; end
 
-			// ------------------------------------------------------------------ MAP_BASEBALL, Start=0
-			16'hF837,                       // TV Arcade IV – Baseball
-			16'h2526: begin                 // baseball.st2
-				map_profile <= MAP_BASEBALL;
-				start_key   <= 4'd0;
-			end
+			// Homebrew
+			16'h1943, 16'hFBEF, 16'h2B4D: begin map_profile <= MAP_HOMEBREW; start_key <= 4'd5; end // Asteroids
+			16'h4F61, 16'hAEC7, 16'hE080: begin map_profile <= MAP_HOMEBREW; start_key <= 4'd5; end // Berzerk
+			16'h69AA, 16'h5AC5, 16'h2D86: begin map_profile <= MAP_HOMEBREW; start_key <= 4'd0; end // Invaders
+			16'h6793, 16'hDFCF, 16'h8551: begin map_profile <= MAP_HOMEBREW; start_key <= 4'd0; end // Kaboom
+			16'hC556, 16'h5359, 16'hE00A: begin map_profile <= MAP_HOMEBREW; start_key <= 4'd0; end // Pacman
+			16'hBA0B, 16'hE45F, 16'h1280: begin map_profile <= MAP_HOMEBREW; start_key <= 4'd6; end // Scramble
 
-			// ------------------------------------------------------------------ MAP_GUNFIGHTER, Start=1
-			16'h3CDC,                       // Gunfighter + Moonship Battle
-			16'h043E: begin                 // gunfighter.st2
-				map_profile <= MAP_GUNFIGHTER;
-				start_key   <= 4'd1;
+			// 2P Homebrew
+			16'h4ADA, 16'h188E, 16'hD87F: begin map_profile <= MAP_HB2P; start_key <= 4'd1; end // Combat
+			16'h114A, 16'h4F55, 16'hD5DE: begin map_profile <= MAP_HB2P; start_key <= 4'd1; end // Hockey
+
+			// Other
+			16'hFB76: begin map_profile <= MAP_PADDLE;     start_key <= 4'd1; end
+			16'h1634, 16'hB76F: begin map_profile <= MAP_CLEAR_ONLY; start_key <= 4'd1; end
+			16'hE4C4, 16'hD124, 16'h3EAF, 16'h0C03, 16'h92C7: begin
+				map_profile <= MAP_8WAY; start_key <= 4'd1;
 			end
 
-			// ------------------------------------------------------------------ MAP_HOMEBREW family
-			// Paul Robson single-player focused games – fire usually on 0
-			16'h1943, 16'hFBEF, 16'h2B4D: begin  // Asteroids
-				map_profile <= MAP_HOMEBREW; start_key <= 4'd5;
-			end
-			16'h4F61, 16'hAEC7, 16'hE080: begin  // Berzerk
-				map_profile <= MAP_HOMEBREW; start_key <= 4'd5;
-			end
-			16'h69AA, 16'h5AC5, 16'h2D86: begin  // Invaders
-				map_profile <= MAP_HOMEBREW; start_key <= 4'd0;
-			end
-			16'h6793, 16'hDFCF, 16'h8551: begin  // Kaboom
-				map_profile <= MAP_HOMEBREW; start_key <= 4'd0;
-			end
-			16'hC556, 16'h5359, 16'hE00A: begin  // Pacman
-				map_profile <= MAP_HOMEBREW; start_key <= 4'd0;
-			end
-			16'hBA0B, 16'hE45F, 16'h1280: begin  // Scramble
-				map_profile <= MAP_HOMEBREW; start_key <= 4'd6;
-			end
-
-			// ------------------------------------------------------------------ MAP_HB2P (2-player homebrew)
-			// Paul Robson multiplayer-oriented games – fire usually on 0
-			16'h4ADA, 16'h188E, 16'hD87F: begin  // Combat
-				map_profile <= MAP_HB2P; start_key <= 4'd1;
-			end
-			16'h114A, 16'h4F55, 16'hD5DE: begin  // Hockey
-				map_profile <= MAP_HB2P; start_key <= 4'd1;
-			end
-
-			// ------------------------------------------------------------------ MAP_PADDLE
-			16'hFB76: begin                 // tennis.st2 (Andy Modla)
-				map_profile <= MAP_PADDLE;
-				start_key   <= 4'd1;
-			end
-
-			// ------------------------------------------------------------------ MAP_CLEAR_ONLY (number-entry)
-			16'h1634,                       // Fun with Numbers / School House I
-			16'hB76F: begin                 // Blackjack, Bingo, Biorhythm, Math Fun…
-				map_profile <= MAP_CLEAR_ONLY;
-				start_key   <= 4'd1;
-			end
-
-			// ------------------------------------------------------------------ MAP_8WAY (generic / unverified)
-			16'hD124,                       // flappy.st2
-			16'h3EAF,                       // RCA_demo.st2
-			16'h0C03,                       // Space Explorer.bin
-			16'h92C7: begin                 // space_explorer.st2
-				map_profile <= MAP_8WAY;
-				start_key   <= 4'd1;
-			end
-
-			default: ;   // already set above
+			default: begin map_profile <= MAP_8WAY; start_key <= 4'd1; end
 		endcase
 	end
 end
