@@ -280,9 +280,7 @@ end
 // apart by the key that starts them (service manual pp.7-8): A1 Doodles,
 // A2 Patterns, A3 Freeway, A4 Bowling, A5 Addition. Only the *first* such press
 // after reset counts -- those keys are reused during play (A5 rolls the ball in
-// Bowling, for instance). Detection reads the keyboard vector rather than the
-// joystick-merged one, both because you pick the game before a profile exists
-// and to keep this out of the joystick combinational path.
+// Bowling, for instance). 
 
 wire       no_cart = (cart_crc == 16'hFFFF);
 reg        builtin_sel;

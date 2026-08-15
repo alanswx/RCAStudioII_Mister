@@ -57,38 +57,34 @@ a 3x4 block — so the shapes match rather than the digits:
 | **Keypad B** | `7` | `8` | `9` | `U` | `I` | `O` | `J` | `K` | `L` | `,` |
 
 **CLEAR** — the console reset button every manual asks for — is **F3**, or
-**Clear** in the OSD.
+**Clear** in the OSD. Select on the joystick is always Clear.
 
 With no cartridge, the five BIOS built-in games are selected with keys **1**–**5** on keypad 
 A — see below.
 
 ### Joystick
 
-A gamepad works, but not through a fixed mapping. The Studio II has no joystick —
-every game invents its own keypad controls — so Tennis moves the racquet on
-**2/8** while using **4/5/6** to pick racquet *size*, and Space War fires on
-keypad **A** but steers on keypad **B**. One mapping cannot serve both.
-
-So the core takes a **CRC16 of the cartridge as it loads** and selects a profile
-from a table in `rtl/rcastudioii.sv`. Joystick and keyboard inputs are both accepted at 
-once.
+By default, keypad controls are dynamically mapped to gamepads on a per-game basis. The core 
+takes a **CRC16 of the cartridge as it loads** and selects a profile from a table in 
+`rtl/rcastudioii.sv`. Joystick and keyboard inputs are both accepted at once.
 
 #### Profiles
 
-| Profile | Up | Down | Left | Right | Fire | Extra |
-|---------|----|------|------|-------|------|-------|
-| `CROSS` | `2` | `8` | `4` | `6` | `5` | `0` |
-| `SPACEWAR` | — | — | `B4` | `B6` | `A2` | — |
-| `FREEWAY` | `A2` | `A8` | `B4` | `B6` | — | — |
-| `BOWLING` | `A2` | `A8` | — | — | `A5` | — |
-| `BASEBALL` | `B2` | `B8` | — | — | `A5` / `B5` | — |
-| `HOMEBREW` | `2` | `8` | `4` | `6` | `B0` | — |
-| `HB2P` | `2` | `8` | `4` | `6` | `0` | — |
-| `GUNFIGHTER` | `B2` | `B8` | `B4` | `B6` | `B5` | `B0` |
-| `8WAY` | `2` | `8` | `4` | `6` | `5` | `0` |
-| `DOODLES` | `B2` | `B8` | `B4` | `B6` | `B5` | `B0` |
-| `PADDLE` | `B2` | `B8` | `B4` | `B6` | `B5` | — |
-| `CLEAR_ONLY` | — | — | — | — | — | — |
+| Profile | Up | Down | Left | Right | Fire | Extra | Start | Select |
+|---------|----|------|------|-------|------|-------|-------|--------|
+| `CROSS` | `2` | `8` | `4` | `6` | `5` | `0` | `A1` / `A2` | `CLEAR` |
+| `SPACEWAR` | — | — | `B4` | `B6` | `A2` | — | `A1` | `CLEAR` |
+| `FREEWAY` | `A2` | `A8` | `B4` | `B6` | — | — | `A3` | `CLEAR` |
+| `BOWLING` | `A2` | `A8` | — | — | `A5` | — | `A4` | `CLEAR` |
+| `BASEBALL` | `B2` | `B8` | — | — | `A5` / `B5` | — | `A0` | `CLEAR` |
+| `HOMEBREW` | `2` | `8` | `4` | `6` | `B0` | — | `A0` / `A5` / `A6` | `CLEAR` |
+| `HB2P` | `2` | `8` | `4` | `6` | `0` | — | `A1` | `CLEAR` |
+| `GUNFIGHTER` | `B2` | `B8` | `B4` | `B6` | `B5` | `B0` | `A1` | `CLEAR` |
+| `8WAY` | `2` | `8` | `4` | `6` | `5` | `0` | `A1` | `CLEAR` |
+| `DOODLES` | `B2` | `B8` | `B4` | `B6` | `B5` | `B0` | `A1` / `A2` | `CLEAR` |
+| `PADDLE` | `B2` | `B8` | `B4` | `B6` | `B5` | — | `A1` | `CLEAR` |
+| `CLEAR_ONLY` | — | — | — | — | — | — | — | `CLEAR` |
+| `NONE` | — | — | — | — | — | — | `A1` | `CLEAR` |
 
 `CROSS` is the standard 2/4/6/8 cross with fire on `5` and extra on `0`. It matches the official MPT-02 joystick layout and applies to both keypads.
 
@@ -104,6 +100,9 @@ buttons to the setup choices `B4`, `B5`, and `B6`, respectively.
 `CLEAR_ONLY` leaves the gamepad's Select button available for **CLEAR**, but
 disables all controller-driven keypad presses; keyboard, on-screen numstick, and
 direct key bindings still work.
+
+`NONE` is `CLEAR_ONLY` plus `A1` on Start. works well in conjunction with numstick 
+so the game can be started using the Start button.
 
 #### Which cartridges are mapped
 
