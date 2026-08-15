@@ -3,7 +3,8 @@
 //  RCA Studio II core glue: CPU + CDP1861 + RAM + keypad.
 //
 //  Original implementation by Jason Coombes (JasonA-dev), 2022, with MiSTer
-//  framework integration by Flandango. Extended 2026 by Alan Steremberg.
+//  framework integration by Flandango. Extended 2026 by Alan Steremberg and
+//  Elle Ball.
 //
 //  This program is free software; you can redistribute it and/or modify it
 //  under the terms of the GNU General Public License as published by the Free
@@ -237,14 +238,27 @@ always @(posedge clk_sys) begin
 			// start, so CROSS's fire-on-5 is wrong for every one of them. Both
 			// the .st2 and its .bin conversion are listed -- the CRC covers the
 			// file as downloaded, header and all, so the formats hash apart.
+			16'h1943: begin map_profile <= MAP_HOMEBREW; start_key <= 4'd5; end // Asteroids (asm.bin build)
 			16'hFBEF, 16'h2B4D: begin map_profile <= MAP_HOMEBREW; start_key <= 4'd5; end // Asteroids
+			16'h4F61: begin map_profile <= MAP_HOMEBREW; start_key <= 4'd5; end // Berzerk (asm.bin build)
 			16'hAEC7, 16'hE080: begin map_profile <= MAP_HOMEBREW; start_key <= 4'd5; end // Berzerk
+			16'h4ADA: begin map_profile <= MAP_HB2P;     start_key <= 4'd1; end // Combat (asm.bin build)
 			16'h188E, 16'hD87F: begin map_profile <= MAP_HB2P;     start_key <= 4'd1; end // Combat (G? code, then B0)
+			16'h114A: begin map_profile <= MAP_HB2P;     start_key <= 4'd1; end // Hockey (asm.bin build)
 			16'h4F55, 16'hD5DE: begin map_profile <= MAP_HB2P;     start_key <= 4'd1; end // Hockey (1 = hockey)
+			16'h69AA: begin map_profile <= MAP_HOMEBREW; start_key <= 4'd0; end // Invaders (asm.bin build)
 			16'h5AC5, 16'h2D86: begin map_profile <= MAP_HOMEBREW; start_key <= 4'd0; end // Invaders (0 = restart)
+			16'h6793: begin map_profile <= MAP_HOMEBREW; start_key <= 4'd0; end // Kaboom (asm.bin build)
 			16'hDFCF, 16'h8551: begin map_profile <= MAP_HOMEBREW; start_key <= 4'd0; end // Kaboom
+			16'hC556: begin map_profile <= MAP_HOMEBREW; start_key <= 4'd0; end // Pacman (asm.bin build)
 			16'h5359, 16'hE00A: begin map_profile <= MAP_HOMEBREW; start_key <= 4'd0; end // Pacman
+			16'hBA0B: begin map_profile <= MAP_HOMEBREW; start_key <= 4'd6; end // Scramble (asm.bin build)
 			16'hE45F, 16'h1280: begin map_profile <= MAP_HOMEBREW; start_key <= 4'd6; end // Scramble
+			// Harvested CRCs (automatically added) — defaulting to MAP_8WAY/start 1 unless known
+			16'h1877: begin map_profile <= MAP_8WAY;      start_key <= 4'd1; end // RCA_demo.st2
+			16'h5479: begin map_profile <= MAP_CROSS;     start_key <= 4'd2; end // tennis.st2 (likely Tennis)
+			16'h264F: begin map_profile <= MAP_8WAY;      start_key <= 4'd1; end // cas-190/flappy/space_explorer/Visicom (multiple files share this CRC)
+			16'hC584: begin map_profile <= MAP_8WAY;      start_key <= 4'd1; end // Space Explorer.bin
 			// Number-entry games: digit-only input, cannot be driven by joystick
 			16'h1634: begin map_profile <= MAP_UNMAPPED; start_key <= 4'd1; end // TV Arcade II - Fun with Numbers, TV School House I
 			16'hB76F: begin map_profile <= MAP_UNMAPPED; start_key <= 4'd1; end // TV Casino Series - Blackjack, TV Bingo; TV Mystic Series - Biorhythm; TV School House II - Math Fun; Concentration Match; Demonstration Cartridge
@@ -268,17 +282,23 @@ wire       no_cart = (cart_crc == 16'hFFFF);
 reg        builtin_sel;
 reg  [3:0] builtin_profile;
 
+// Consider on-screen keypad (osk_a) as well as the physical keypad for
+// selecting built-in games. Treat the on-screen keypad's key at
+// active_start_key as a Start press so numstick users can activate by the OSK.
+wire [9:0] builtin_padA = playerA | osk_a;
+wire        builtin_start_press = start_press | osk_a[active_start_key];
+
 always @(posedge clk_sys) begin
 	if (reset) begin
 		builtin_sel     <= 1'b0;
 		builtin_profile <= MAP_NONE;
 	end
 	else if (no_cart && !builtin_sel) begin
-		if      (playerA[1] || (start_press && (active_start_key == 4'd1))) begin builtin_profile <= MAP_DOODLES; builtin_sel <= 1'b1; end  // Doodles: B-side 8-way
-		else if (playerA[2] || (start_press && (active_start_key == 4'd2))) begin builtin_profile <= MAP_DOODLES; builtin_sel <= 1'b1; end  // Patterns: B-side 8-way
-		else if (playerA[3]) begin builtin_profile <= MAP_FREEWAY; builtin_sel <= 1'b1; end  // Freeway
-		else if (playerA[4]) begin builtin_profile <= MAP_BOWLING; builtin_sel <= 1'b1; end  // Bowling
-		else if (playerA[5]) begin builtin_profile <= MAP_UNMAPPED; builtin_sel <= 1'b1; end  // Addition: digits
+		if      (builtin_padA[1] || (builtin_start_press && (active_start_key == 4'd1))) begin builtin_profile <= MAP_DOODLES; builtin_sel <= 1'b1; end  // Doodles: B-side 8-way
+		else if (builtin_padA[2] || (builtin_start_press && (active_start_key == 4'd2))) begin builtin_profile <= MAP_DOODLES; builtin_sel <= 1'b1; end  // Patterns: B-side 8-way
+		else if (builtin_padA[3]) begin builtin_profile <= MAP_FREEWAY; builtin_sel <= 1'b1; end  // Freeway
+		else if (builtin_padA[4]) begin builtin_profile <= MAP_BOWLING; builtin_sel <= 1'b1; end  // Bowling
+		else if (builtin_padA[5]) begin builtin_profile <= MAP_UNMAPPED; builtin_sel <= 1'b1; end  // Addition: digits
 	end
 end
 
