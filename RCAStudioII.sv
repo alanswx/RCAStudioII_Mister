@@ -201,7 +201,7 @@ localparam CONF_STR = {
 	"RCA-StudioII;v2;",
 	"-;",
 	"F1,ST2BINROM,Load Cartridge;",
-	"F0,rom,Load Bios;",
+	"F0,ROM,Load BIOS;",
 	"-;",
 	"O[5:2],Joystick,Auto,Cross,Paddle,Space War,Freeway,Bowling,Baseball,Homebrew,Gunfighter;",
 	"O[8:7],Players,Auto,1,2;",
