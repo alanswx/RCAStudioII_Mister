@@ -74,14 +74,13 @@ keyboard, so both work at once.
 | Profile | Up | Down | Left | Right | Fire | Extra |
 |---------|----|------|------|-------|------|-------|
 | `CROSS` | `2` | `8` | `4` | `6` | `5` | `0` |
-| `PADDLE` | `2` | `8` | — | — | — | `0` pause |
 | `SPACEWAR` | — | — | `B4` | `B6` | `A2` | — |
 | `FREEWAY` | `A2` throttle | `A8` brake | `B4` | `B6` | — | — |
 | `BOWLING` | `A2` hook | `A8` hook | — | — | `A5` roll | — |
 | `BASEBALL` | `B2` curve | `B8` curve | — | — | `A5` bat / `B5` pitch | — |
 | `HOMEBREW` | `2` | `8` | `4` | `6` | `B0` | — |
 | `HB2P` | `2` | `8` | `4` | `6` | `0` (own pad) | — |
-| `GUNFIGHTER` | `2` | `8` | `4` | `6` | `5` | `0` |
+| `GUNFIGHTER` | `B2` | `B8` | `B4` | `B6` | `B5` | `B0` |
 | `8WAY` | `2` | `8` | `4` | `6` | `5` | `0` |
 | `DOODLES` | `B2` | `B8` | `B4` | `B6` | `B5` | `B0` |
 | `UNMAPPED` | — | — | — | — | — | — |
@@ -93,9 +92,9 @@ Soundic **Victory Home TV Programmer** and Hanimex **Jeu TV Programmable** —
 both MPT-02 Studio III machines — had detachable keypads that could be swapped
 for joysticks, mapped exactly this way: cross on `2/4/6/8`, fire on `5`, and a
 second button on `0`. That second button is the gamepad's **Extra**. It only
-presses `0` where `0` is documented and harmless — `CROSS`, and `PADDLE` where
-`0` pauses Tennis — never in `HOMEBREW`, where `A0` restarts Invaders; bind
-B0/A0 directly if a game needs more. `HOMEBREW` is for Paul Robson's games, which
+presses `0` where `0` is documented and harmless — `CROSS` — never in
+`HOMEBREW`, where `A0` restarts Invaders; bind B0/A0 directly if a game needs
+more. `HOMEBREW` is for Paul Robson's games, which
 all fire or start on `0`; it is also 8-way — a held diagonal presses the corner
 key (`1/3/7/9`), which is how Berzerk moves diagonally. Fire lands on `B0`, never
 `A0`, because `A0` restarts Invaders. `HB2P` is the two-player variant (Hockey,
@@ -125,7 +124,7 @@ available as **Unmapped** in the OSD override list.
 | Cartridge | Profile | Start key |
 |-----------|---------|-----------|
 | TV Arcade I – Space War | `SPACEWAR` | `A1` |
-| TV Arcade III – Tennis / Squash | `PADDLE` | `A2` (Tennis) |
+| TV Arcade III – Tennis / Squash | `CROSS` | `A2` (Tennis) |
 | TV Arcade IV – Baseball | `BASEBALL` | `A0` |
 | TV Arcade Series – Gunfighter / Moonship Battle | `GUNFIGHTER` | `A1` |
 | TV Arcade Series – Speedway / Tag (USA and Europe) | `CROSS` | `A1` |
@@ -158,20 +157,7 @@ on-screen numstick, or bind individual keys:
 - TV School House I (arithmetic answers) | CRC `0x1634`
 - TV School House II – Math Fun (arithmetic answers) | CRC `0xB76F`
 - Concentration Match (grid squares by number) | CRC `0xB76F`
-- Demonstration Cartridge (unidentified) | CRC `0xB76F`
-
-#### Which are deliberately *not* mapped (fall through to 8-way)
-
-Four unidentified cartridges fall through to the `8-way` default, and no manual
-exists for any of them:
-
-- `86677b (Europe)` — not in test set
-- `87201 (Europe)` — not in test set
-
-These are also the ones whose frames diverge from the reference emulator,
-so treat them as untested rather than working. Any others not recognized by CRC
-also fall back to `8-way`, which is the most flexible profile and covers most
-games adequately.
+- Demonstration Cartridge (autoplay) | CRC `0xB76F`
 
 #### Built-in games
 
@@ -181,18 +167,18 @@ get reused during play (`A5` rolls the ball in Bowling):
 
 | Game | Start | Profile |
 |------|-------|---------|
-| Doodles | `A1` | `8WAY` |
-| Patterns | `A2` | `CROSS` |
+| Doodles | `A1` | `DOODLES` |
+| Patterns | `A2` | `DOODLES` |
 | Freeway | `A3` | `FREEWAY` |
 | Bowling | `A4` | `BOWLING` |
-| Addition | `A5` | `UNMAPPED` — the answers are digits |
+| Addition | `A5` | `UNMAPPED` |
 
 #### Overriding it
 
 The table can only be as good as its entries, and an unknown cartridge falls back
 to `8-way`, which is the default profile. So the OSD has a **Joystick** setting:
 
-`Auto` (default) · `Cross` · `Paddle` · `Space War` · `Freeway` · `Bowling` · `Baseball` · `Homebrew` · `Gunfighter` · `8-way` · `Doodles` · `2P Homebrew` · `Unmapped`
+`Auto` (default) · `Cross` · `Space War` · `Freeway` · `Bowling` · `Baseball` · `Homebrew` · `Gunfighter` · `8-way` · `Doodles` · `2P Homebrew` · `Unmapped`
 
 `Auto` uses the detection above; anything else forces that profile regardless of
 the cartridge. `Unmapped` suppresses all controller-driven keypad presses while
@@ -210,8 +196,8 @@ The **Players** OSD setting decides which gamepad drives keypad B's half of the
 profile. `1` runs everything from gamepad 0: `SPACEWAR`, `FREEWAY`, `BOWLING`,
 `HOMEBREW`, `GUNFIGHTER`, and `8WAY` all act as one-player layouts, with the
 single stick steering or firing from one side. `2` gives each gamepad its own
-keypad, so symmetric profiles like `CROSS`, `PADDLE`, `BASEBALL`, and `HB2P`
-split across pads A and B exactly as the cartridge expects. `AUTO` (default)
+keypad, so symmetric profiles like `CROSS`, `BASEBALL`, and `HB2P` split
+across pads A and B exactly as the cartridge expects. `AUTO` (default)
 keeps the profile's natural arrangement: one-player layouts are treated as
 one-player, while the symmetric layouts stay two-player.
 

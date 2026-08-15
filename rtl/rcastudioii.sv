@@ -158,34 +158,35 @@ reg  [9:0] playerB = 10'h0;
 // Fire/Extra mirror the MPT-02 joystick (the Soundic/Hanimex Studio III
 // machines' swappable keypad controller): fire on 5, a second button on 0.
 // Extra only presses 0 in the profiles where 0 is documented and safe --
-// CROSS (the MPT-02's own layout) and PADDLE (0 pauses Tennis) -- never in
-// HOMEBREW, where A0 restarts Invaders.
+// CROSS, the MPT-02's own layout -- never in HOMEBREW, where A0 restarts
+// Invaders.
 // A0..B9 are direct per-key bindings with no default mapping: they are inert
 // until the user binds them in Define Buttons, and then they always work, on
 // top of whatever profile is active.
 
 // The profile is 4 bits internally; the OSD override (joy_override) is 4, so
 // the menu can force any of the 16 encoded profiles, including Gunfighter.
-// MAP_HB2P exists solely for the two-player homebrews, which the CRC table selects
-// on its own.
+// Keep the numeric values aligned with the OSD list so a user selection selects
+// the correct profile. MAP_PADDLE remains as a legacy alias for compatibility but
+// is not exposed in the menu because CROSS is a better default for Tennis/Squash.
 localparam [3:0] MAP_NONE       = 4'd0;   // no controller mapping; keep keypad/OSK input only
 localparam [3:0] MAP_CROSS      = 4'd1;   // 2/8/4/6 + 5 fire, both pads
-localparam [3:0] MAP_PADDLE     = 4'd2;   // up/down only (Tennis, Squash)
-localparam [3:0] MAP_SPACEWAR   = 4'd3;   // fire A2, steer B4/B6
-localparam [3:0] MAP_FREEWAY    = 4'd4;   // steer B4/B6, throttle A2, brake A8
-localparam [3:0] MAP_BOWLING    = 4'd5;   // roll A5, hook A2/A8
-localparam [3:0] MAP_BASEBALL   = 4'd6;   // bat A5; pitch B5 straight, B2/B8 curve
-localparam [3:0] MAP_HOMEBREW   = 4'd7;   // Paul Robson's 1P games: 8-way on pad A
+localparam [3:0] MAP_SPACEWAR   = 4'd2;   // fire A2, steer B4/B6
+localparam [3:0] MAP_FREEWAY    = 4'd3;   // steer B4/B6, throttle A2, brake A8
+localparam [3:0] MAP_BOWLING    = 4'd4;   // roll A5, hook A2/A8
+localparam [3:0] MAP_BASEBALL   = 4'd5;   // bat A5; pitch B5 straight, B2/B8 curve
+localparam [3:0] MAP_HOMEBREW   = 4'd6;   // Paul Robson's 1P games: 8-way on pad A
                                           // (diagonals are keys 1/3/7/9), fire B0
-localparam [3:0] MAP_GUNFIGHTER = 4'd8;   // vertical cross: 2/8 + fire 5, one-player
-localparam [3:0] MAP_8WAY       = 4'd9;   // CROSS plus diagonals: 1/3/7/9, fire 5 + extra 0
-localparam [3:0] MAP_DOODLES    = 4'd10;  // Doodles/Patterns: B-side 8-way, fire 5, extra 0
-localparam [3:0] MAP_HB2P       = 4'd11;  // 2P homebrew (Hockey, Combat): cross plus
+localparam [3:0] MAP_GUNFIGHTER = 4'd7;   // vertical cross: 2/8 + fire 5, one-player
+localparam [3:0] MAP_8WAY       = 4'd8;   // CROSS plus diagonals: 1/3/7/9, fire 5 + extra 0
+localparam [3:0] MAP_DOODLES    = 4'd9;   // Doodles/Patterns: B-side 8-way, fire 5, extra 0
+localparam [3:0] MAP_HB2P       = 4'd10;  // 2P homebrew (Hockey, Combat): cross plus
                                           // fire-on-0, each player's own pad. Normally
                                           // chosen by CRC, but also exposed in the OSD
                                           // list as "2P Homebrew" for manual override.
-localparam [3:0] MAP_UNMAPPED   = 4'd12;  // explicit no-controller mapping: only Clear/Select
+localparam [3:0] MAP_UNMAPPED   = 4'd11;  // explicit no-controller mapping: only Clear/Select
                                           // from the pad; numstick/keyboard still work.
+localparam [3:0] MAP_PADDLE     = 4'd12;  // legacy alias for Tennis/Squash, retained for compatibility
 
 reg [3:0] map_profile = MAP_NONE;
 
@@ -220,7 +221,7 @@ always @(posedge clk_sys) begin
 	if (dl_done) begin
 		case (cart_crc)
 			16'h977C: begin map_profile <= MAP_SPACEWAR;   start_key <= 4'd1; end // TV Arcade I - Space War
-			16'h88FB: begin map_profile <= MAP_PADDLE;     start_key <= 4'd2; end // TV Arcade III - Tennis + Squash (2 = Tennis)
+			16'h88FB: begin map_profile <= MAP_CROSS;      start_key <= 4'd2; end // TV Arcade III - Tennis + Squash: CROSS is the better default and a superset of PADDLE.
 			16'hF837: begin map_profile <= MAP_BASEBALL;   start_key <= 4'd0; end // TV Arcade IV - Baseball
 			16'hD3E2: begin map_profile <= MAP_CROSS;      start_key <= 4'd1; end // Pinball
 			16'hE153: begin map_profile <= MAP_CROSS;      start_key <= 4'd1; end // Speedway + Tag (Europe)
@@ -289,7 +290,7 @@ wire [3:0] profile      = (joy_override == 4'd0) ? auto_profile : joy_override;
 // two players get one stick per pad. Auto keeps each profile's natural
 // default, which is exactly the behaviour the joystick regression verified:
 // the asymmetric single-player profiles (Space War, Freeway, Bowling) act as
-// one-player, the symmetric ones (Cross, Paddle, Baseball) as two.
+// one-player, the symmetric ones (Cross, Baseball) as two.
 
 function automatic [9:0] map_padA(input [3:0] prof, input [31:0] j);
 	reg [9:0] k;
