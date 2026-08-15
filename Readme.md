@@ -56,7 +56,8 @@ a 3x4 block — so the shapes match rather than the digits:
 **CLEAR** — the console reset button every manual asks for — is **F3**, or
 **Clear** in the OSD.
 
-With no cartridge, the five BIOS built-in games are selected with keys **1**–**5** on keyboard A — see below.
+With no cartridge, the five BIOS built-in games are selected with keys **1**–**5** on keypad 
+A — see below.
 
 ### Joystick
 
@@ -66,8 +67,8 @@ every game invents its own keypad controls — so Tennis moves the racquet on
 keypad **A** but steers on keypad **B**. One mapping cannot serve both.
 
 So the core takes a **CRC16 of the cartridge as it loads** and selects a profile
-from a table in `rtl/rcastudioii.sv`. Joystick presses are OR'd with the
-keyboard, so both work at once.
+from a table in `rtl/rcastudioii.sv`. Joystick and keyboard inputs are both accepted at 
+once.
 
 #### Profiles
 
