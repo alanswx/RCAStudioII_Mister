@@ -159,8 +159,8 @@ Built-in BIOS games are detected by the first key pressed after reset:
 |------|-------|---------|
 | Doodles | `A1` | `DOODLES` |
 | Patterns | `A2` | `DOODLES` |
-| Freeway | `A3` | `FREEWAY` |
-| Bowling | `A4` | `BOWLING` |
+| Bowling | `A3` | `BOWLING` |
+| Freeway | `A4` | `FREEWAY` |
 | Addition | `A5` | `CLEAR_ONLY` |
 
 #### Mapping: Auto or Manual
