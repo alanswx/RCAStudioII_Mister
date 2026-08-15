@@ -343,18 +343,30 @@ function automatic [9:0] map_padA(input [3:0] prof, input [31:0] j);
 			if (j[5]) k[0] = 1'b1;
 		end
 		MAP_8WAY: begin                      // CROSS + 8-way diagonals: 1/3/7/9 on corners
-			if (j[3] && j[1]) k[1] = 1'b1;   if (j[3] && j[0]) k[3] = 1'b1;
-			if (j[2] && j[1]) k[7] = 1'b1;   if (j[2] && j[0]) k[9] = 1'b1;
-			if (j[3]) k[2] = 1'b1;           if (j[2]) k[8] = 1'b1;
-			if (j[1]) k[4] = 1'b1;           if (j[0]) k[6] = 1'b1;
+			case (j[3:0])
+			4'b1010: k[1] = 1'b1;            // up+left
+			4'b1001: k[3] = 1'b1;            // up+right
+			4'b0110: k[7] = 1'b1;            // down+left
+			4'b0101: k[9] = 1'b1;            // down+right
+			default: begin
+				if (j[3]) k[2] = 1'b1;   if (j[2]) k[8] = 1'b1;
+				if (j[1]) k[4] = 1'b1;   if (j[0]) k[6] = 1'b1;
+			end
+			endcase
 			if (j[4]) k[5] = 1'b1;
 			if (j[5]) k[0] = 1'b1;
 		end
 		MAP_DOODLES: begin                   // Doodles/Patterns: B-side 8-way, single-player
-			if (j[3] && j[1]) k[1] = 1'b1;   if (j[3] && j[0]) k[3] = 1'b1;
-			if (j[2] && j[1]) k[7] = 1'b1;   if (j[2] && j[0]) k[9] = 1'b1;
-			if (j[3]) k[2] = 1'b1;           if (j[2]) k[8] = 1'b1;
-			if (j[1]) k[4] = 1'b1;           if (j[0]) k[6] = 1'b1;
+			case (j[3:0])
+			4'b1010: k[1] = 1'b1;            // up+left
+			4'b1001: k[3] = 1'b1;            // up+right
+			4'b0110: k[7] = 1'b1;            // down+left
+			4'b0101: k[9] = 1'b1;            // down+right
+			default: begin
+				if (j[3]) k[2] = 1'b1;   if (j[2]) k[8] = 1'b1;
+				if (j[1]) k[4] = 1'b1;   if (j[0]) k[6] = 1'b1;
+			end
+			endcase
 			if (j[4]) k[5] = 1'b1;
 			if (j[5]) k[0] = 1'b1;
 		end
@@ -411,18 +423,30 @@ function automatic [9:0] map_padB(input [3:0] prof, input [31:0] j);
 			if (j[5]) k[0] = 1'b1;
 		end
 		MAP_8WAY: begin                      // CROSS + 8-way diagonals: 1/3/7/9 on corners
-			if (j[3] && j[1]) k[1] = 1'b1;   if (j[3] && j[0]) k[3] = 1'b1;
-			if (j[2] && j[1]) k[7] = 1'b1;   if (j[2] && j[0]) k[9] = 1'b1;
-			if (j[3]) k[2] = 1'b1;           if (j[2]) k[8] = 1'b1;
-			if (j[1]) k[4] = 1'b1;           if (j[0]) k[6] = 1'b1;
+			case (j[3:0])
+			4'b1010: k[1] = 1'b1;            // up+left
+			4'b1001: k[3] = 1'b1;            // up+right
+			4'b0110: k[7] = 1'b1;            // down+left
+			4'b0101: k[9] = 1'b1;            // down+right
+			default: begin
+				if (j[3]) k[2] = 1'b1;   if (j[2]) k[8] = 1'b1;
+				if (j[1]) k[4] = 1'b1;   if (j[0]) k[6] = 1'b1;
+			end
+			endcase
 			if (j[4]) k[5] = 1'b1;
 			if (j[5]) k[0] = 1'b1;
 		end
 		MAP_DOODLES: begin                   // Doodles/Patterns: B-side 8-way, single-player
-			if (j[3] && j[1]) k[1] = 1'b1;   if (j[3] && j[0]) k[3] = 1'b1;
-			if (j[2] && j[1]) k[7] = 1'b1;   if (j[2] && j[0]) k[9] = 1'b1;
-			if (j[3]) k[2] = 1'b1;           if (j[2]) k[8] = 1'b1;
-			if (j[1]) k[4] = 1'b1;           if (j[0]) k[6] = 1'b1;
+			case (j[3:0])
+			4'b1010: k[1] = 1'b1;            // up+left
+			4'b1001: k[3] = 1'b1;            // up+right
+			4'b0110: k[7] = 1'b1;            // down+left
+			4'b0101: k[9] = 1'b1;            // down+right
+			default: begin
+				if (j[3]) k[2] = 1'b1;   if (j[2]) k[8] = 1'b1;
+				if (j[1]) k[4] = 1'b1;   if (j[0]) k[6] = 1'b1;
+			end
+			endcase
 			if (j[4]) k[5] = 1'b1;
 			if (j[5]) k[0] = 1'b1;
 		end
