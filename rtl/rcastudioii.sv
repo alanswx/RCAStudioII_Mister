@@ -405,7 +405,8 @@ always @* begin
 	end
 end
 wire       start_press = joystick_0[6] | joystick_1[6];
-wire [9:0] start_keys  = start_press ? (10'd1 << start_key) : 10'd0;
+wire [3:0] active_start_key = (profile == MAP_GUNFIGHTER) ? 4'd1 : start_key;
+wire [9:0] start_keys       = start_press ? (10'd1 << active_start_key) : 10'd0;
 
 // Gunfighter is a special case: in Auto/1P it is B-only (2/4/6/8 + 5 + 0 on the
 // right-hand pad), while in 2P it splits exactly like CROSS across both pads.
