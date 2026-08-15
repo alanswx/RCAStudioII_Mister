@@ -48,7 +48,7 @@ a 3x4 block — so the shapes match rather than the digits:
        X                      ,
 ```
 
-| Keypad key | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 0 |
+| Key | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 0 |
 |---|---|---|---|---|---|---|---|---|---|---|
 | **Keypad A** | `1` | `2` | `3` | `Q` | `W` | `E` | `A` | `S` | `D` | `X` |
 | **Keypad B** | `7` | `8` | `9` | `U` | `I` | `O` | `J` | `K` | `L` | `,` |
@@ -86,8 +86,7 @@ keyboard, so both work at once.
 | `DOODLES` | `B2` | `B8` | `B4` | `B6` | `B5` | `B0` |
 | `UNMAPPED` | — | — | — | — | — | — |
 
-`CROSS` applies to both keypads (joystick 1 drives keypad B). Every mapping comes
-from the RCA manuals, not guesswork.
+`CROSS` applies to both keypads (joystick 0 drives keypad A, joystick 1 drives keypad B).
 
 `CROSS` is also, it turns out, the closest thing to an *official* mapping: the
 Soundic **Victory Home TV Programmer** and Hanimex **Jeu TV Programmable** —
@@ -128,7 +127,7 @@ available as **Unmapped** in the OSD override list.
 | TV Arcade I – Space War | `SPACEWAR` | `A1` |
 | TV Arcade III – Tennis / Squash | `PADDLE` | `A2` (Tennis) |
 | TV Arcade IV – Baseball | `BASEBALL` | `A0` |
-| TV Arcade Series – Gunfighter / Moonship Battle | `CROSS` | `A1` |
+| TV Arcade Series – Gunfighter / Moonship Battle | `GUNFIGHTER` | `A1` |
 | TV Arcade Series – Speedway / Tag (USA and Europe) | `CROSS` | `A1` |
 | Star Wars | `CROSS` | `A1` |
 | Pinball | `CROSS` | `A1` |
