@@ -177,11 +177,13 @@ localparam [3:0] MAP_BOWLING    = 4'd5;   // roll A5, hook A2/A8
 localparam [3:0] MAP_BASEBALL   = 4'd6;   // bat A5; pitch B5 straight, B2/B8 curve
 localparam [3:0] MAP_HOMEBREW   = 4'd7;   // Paul Robson's 1P games: 8-way on pad A
                                           // (diagonals are keys 1/3/7/9), fire B0
-localparam [3:0] MAP_HB2P       = 4'd8;   // 2P homebrew (Hockey, Combat): cross
-                                          // plus fire-on-0, each player's own pad
-localparam [3:0] MAP_GUNFIGHTER = 4'd9;   // vertical cross: 2/8 + fire 5, one-player
-localparam [3:0] MAP_8WAY       = 4'd10;  // CROSS plus diagonals: 1/3/7/9, fire 5 + extra 0
-localparam [3:0] MAP_DOODLES    = 4'd11;  // Doodles/Patterns: B-side 8-way, fire 5, extra 0
+localparam [3:0] MAP_GUNFIGHTER = 4'd8;   // vertical cross: 2/8 + fire 5, one-player
+localparam [3:0] MAP_8WAY       = 4'd9;   // CROSS plus diagonals: 1/3/7/9, fire 5 + extra 0
+localparam [3:0] MAP_DOODLES    = 4'd10;  // Doodles/Patterns: B-side 8-way, fire 5, extra 0
+localparam [3:0] MAP_HB2P       = 4'd11;  // 2P homebrew (Hockey, Combat): cross plus
+                                          // fire-on-0, each player's own pad. Normally
+                                          // chosen by CRC, but also exposed in the OSD
+                                          // list as "2P Homebrew" for manual override.
 
 reg [3:0] map_profile = MAP_NONE;
 

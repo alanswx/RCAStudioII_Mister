@@ -95,8 +95,9 @@ B0/A0 directly if a game needs more. `HOMEBREW` is for Paul Robson's games, whic
 all fire or start on `0`; it is also 8-way — a held diagonal presses the corner
 key (`1/3/7/9`), which is how Berzerk moves diagonally. Fire lands on `B0`, never
 `A0`, because `A0` restarts Invaders. `HB2P` is the two-player variant (Hockey,
-Combat): the plain cross plus fire-on-`0`, on each player's own pad. It is chosen
-by CRC only — the OSD override list stops at `Homebrew`.
+Combat): the plain cross plus fire-on-`0`, on each player's own pad. Cartridges
+pick it automatically by CRC, and it's also available as **2P Homebrew** in the
+OSD override list for manual use.
 
 #### Which cartridges are mapped
 
@@ -163,7 +164,7 @@ get reused during play (`A5` rolls the ball in Bowling):
 The table can only be as good as its entries, and an unknown cartridge falls back
 to `8-way`, which is the default profile. So the OSD has a **Joystick** setting:
 
-`Auto` (default) · `Cross` · `Paddle` · `Space War` · `Freeway` · `Bowling` · `Baseball` · `Homebrew` · `Gunfighter` · `8-way`
+`Auto` (default) · `Cross` · `Paddle` · `Space War` · `Freeway` · `Bowling` · `Baseball` · `Homebrew` · `Gunfighter` · `8-way` · `Doodles` · `2P Homebrew`
 
 `Auto` uses the detection above; anything else forces that profile regardless of
 the cartridge. Useful for the unmapped titles, for a homebrew `.st2` the table has

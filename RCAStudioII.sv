@@ -203,7 +203,7 @@ localparam CONF_STR = {
 	"F1,ST2BINROM,Load Cartridge;",
 	"F0,ROM,Load Firmware;",
 	"-;",
-	"O[5:2],Joystick,Auto,Cross,Paddle,Space War,Freeway,Bowling,Baseball,Homebrew,Gunfighter,8-way,Doodles;",
+	"O[5:2],Joystick,Auto,Cross,Paddle,Space War,Freeway,Bowling,Baseball,Homebrew,Gunfighter,8-way,Doodles,2P Homebrew;",
 	"O[8:7],Players,Auto,1,2;",
 	"O[10:9],Stick Keypad,Off,Pad A,Pad B;",
 	"-;",
