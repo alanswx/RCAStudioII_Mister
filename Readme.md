@@ -191,11 +191,11 @@ then add one line to the `cart_crc` case in `rtl/rcastudioii.sv`.
 
 ### Per-cartridge
 
-Each cartridge was run in the simulator and every key tried. "Starts with" is 
-the key that first puts something on screen; "responds to" lists keys that 
-demonstrably change the game state afterwards.
+"Starts with" is the key that first puts something on screen; 
+"responds to" lists keys that demonstrably change the game state afterwards.
 
-Regenerate it with `tools/probe-keys.sh`.
+Each cartridge was run in the simulator and every key tried; see 
+`tools/probe-keys.sh`. Further corrections have been made manually.
 
 | Cartridge | Starts with | Keypad A responds to | Keypad B responds to |
 |-----------|-------------|----------------------|----------------------|
@@ -207,24 +207,14 @@ Regenerate it with `tools/probe-keys.sh`.
 | TV Arcade I - Space War (USA) | `1 3` | `2` | — |
 | TV Arcade II - Fun with Numbers (USA) | `1 2 3` | — | `1 2 3 4 5 6 7 8` |
 | TV Arcade III - Tennis + Squash (USA) | `1 2` | — | `4 5 6` |
-| TV Arcade IV - Baseball (USA) | `0` | — | `2 5 8` |
-| TV Arcade Series - Gunfighter + Moonship Battle (USA, Europe) | `1 2 3` | — | `2 5 8` |
+| TV Arcade IV - Baseball (USA) | `0` | `5` | `2 5 8` |
+| TV Arcade Series - Gunfighter + Moonship Battle (USA, Europe) | `1 2 3` | `2 4 5 6 8` | `2 4 5 6 8` |
 | TV Arcade Series - Speedway + Tag (USA) | `1 2` | `2 4 6 8` | `2 4 6 8` |
 | TV Casino Series - Blackjack (USA) | `1 2` | — | `0` |
 | TV Casino Series - TV Bingo (USA, Europe) | `1 2` | `1` | — |
 | TV Mystic Series - Biorhythm (USA, Europe) | `0` | — | `1 2 3 4 5 6 7 8 0` |
 | TV School House I (USA) | `any` | `1 2 3 4 5 6 7 8 9` | — |
 | TV School House II - Math Fun (USA, Europe) | `1 2` | `1 2 3 4 5` | — |
-
-Notes on the measurements:
-
-- `any` means the cartridge draws regardless of which key is pressed — these are
-  demos or menu-driven titles rather than games with a start button.
-- A dash means no key changed the outcome in the window tested during 
-simulation.
-- Demonstration Cartridge` plays automatically; doesn't respond to either keypad. 
-- `86677b` and `87201` are labeled as "BIOS" files; it isn't clear if they work
-on the core currently.
 
 ### How to play
 
