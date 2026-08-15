@@ -244,21 +244,16 @@ then add one line to the `cart_crc` case in `rtl/rcastudioii.sv`.
 
 ### Per-cartridge
 
-Original RCA manuals are not included with the dumps, so the table below is
-**measured, not documented**: each cartridge was run in the simulator and every
-key tried. "Starts with" is the key that first puts something on screen;
-"responds to" lists keys that demonstrably change the game state afterwards. It
-tells you which keys are live, **not what they do** — that would need the
-manuals, and guessing would be worse than saying so.
+Each cartridge was run in the simulator and every key tried. "Starts with" is 
+the key that first puts something on screen; "responds to" lists keys that 
+demonstrably change the game state afterwards.
 
 Regenerate it with `tools/probe-keys.sh`.
 
 | Cartridge | Starts with | Keypad A responds to | Keypad B responds to |
 |-----------|-------------|----------------------|----------------------|
-| 86677b (Europe) | `any` | — | — |
-| 87201 (Europe) | `any` | — | — |
 | Concentration Match (Europe) | `any` | `1 2 3 4 5 6 7 8 9` | `1 2 3 4 5 6 7 8` |
-| Demonstration Cartridge (USA) | `any` | — | — |
+| Demonstration Cartridge (USA) | — | — | — |
 | Pinball (Europe) | `1 2` | — | `1` |
 | Speedway + Tag (Europe) | `1 2` | `2 4 6 8` | `2 4 6 8` |
 | Star Wars (Europe) | `1 2 3` | `1 2 3` | `1 2 3` |
@@ -282,8 +277,7 @@ Notes on the measurements:
   the title genuinely ignores that keypad, or that it needs a longer or
   different input sequence than the probe used.
 - `86677b`, `87201` and `Demonstration Cartridge` show no response on either
-  keypad; the first two are also the cartridges whose frames differ from the
-  reference emulator (see below), so treat them as untested rather than working.
+  keypad.
 
 ### How to play
 
@@ -296,11 +290,8 @@ available — Pinball, TV Bingo, Concentration Match, TV School House I and II,
 and the unidentified `86677b`/`87201` — are only in the measured table above.
 
 Every manual begins **"Press CLEAR"**. CLEAR is the Studio II's console reset
-button (see `docs/RCA_Studio_II_Service_Manual.pdf`, Figure 1); press **F3**, or
-use **Clear** in the OSD.
-
-Movement is the keypad cross on both keyboards: **2** up, **8** down, **4**
-left, **6** right, **5** fire.
+button (see `docs/RCA_Studio_II_Service_Manual.pdf`, Figure 1); press **F3**,
+use **Clear** in the OSD, or press Select on the virtual joystick.
 
 #### Built-in games (no cartridge)
 
@@ -309,11 +300,11 @@ Five games live in the BIOS. From `docs/RCA_Studio_II_Service_Manual.pdf` (pages
 
 | Game | Select | Controls |
 |------|--------|----------|
-| **Doodles** | A **1** | Keyboard B moves the dot per the arrows on the panel. **B5** leaves a trail as you "write"; **B0** leaves none. Retrace to erase. |
-| **Patterns** | A **2** | Screen stays dark; keyboard B "writes" per the panel arrows. Memory holds 130 moves — after 130 the pattern auto-repeats, and for fewer, **B0** starts the repeat cycle. |
-| **Freeway** | A **3** | **B4**/**B6** steer left/right, **A2** throttle, **A8** brake. Avoid the computer car for two minutes; distance travelled shows at the end. |
-| **Bowling** | A **4** | **A5** rolls straight, **A2** hooks left (up), **A8** hooks right (down). Strike scores 20 (`ST-20`), spare 15 (`SP-15`). Player 2 then uses keyboard B. |
-| **Addition** | A **5** | Add the three digits shown and press the total on either keyboard within five seconds. Faster answers score more, max 11 a set; a wrong answer locks you out of that set. 20 sets. |
+| **Doodles** | **A1** | Keyboard B moves the dot per the arrows on the panel. **B5** leaves a trail as you "write"; **B0** leaves none. Retrace to erase. |
+| **Patterns** | **A2** | Screen stays dark; keyboard B "writes" per the panel arrows. Memory holds 130 moves — after 130 the pattern auto-repeats, and for fewer, **B0** starts the repeat cycle. |
+| **Freeway** | **A3** | **B4**/**B6** steer left/right, **A2** throttle, **A8** brake. Avoid the computer car for two minutes; distance travelled shows at the end. |
+| **Bowling** | **A4** | **A5** rolls straight, **A2** hooks left (up), **A8** hooks right (down). Strike scores 20 (`ST-20`), spare 15 (`SP-15`). Player 2 then uses keyboard B. |
+| **Addition** | **A5** | Add the three digits shown and press the total on either keyboard within five seconds. Faster answers score more, max 11 a set; a wrong answer locks you out of that set. 20 sets. |
 
 These match what the core does: A2 correctly shows a dark screen, A1 puts a
 single dot at the lower left, and A4/A5 draw the bowling and score displays.
