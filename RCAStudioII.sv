@@ -397,19 +397,22 @@ reg          manual_d     = 1'b0;
 reg          push_pending = 1'b0;
 reg   [21:0] push_dly     = 22'd0;
 
+wire row_stale = !status[6] && (status[5:2] != auto_profile);
 always @(posedge clk_sys) begin
 	status_set <= 1'b0;
 	auto_d     <= auto_profile;
 	manual_d   <= status[6];
 
-	if ((auto_profile != auto_d) || (manual_d && !status[6])) begin
+	// When the menu is in Auto mode, the row must match the detected profile.
+	if ((auto_profile != auto_d) || (manual_d && !status[6]) || row_stale) begin
 		push_pending <= 1'b1;
 		// ~0.3 s at 7.04 MHz. map_profile only settles when the transfer ends,
-		// and the HPS is busy with the download until then, so let it quieten
-		// down before handing it a new status word.
+		// and the HPS is busy with the download until then, so let it finish.
 		push_dly     <= 22'd2000000;
 	end
-	else if (|push_dly)  push_dly <= push_dly - 1'b1;
+	else if (|push_dly) begin
+		push_dly <= push_dly - 1'b1;
+	end
 	else if (push_pending && !status[6] && !ioctl_download) begin
 		push_pending <= 1'b0;
 		status_in    <= {status[127:6], auto_profile, status[1:0]};

@@ -203,6 +203,9 @@ always @(posedge clk_sys) begin
 	integer i;
 	reg [15:0] c;
 	dl_d <= ioctl_download;
+	if (cart_dl && ioctl_download && !dl_d) begin
+		cart_crc <= 16'hFFFF;
+	end
 	if (cart_dl && ioctl_wr) begin
 		c = (ioctl_addr == 0) ? 16'hFFFF : cart_crc;
 		c = c ^ {ioctl_dout, 8'h00};
