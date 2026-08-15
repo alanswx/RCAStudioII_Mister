@@ -423,8 +423,7 @@ tools/quartus-build.sh map      # analysis & synthesis only
 tools/quartus-build.sh clean
 ```
 
-Resource use is modest: 19 % of ALMs, 7 % of block RAM, 3 of 6 PLLs, timing
-closed with +0.423 ns worst-case slack.
+Last known-good build: **0 errors**, 10,003 ALMs (24 %), 444 kbit of block RAM (8 %), timing closed with +0.710 ns worst-case slack.
 
 ## Simulators
 
