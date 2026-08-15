@@ -239,6 +239,9 @@ always @(posedge clk_sys) begin
 			16'hDFCF, 16'h8551: begin map_profile <= MAP_HOMEBREW; start_key <= 4'd0; end // Kaboom
 			16'h5359, 16'hE00A: begin map_profile <= MAP_HOMEBREW; start_key <= 4'd0; end // Pacman
 			16'hE45F, 16'h1280: begin map_profile <= MAP_HOMEBREW; start_key <= 4'd6; end // Scramble
+			// Number-entry games: digit-only input, cannot be driven by joystick
+			16'h1634: begin map_profile <= MAP_UNMAPPED; start_key <= 4'd1; end // TV Arcade II - Fun with Numbers, TV School House I
+			16'hB76F: begin map_profile <= MAP_UNMAPPED; start_key <= 4'd1; end // TV Casino Series - Blackjack, TV Bingo; TV Mystic Series - Biorhythm; TV School House II - Math Fun; Concentration Match; Demonstration Cartridge
 			// Default to 8-way which mirrors the MPT-02 joystick layout + diagonals
 			// Start on 1, which is the most common start key
 			default: begin map_profile <= MAP_8WAY;     start_key <= 4'd1; end // Built-in games, or CRC not detected
