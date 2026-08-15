@@ -338,8 +338,7 @@ Once the full software library runs reliably, make a deliberate consolidation
 pass: inventory every title's controls, merge profiles that can completely
 encompass one another, then reorder the remaining minimal set into a logical
 progression. That is the right time to bump the `CONF_STR` version and reorder
-its profile entries; doing it earlier would churn saved OSD values before the
-complete control taxonomy is known.
+its profile entries.
 
 ### 7.3 Keep the comparison green
 Any RTL change should be re-checked against the reference emulator (§9) before
@@ -663,7 +662,6 @@ The same manual settles a timing question: the Studio II clock is a **slug-tuned
 RC oscillator**, adjusted by eye for "zero waveform drift" against the 60 Hz line
 (§13, Figure 33). There is no exact crystal frequency, which is why MAME uses a
 round 1760000 Hz.
-
 
 The core went from "puts a picture on screen but most of the machine is
 stubbed" to pixel-identical output. Briefly, so the history is not lost:
