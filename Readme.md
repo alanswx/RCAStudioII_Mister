@@ -84,6 +84,7 @@ keyboard, so both work at once.
 | `GUNFIGHTER` | `2` | `8` | `4` | `6` | `5` | `0` |
 | `8WAY` | `2` | `8` | `4` | `6` | `5` | `0` |
 | `DOODLES` | `B2` | `B8` | `B4` | `B6` | `B5` | `B0` |
+| `UNMAPPED` | — | — | — | — | — | — |
 
 `CROSS` applies to both keypads (joystick 1 drives keypad B). Every mapping comes
 from the RCA manuals, not guesswork.
@@ -115,6 +116,11 @@ layout, but everything lands on keypad B only — Doodles and Patterns are both
 read entirely from keypad B, so keypad A is left untouched to avoid interfering
 with anything.
 
+`UNMAPPED` suppresses all controller presses — it sends zero input from the gamepad.
+Use it for digit-only games that cannot be driven by a cross or stick. The keyboard,
+on-screen numstick, and direct key bindings still work normally. It is also
+available as **Unmapped** in the OSD override list.
+
 #### Which cartridges are mapped
 
 | Cartridge | Profile | Start key |
@@ -138,28 +144,35 @@ downloaded:
 | Scramble | `HOMEBREW` | `A6` (starts each level) |
 | Hockey, Combat | `HB2P` | `A1` (game select) |
 
-#### Which are deliberately *not* mapped
+#### Which are mapped to UNMAPPED
 
-Ten cartridges fall through to the `8-way` default. That is intentional for most
-of them, and a joystick simply cannot express what they need:
+The following cartridges are explicitly mapped to `UNMAPPED` — they require only
+digit input, so a joystick cannot express what they need. Use the keypad, keyboard,
+on-screen numstick, or bind individual keys:
 
-**Number-entry games** — the input *is* a digit, so a four-way stick has nothing
-sensible to say. Use the keypad:
+**Number-entry games:**
 
-- TV Arcade II – Fun with Numbers (3-digit guesses)
-- TV Casino Series – Blackjack (bet `1`–`9`/`0`, hit `1`, double `2`, stand `0`)
-- TV Casino Series – TV Bingo
-- TV Mystic Series – Biorhythm (birth and start dates)
-- TV School House I, and II – Math Fun (arithmetic answers)
-- Concentration Match (grid squares chosen by number)
+- TV Arcade II – Fun with Numbers (3-digit guesses) | CRC `0x1634`
+- TV Casino Series – Blackjack (bet `1`–`9`/`0`) | CRC `0xB76F`
+- TV Casino Series – TV Bingo | CRC `0xB76F`
+- TV Mystic Series – Biorhythm (birth and start dates) | CRC `0xB76F`
+- TV School House I (arithmetic answers) | CRC `0x1634`
+- TV School House II – Math Fun (arithmetic answers) | CRC `0xB76F`
+- Concentration Match (grid squares by number) | CRC `0xB76F`
+- Demonstration Cartridge (unidentified) | CRC `0xB76F`
 
-**Unidentified** — no manual and no confirmed controls, so any mapping would be
-a guess:
+#### Which are deliberately *not* mapped (fall through to 8-way)
 
-- `86677b (Europe)`, `87201 (Europe)`, Demonstration Cartridge
+Four unidentified cartridges fall through to the `8-way` default, and no manual
+exists for any of them:
 
-These three are also the ones whose frames diverge from the reference emulator,
-so treat them as untested rather than working.
+- `86677b (Europe)` — not in test set
+- `87201 (Europe)` — not in test set
+
+These are also the ones whose frames diverge from the reference emulator,
+so treat them as untested rather than working. Any others not recognized by CRC
+also fall back to `8-way`, which is the most flexible profile and covers most
+games adequately.
 
 #### Built-in games
 
