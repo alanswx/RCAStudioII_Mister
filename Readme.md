@@ -163,7 +163,7 @@ get reused during play (`A5` rolls the ball in Bowling):
 The table can only be as good as its entries, and an unknown cartridge falls back
 to `CROSS`, which is a guess. So the OSD has a **Joystick** setting:
 
-`Auto` (default) · `Cross` · `Paddle` · `Space War` · `Freeway` · `Bowling` · `Baseball` · `Homebrew`
+`Auto` (default) · `Cross` · `Paddle` · `Space War` · `Freeway` · `Bowling` · `Baseball` · `Homebrew` · `Gunfighter`
 
 `Auto` uses the detection above; anything else forces that profile regardless of
 the cartridge. Useful for the unmapped titles, for a homebrew `.st2` the table has

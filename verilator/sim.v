@@ -8,7 +8,7 @@ module top(
    input [11:0]  inputs/*verilator public_flat*/,
    input [31:0]  joystick_0/*verilator public_flat*/,
    input [31:0]  joystick_1/*verilator public_flat*/,
-   input [2:0]   joy_override/*verilator public_flat*/,
+   input [3:0]   joy_override/*verilator public_flat*/,
    input [1:0]   players/*verilator public_flat*/,
 
    output [7:0] VGA_R/*verilator public_flat*/,

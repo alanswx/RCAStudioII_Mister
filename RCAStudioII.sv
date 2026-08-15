@@ -203,7 +203,7 @@ localparam CONF_STR = {
 	"F0,rom,Load Bios;",
 	"F1,ST2BINROM,Load Cartridge;",
 	"-;",
-O[4:2],Joystick,Auto,Cross,Paddle,Space War,Freeway,Bowling,Baseball,Homebrew;
+O[5:2],Joystick,Auto,Cross,Paddle,Space War,Freeway,Bowling,Baseball,Homebrew,Gunfighter;
 O[8:7],Players,Auto,1,2;
 O[10:9],Stick Keypad,Off,Pad A,Pad B;
 -;
@@ -353,7 +353,7 @@ rcastudioii rcastudio
 	.audio(audio),
 	.joystick_0(joystick_0),
 	.joystick_1(joystick_1),
-	.joy_override(status[4:2]),
+	.joy_override(status[5:2]),
 	.players(status[8:7]),
 	.osk_a(osk_a),
 	.osk_b(osk_b)

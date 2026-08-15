@@ -35,7 +35,7 @@ module rcastudioii
 	input       [10:0] ps2_key,
 	input       [31:0] joystick_0,
 	input       [31:0] joystick_1,
-	input        [2:0] joy_override,   // OSD: 0 = auto, else the profile to force
+	input        [3:0] joy_override,   // OSD: 0 = auto, else the profile to force
 	input        [1:0] players,        // OSD: 0 = auto, 1 = one player, 2 = two players
 	input        [9:0] osk_a,          // on-screen keypad presses for keypad A (bit = key)
 	input        [9:0] osk_b,          // and for keypad B
@@ -164,20 +164,22 @@ reg  [9:0] playerB = 10'h0;
 // until the user binds them in Define Buttons, and then they always work, on
 // top of whatever profile is active.
 
-// The profile is 4 bits internally; the OSD override (joy_override) is 3, so
-// only the first seven are forceable from the menu. MAP_HB2P exists solely for
-// the two-player homebrews, which the CRC table selects on its own.
-localparam [3:0] MAP_NONE     = 4'd0;   // keypad only
-localparam [3:0] MAP_CROSS    = 4'd1;   // 2/8/4/6 + 5 fire, both pads
-localparam [3:0] MAP_PADDLE   = 4'd2;   // up/down only (Tennis, Squash)
-localparam [3:0] MAP_SPACEWAR = 4'd3;   // fire A2, steer B4/B6
-localparam [3:0] MAP_FREEWAY  = 4'd4;   // steer B4/B6, throttle A2, brake A8
-localparam [3:0] MAP_BOWLING  = 4'd5;   // roll A5, hook A2/A8
-localparam [3:0] MAP_BASEBALL = 4'd6;   // bat A5; pitch B5 straight, B2/B8 curve
-localparam [3:0] MAP_HOMEBREW = 4'd7;   // Paul Robson's 1P games: 8-way on pad A
-                                        // (diagonals are keys 1/3/7/9), fire B0
-localparam [3:0] MAP_HB2P     = 4'd8;   // 2P homebrew (Hockey, Combat): cross
-                                        // plus fire-on-0, each player's own pad
+// The profile is 4 bits internally; the OSD override (joy_override) is 4, so
+// the menu can force any of the 16 encoded profiles, including Gunfighter.
+// MAP_HB2P exists solely for the two-player homebrews, which the CRC table selects
+// on its own.
+localparam [3:0] MAP_NONE       = 4'd0;   // keypad only
+localparam [3:0] MAP_CROSS      = 4'd1;   // 2/8/4/6 + 5 fire, both pads
+localparam [3:0] MAP_PADDLE     = 4'd2;   // up/down only (Tennis, Squash)
+localparam [3:0] MAP_SPACEWAR   = 4'd3;   // fire A2, steer B4/B6
+localparam [3:0] MAP_FREEWAY    = 4'd4;   // steer B4/B6, throttle A2, brake A8
+localparam [3:0] MAP_BOWLING    = 4'd5;   // roll A5, hook A2/A8
+localparam [3:0] MAP_BASEBALL   = 4'd6;   // bat A5; pitch B5 straight, B2/B8 curve
+localparam [3:0] MAP_HOMEBREW   = 4'd7;   // Paul Robson's 1P games: 8-way on pad A
+                                          // (diagonals are keys 1/3/7/9), fire B0
+localparam [3:0] MAP_HB2P       = 4'd8;   // 2P homebrew (Hockey, Combat): cross
+                                          // plus fire-on-0, each player's own pad
+localparam [3:0] MAP_GUNFIGHTER = 4'd9;   // vertical cross: 2/8 + fire 5, one-player
 
 reg [3:0] map_profile = MAP_NONE;
 
@@ -218,7 +220,7 @@ always @(posedge clk_sys) begin
 			16'hE153: begin map_profile <= MAP_CROSS;    start_key <= 4'd1; end // Speedway + Tag (Europe)
 			16'hD0DA: begin map_profile <= MAP_CROSS;    start_key <= 4'd1; end // Speedway + Tag (USA)
 			16'hD13E: begin map_profile <= MAP_CROSS;    start_key <= 4'd1; end // Star Wars
-			16'h3CDC: begin map_profile <= MAP_CROSS;    start_key <= 4'd1; end // Gunfighter + Moonship Battle
+			16'h3CDC: begin map_profile <= MAP_GUNFIGHTER; start_key <= 4'd1; end // Gunfighter + Moonship Battle
 			// Paul Robson's homebrew (refs/studio2-games): all use 0 to fire or
 			// start, so CROSS's fire-on-5 is wrong for every one of them. Both
 			// the .st2 and its .bin conversion are listed -- the CRC covers the
@@ -265,10 +267,9 @@ end
 
 // ---- effective profile: OSD override wins over auto-detection ---------------
 wire [3:0] auto_profile = no_cart ? builtin_profile : map_profile;
-// OSD list is Auto, Cross, Paddle, Space War, Freeway, Bowling, Baseball,
-// Homebrew -- after Auto those line up 1:1 with MAP_CROSS..MAP_HOMEBREW, so no
-// adjustment is needed. MAP_HB2P is CRC-selected only.
-wire [3:0] profile      = (joy_override == 3'd0) ? auto_profile : {1'b0, joy_override};
+// The OSD enum is 4 bits wide, so it can force any profile value directly,
+// including the Gunfighter preset. Auto still leaves the CRC/BIOS mapping alone.
+wire [3:0] profile      = (joy_override == 4'd0) ? auto_profile : joy_override;
 
 // ---- profile -> keypad presses ---------------------------------------------
 // Each profile is two halves: the keys it lands on keypad A and on keypad B.
@@ -325,6 +326,12 @@ function automatic [9:0] map_padA(input [3:0] prof, input [31:0] j);
 			if (j[1]) k[4] = 1'b1;   if (j[0]) k[6] = 1'b1;
 			if (j[4]) k[0] = 1'b1;
 		end
+		MAP_GUNFIGHTER: begin                // 2P behaves like CROSS; Auto/1P uses the
+			if (j[3]) k[2] = 1'b1;   if (j[2]) k[8] = 1'b1;   // right-hand B-only mapping
+			if (j[1]) k[4] = 1'b1;   if (j[0]) k[6] = 1'b1;
+			if (j[4]) k[5] = 1'b1;
+			if (j[5]) k[0] = 1'b1;
+		end
 		default: ;
 		endcase
 		map_padA = k;
@@ -369,6 +376,12 @@ function automatic [9:0] map_padB(input [3:0] prof, input [31:0] j);
 			if (j[1]) k[4] = 1'b1;   if (j[0]) k[6] = 1'b1;
 			if (j[4]) k[0] = 1'b1;
 		end
+		MAP_GUNFIGHTER: begin                // 2P behaves like CROSS; Auto/1P uses the
+			if (j[3]) k[2] = 1'b1;   if (j[2]) k[8] = 1'b1;   // right-hand B-only mapping
+			if (j[1]) k[4] = 1'b1;   if (j[0]) k[6] = 1'b1;
+			if (j[4]) k[5] = 1'b1;
+			if (j[5]) k[0] = 1'b1;
+		end
 		default: ;                           // Bowling: keypad B unused
 		endcase
 		map_padB = k;
@@ -377,7 +390,7 @@ endfunction
 
 wire profile_1p = (profile == MAP_SPACEWAR) || (profile == MAP_FREEWAY) ||
                   (profile == MAP_BOWLING)  || (profile == MAP_NONE) ||
-                  (profile == MAP_HOMEBREW);
+                  (profile == MAP_HOMEBREW) || (profile == MAP_GUNFIGHTER);
 wire one_player = (players == 2'd1) || ((players == 2'd0) && profile_1p);
 
 // Direct A0..A9/B0..B9 bindings and Start work from either stick: MiSTer maps
@@ -394,9 +407,15 @@ end
 wire       start_press = joystick_0[6] | joystick_1[6];
 wire [9:0] start_keys  = start_press ? (10'd1 << start_key) : 10'd0;
 
-wire [9:0] joyA = map_padA(profile, joystick_0) | directA | start_keys;
-wire [9:0] joyB = (one_player ? map_padB(profile, joystick_0)
-                              : map_padB(profile, joystick_1)) | directB;
+// Gunfighter is a special case: in Auto/1P it is B-only (2/4/6/8 + 5 + 0 on the
+// right-hand pad), while in 2P it splits exactly like CROSS across both pads.
+wire [9:0] joyA = ((profile == MAP_GUNFIGHTER) && one_player) ? 10'd0
+                : ((profile == MAP_GUNFIGHTER) ? map_padA(MAP_CROSS, joystick_0)
+                                              : map_padA(profile, joystick_0));
+wire [9:0] joyB = ((profile == MAP_GUNFIGHTER) && one_player) ? map_padB(MAP_CROSS, joystick_0)
+                : ((profile == MAP_GUNFIGHTER) ? map_padB(MAP_CROSS, joystick_1)
+                                              : (one_player ? map_padB(profile, joystick_0)
+                                                             : map_padB(profile, joystick_1)));
 
 ////////////////// CPU //////////////////////////////////////////////////////////////////
 
