@@ -139,7 +139,24 @@ Built-in BIOS games are detected by the first key pressed after reset:
 | Bowling | `A4` | `BOWLING` |
 | Addition | `A5` | `UNMAPPED` |
 
-`Auto` uses this table; any override forces a specific profile regardless of cartridge. `Unmapped` disables controller-driven keypad presses while still allowing the keyboard, on-screen numstick, and direct key bindings.
+#### Mapping: Auto or Manual
+
+Two OSD rows control this, rather than one list with `Auto` buried in it:
+
+| Row | Meaning |
+|-----|---------|
+| **Mapping** | `Auto` — use the table above. `Manual` — use whatever **Joystick** says. |
+| **Joystick** | The profile itself. |
+
+On `Auto` the **Joystick** row is a *readout*: the core writes the profile it
+detected back into the menu, so after loading Gunfighter the row reads
+`Gunfighter` rather than `Auto`, and you can see at a glance what you are
+playing with. Switch **Mapping** to `Manual` and that same row becomes editable,
+starting from the detected profile instead of a stale selection — so overriding
+a profile means changing one row, from a sensible starting point.
+
+`None` leaves the pad with only Start; `Unmapped` silences it completely. Both
+still allow the keyboard, the on-screen numstick, and direct key bindings.
 
 #### Start, Select, and the Players setting
 

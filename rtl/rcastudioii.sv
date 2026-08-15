@@ -35,7 +35,9 @@ module rcastudioii
 	input       [10:0] ps2_key,
 	input       [31:0] joystick_0,
 	input       [31:0] joystick_1,
-	input        [3:0] joy_override,   // OSD: 0 = auto, else the profile to force
+	input        [3:0] joy_override,   // OSD "Joystick" row: the profile to use when joy_manual
+	input              joy_manual,     // OSD "Mapping": 0 = auto-detect, 1 = use joy_override
+	output       [3:0] auto_profile,   // the detected profile, for the top level to show in the OSD
 	input        [1:0] players,        // OSD: 0 = auto, 1 = one player, 2 = two players
 	input        [9:0] osk_a,          // on-screen keypad presses for keypad A (bit = key)
 	input        [9:0] osk_b,          // and for keypad B
@@ -277,11 +279,14 @@ always @(posedge clk_sys) begin
 	end
 end
 
-// ---- effective profile: OSD override wins over auto-detection ---------------
-wire [3:0] auto_profile = no_cart ? builtin_profile : map_profile;
-// The OSD enum is 4 bits wide, so it can force any profile value directly,
-// including the Gunfighter preset. Auto still leaves the CRC/BIOS mapping alone.
-wire [3:0] profile      = (joy_override == 4'd0) ? auto_profile : joy_override;
+// ---- effective profile ------------------------------------------------------
+// Two independent OSD rows now: "Mapping" chooses between auto-detection and
+// the menu, and "Joystick" is the profile itself. There is no longer a magic
+// "0 = auto" value inside the profile enum, so every one of the 16 encodings --
+// MAP_NONE included -- is selectable, and the top level can display the
+// detected profile in the same row the user would edit (see RCAStudioII.sv).
+assign     auto_profile = no_cart ? builtin_profile : map_profile;
+wire [3:0] profile      = joy_manual ? joy_override : auto_profile;
 
 // ---- profile -> keypad presses ---------------------------------------------
 // Each profile is two halves: the keys it lands on keypad A and on keypad B.

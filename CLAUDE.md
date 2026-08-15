@@ -25,12 +25,13 @@ the beeper and RTL ST2 loader are implemented, and the core builds clean in
 Quartus with timing closed (§4).
 
 Recent additions that matter for day-to-day use include the OSD-managed joystick
-profile system, the wider 4-bit override path, the default 8-way profile,
+profile system with its Auto/Manual split (the menu shows the detected profile
+instead of the word "Auto"), the default 8-way profile,
 Gunfighter/8-way/Doodles special cases, the unmapped profile for digit-entry
-software, and config-versioning so old saved menu state does not silently map to
-the wrong fields.
+software, the memory decode, and config-versioning so old saved menu state does
+not silently map to the wrong fields.
 
-What is still missing: proper **memory decode/mirroring** and **PAL**. See §6.
+What is still missing: **PAL**, and an embedded BIOS. See §6.
 
 Licence: GPL-2.0-or-later (file headers). Note `rtl/reference/cosmac.vhdl` and
 its translation `rtl/cosmac.v` are Eric Smith's GPL-3.0 code — compatible with
@@ -426,6 +427,38 @@ cartridges including an RCA test cart.
 ---
 
 ## 10. What changed
+
+### 2026-08-15 (OSD shows the detected profile)
+
+**"Auto" is gone from the Joystick list.** It was a value inside the profile
+enum, which meant the menu could tell you the core was auto-detecting but never
+*what it had detected*. Now there are two rows: `Mapping` (Auto/Manual, bit 6)
+and `Joystick` (the profile itself, bits 5:2, no Auto entry). On Auto the core
+pushes the detected profile into bits 5:2 through hps_io's `status_set`, so the
+row reads "Gunfighter" after Gunfighter loads; on Manual the row is the user's,
+and it starts from whatever was last detected rather than a stale value.
+
+Freeing value 0 from meaning "auto" also makes every one of the 16 encodings
+selectable, `MAP_NONE` included — it is listed as "None" and differs from
+"Unmapped" in that Start still works.
+
+The write-back is one pulse per change (new detection, or Manual→Auto), delayed
+~0.3 s past the end of the download so `map_profile` has settled and the HPS is
+no longer busy. Deliberately *not* a retry loop that pushes until the row
+agrees: that would fight the user if they scrolled the row, and would pulse
+forever on a Main that ignores `status_set`. Shape copied from the NES core
+(`status_in`/`statusUpdate`) and Apple IIgs (`status_mirror`). A dropped pulse
+only leaves the row stale — nothing about the mapping itself depends on it,
+because the core plays from `auto_profile` directly.
+
+CONF_STR bumped `v2` → `v3`, since bit 6 is new and bits 5:2 changed meaning.
+
+**Verified in sim, with one gap.** For five cartridges, `Manual` + the detected
+profile number gives byte-identical frames to `Auto` (the override path reaches
+the mapping and agrees with detection), and `Auto` vs `Unmapped` differs on
+Gunfighter and Star Wars (the pad is genuinely driving input). **The `status_set`
+write-back itself is not simulated** — Verilator has no HPS — so that the OSD
+row actually updates needs checking on hardware.
 
 ### 2026-08-15 (memory decode)
 

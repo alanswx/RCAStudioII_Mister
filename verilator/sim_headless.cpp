@@ -396,8 +396,11 @@ static void usage(const char* argv0) {
 "    --dump-file FILE     write dumps here instead of stdout\n"
 "\n"
 "  Input\n"
-"    --joy-map N          OSD joystick override: 0 auto, 1 cross, 2 paddle,\n"
-"                         3 spacewar, 4 freeway, 5 bowling, 6 baseball, 7 homebrew\n"
+"    --joy-map N          OSD \"Joystick\" profile, and switch \"Mapping\" to Manual:\n"
+"                         0 none/keypad-only, 1 cross, 2 spacewar, 3 freeway,\n"
+"                         4 bowling, 5 baseball, 6 homebrew, 7 gunfighter,\n"
+"                         8 8-way, 9 doodles, 10 2P homebrew, 11 unmapped,\n"
+"                         12 paddle (legacy). Omit for auto-detection.\n"
 "    --joy MASK@F[:H]     drive joystick 0 with MASK (bit0 right, 1 left, 2 down,\n"
 "                         3 up, 4 fire, 5 extra, 6 start, 17:8 A0..A9,\n"
 "                         27:18 B0..B9) at frame F for H frames.\n"
@@ -447,6 +450,7 @@ int main(int argc, char** argv) {
     uint32_t joy_mask = 0; long joy_from = -1, joy_to = -1;
     uint32_t joy2_mask = 0; long joy2_from = -1, joy2_to = -1;
     uint8_t  joy_override = 0;   // applied once top exists
+    bool     joy_manual   = false;
     uint8_t  players_mode = 0;
     // Q gates the Studio II's beeper; track its edges so the core can be compared
     // against the reference emulator's Q even though AUDIO_L/R are still tied off.
@@ -499,7 +503,7 @@ int main(int argc, char** argv) {
             joy2_from = atol(rest.c_str()); joy2_to = joy2_from + hold;
         }
         else if (a == "--players")    players_mode = (uint8_t)atoi(next("--players"));
-        else if (a == "--joy-map")    joy_override = (uint8_t)atoi(next("--joy-map"));
+        else if (a == "--joy-map") { joy_override = (uint8_t)atoi(next("--joy-map")); joy_manual = true; }
         else if (a == "--trace-q")    trace_q = true;
         else if (a == "--frame-log")  frame_log = true;
         else if (a == "--quiet")      quiet = true;
@@ -554,6 +558,7 @@ int main(int argc, char** argv) {
     Verilated::commandArgs(argc, argv);
     top = new Vtop();
     top->joy_override = joy_override;
+    top->joy_manual   = joy_manual;
     top->players = players_mode;
 
     IoctlDriver io;

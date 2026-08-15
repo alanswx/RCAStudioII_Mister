@@ -198,12 +198,22 @@ assign BUTTONS = 0;
 
 `include "build_id.v"
 localparam CONF_STR = {
-	"RCA-StudioII;v2;",
+	"RCA-StudioII;v3;",
 	"-;",
 	"F1,ST2BINROM,Load Cartridge;",
 	"F0,ROM,Load Firmware;",
 	"-;",
-	"O[5:2],Joystick,Auto,Cross,Space War,Freeway,Bowling,Baseball,Homebrew,Gunfighter,8-way,Doodles,2P Homebrew,Unmapped;",
+	// Mapping picks who owns the Joystick row below it. On Auto the core drives
+	// that row: it writes the profile it detected back into the menu through
+	// hps_io's status_set, so loading Gunfighter leaves the menu reading
+	// "Gunfighter" instead of "Auto". Switch to Manual and the row keeps
+	// whatever it is showing and becomes yours to change -- so Manual always
+	// starts from the detected profile rather than from a stale one.
+	"O[6],Mapping,Auto,Manual;",
+	// Value 0 is MAP_NONE, which still passes Start through; Unmapped (11) is the
+	// one that silences the pad completely. Order must match the localparams in
+	// rtl/rcastudioii.sv -- the row's value IS the profile number.
+	"O[5:2],Joystick,None,Cross,Space War,Freeway,Bowling,Baseball,Homebrew,Gunfighter,8-way,Doodles,2P Homebrew,Unmapped;",
 	"O[8:7],Players,Auto,1,2;",
 	"O[10:9],Stick Keypad,Off,Pad A,Pad B;",
 	"-;",
@@ -272,7 +282,9 @@ hps_io #(.CONF_STR(CONF_STR)) hps_io
 
 	.buttons(buttons),
 	.status(status),
-	
+	.status_in(status_in),
+	.status_set(status_set),
+
 	.ps2_key(ps2_key),
 	.joystick_0(joystick_0),
 	.joystick_1(joystick_1),
@@ -350,10 +362,60 @@ rcastudioii rcastudio
 	.joystick_0(joystick_0),
 	.joystick_1(joystick_1),
 	.joy_override(status[5:2]),
+	.joy_manual(status[6]),
+	.auto_profile(auto_profile),
 	.players(status[8:7]),
 	.osk_a(osk_a),
 	.osk_b(osk_b)
 );
+
+////////////////// Joystick profile -> OSD ///////////////////////////////////
+//
+// On Auto, the core's CRC/built-in-game detection owns the Joystick row and the
+// menu is made to agree with it: hps_io's status_set hands the HPS a whole new
+// status word, so writing the detected profile into bits [5:2] is what makes the
+// OSD read "Gunfighter" after Gunfighter is loaded. On Manual nothing is
+// written, so the row holds the last detected profile and the user edits from
+// there rather than from a stale selection.
+//
+// This only changes what the menu *shows*. The mapping itself comes from
+// auto_profile directly, so a write-back that never lands costs nothing but a
+// stale row, and there is no feedback loop -- on Auto the core ignores the row
+// it is writing to.
+//
+// One pulse per change, not a retry loop that nudges until the row agrees: the
+// same shape the NES core (status_in/statusUpdate) and Apple IIgs
+// (status_mirror) use. A retry loop would fight the user keystroke-for-keystroke
+// if they scrolled that row, and would pulse forever on any Main that ignores
+// status_set. Armed by the two things that change what should be displayed: the
+// detection landing on a new profile, or Mapping switching back to Auto.
+wire [3:0]   auto_profile;
+reg  [127:0] status_in;
+reg          status_set   = 1'b0;
+reg    [3:0] auto_d       = 4'd0;
+reg          manual_d     = 1'b0;
+reg          push_pending = 1'b0;
+reg   [21:0] push_dly     = 22'd0;
+
+always @(posedge clk_sys) begin
+	status_set <= 1'b0;
+	auto_d     <= auto_profile;
+	manual_d   <= status[6];
+
+	if ((auto_profile != auto_d) || (manual_d && !status[6])) begin
+		push_pending <= 1'b1;
+		// ~0.3 s at 7.04 MHz. map_profile only settles when the transfer ends,
+		// and the HPS is busy with the download until then, so let it quieten
+		// down before handing it a new status word.
+		push_dly     <= 22'd2000000;
+	end
+	else if (|push_dly)  push_dly <= push_dly - 1'b1;
+	else if (push_pending && !status[6] && !ioctl_download) begin
+		push_pending <= 1'b0;
+		status_in    <= {status[127:6], auto_profile, status[1:0]};
+		status_set   <= 1'b1;
+	end
+end
 
 assign CLK_VIDEO = clk_sys;
 
