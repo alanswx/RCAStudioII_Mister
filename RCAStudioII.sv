@@ -210,10 +210,13 @@ localparam CONF_STR = {
 	// whatever it is showing and becomes yours to change -- so Manual always
 	// starts from the detected profile rather than from a stale one.
 	"O[6],Mapping,Auto,Manual;",
-	// Value 0 is MAP_NONE, which still passes Start through; Unmapped (11) is the
-	// one that silences the pad completely. Order must match the localparams in
-	// rtl/rcastudioii.sv -- the row's value IS the profile number.
-	"O[5:2],Joystick,None,Cross,Space War,Freeway,Bowling,Baseball,Homebrew,Gunfighter,8-way,Doodles,2P Homebrew,Unmapped;",
+	// Value 0 is MAP_NONE, which still passes Start through; Clear-only (11) is the
+	// one that silences the pad completely. Paddle (12) is a single-player,
+	// keypad-B-only profile for the homebrew tennis.st2, distinct from retail
+	// Tennis/Squash's CROSS profile.
+	// Order must match the localparams in rtl/rcastudioii.sv -- the row's value
+	// IS the profile number.
+	"O[5:2],Joystick,None,Cross,Space War,Freeway,Bowling,Baseball,Homebrew,Gunfighter,8-way,Doodles,2P Homebrew,Clear-only,Paddle;",
 	"O[8:7],Players,Auto,1,2;",
 	"O[10:9],Stick Keypad,Off,Pad A,Pad B;",
 	"-;",
@@ -240,8 +243,8 @@ wire forced_scandoubler;
 wire  [21:0] gamma_bus;
 wire   [1:0] buttons;
 wire [127:0] status;
-// Menu mask to gray-out/disable specific OSD rows. Bit i -> disable row i (0-based)
-// Joystick row is the second O-row in CONF_STR (index 1), so bit 1 will gray it when set.
+// Menu mask to gray-out/disable OSD options. Bit i selects the option whose
+// status field begins at bit i; Joystick is O[5:2], so it uses mask bit 2.
 wire  [15:0] status_menumask;
 wire  [10:0] ps2_key;
 wire  [31:0] joystick_0, joystick_1;
@@ -392,24 +395,29 @@ rcastudioii rcastudio
 // same shape the NES core (status_in/statusUpdate) and Apple IIgs
 // (status_mirror) use. A retry loop would fight the user keystroke-for-keystroke
 // if they scrolled that row, and would pulse forever on any Main that ignores
-// status_set. Armed by the two things that change what should be displayed: the
-// detection landing on a new profile, or Mapping switching back to Auto.
+// status_set. Armed at startup and by the two things that change what should be
+// displayed: the detection landing on a new profile, or Mapping switching back
+// to Auto.
 wire [3:0]   auto_profile;
 reg  [127:0] status_in;
 reg          status_set   = 1'b0;
 reg    [3:0] auto_d       = 4'd0;
 reg          manual_d     = 1'b0;
+reg          auto_sync_done = 1'b0;
 reg          push_pending = 1'b0;
 reg   [21:0] push_dly     = 22'd0;
 
-wire row_stale = !status[6] && (status[5:2] != auto_profile);
 always @(posedge clk_sys) begin
 	status_set <= 1'b0;
 	auto_d     <= auto_profile;
 	manual_d   <= status[6];
 
-	// When the menu is in Auto mode, the row must match the detected profile.
-	if ((auto_profile != auto_d) || (manual_d && !status[6]) || row_stale) begin
+	// Schedule exactly one write on initial Auto mode, a new detection, or a
+	// Manual-to-Auto transition. Do not test whether the row is stale here: that
+	// would reload the delay on every clock and prevent the write from firing.
+	if ((!auto_sync_done && !status[6]) || (auto_profile != auto_d) ||
+	    (manual_d && !status[6])) begin
+		auto_sync_done <= 1'b1;
 		push_pending <= 1'b1;
 		// ~0.3 s at 7.04 MHz. map_profile only settles when the transfer ends,
 		// and the HPS is busy with the download until then, so let it finish.
@@ -425,9 +433,10 @@ always @(posedge clk_sys) begin
 	end
 end
 
-// Gray-out the Joystick OSD row when Mapping is set to Auto
-// CONF_STR's O-rows: 0 = Mapping, 1 = Joystick, ... -> mask bit 1 disables (gray) the Joystick row
-assign status_menumask = (!status[6]) ? 16'h0002 : 16'h0000;
+// Gray-out the Joystick OSD option when Mapping is set to Auto. status_menumask
+// is keyed by an option's first status bit, not by the option's visual row;
+// Joystick is O[5:2], hence bit 2.
+assign status_menumask = (!status[6]) ? 16'h0004 : 16'h0000;
 
 assign CLK_VIDEO = clk_sys;
 

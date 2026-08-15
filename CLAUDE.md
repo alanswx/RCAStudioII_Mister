@@ -27,7 +27,7 @@ Quartus with timing closed (§4).
 Recent additions that matter for day-to-day use include the OSD-managed joystick
 profile system with its Auto/Manual split (the menu shows the detected profile
 instead of the word "Auto"), the default 8-way profile,
-Gunfighter/8-way/Doodles special cases, the unmapped profile for digit-entry
+Gunfighter/8-way/Doodles special cases, the Clear-only profile for digit-entry
 software, the memory decode, and config-versioning so old saved menu state does
 not silently map to the wrong fields.
 
@@ -334,6 +334,13 @@ cartridges, but every new title is still a chance to discover a missing special
 case. Keep the profile table aligned with the actual manuals and the reference 
 emulator.
 
+Once the full software library runs reliably, make a deliberate consolidation
+pass: inventory every title's controls, merge profiles that can completely
+encompass one another, then reorder the remaining minimal set into a logical
+progression. That is the right time to bump the `CONF_STR` version and reorder
+its profile entries; doing it earlier would churn saved OSD values before the
+complete control taxonomy is known.
+
 ### 7.3 Keep the comparison green
 Any RTL change should be re-checked against the reference emulator (§9) before
 committing. The regression is cheap — a few seconds per cartridge. Changes that
@@ -471,13 +478,13 @@ and it starts from whatever was last detected rather than a stale value.
 
 Freeing value 0 from meaning "auto" also makes every one of the 16 encodings
 selectable, `MAP_NONE` included — it is listed as "None" and differs from
-"Unmapped" in that Start still works.
+"Clear-only" in that Start still works.
 
-The write-back is one pulse per change (new detection, or Manual→Auto), delayed
-~0.3 s past the end of the download so `map_profile` has settled and the HPS is
-no longer busy. Deliberately *not* a retry loop that pushes until the row
-agrees: that would fight the user if they scrolled the row, and would pulse
-forever on a Main that ignores `status_set`. Shape copied from the NES core
+The write-back is one pulse at startup and per change (new detection, or
+Manual→Auto), delayed ~0.3 s past the end of the download so `map_profile` has
+settled and the HPS is no longer busy. Deliberately *not* a retry loop that
+pushes until the row agrees: that would fight the user if they scrolled the row,
+and would pulse forever on a Main that ignores `status_set`. Shape copied from the NES core
 (`status_in`/`statusUpdate`) and Apple IIgs (`status_mirror`). A dropped pulse
 only leaves the row stale — nothing about the mapping itself depends on it,
 because the core plays from `auto_profile` directly.
@@ -486,7 +493,7 @@ CONF_STR bumped `v2` → `v3`, since bit 6 is new and bits 5:2 changed meaning.
 
 **Verified in sim, with one gap.** For five cartridges, `Manual` + the detected
 profile number gives byte-identical frames to `Auto` (the override path reaches
-the mapping and agrees with detection), and `Auto` vs `Unmapped` differs on
+the mapping and agrees with detection), and `Auto` vs `Clear-only` differs on
 Gunfighter and Star Wars (the pad is genuinely driving input). **The `status_set`
 write-back itself is not simulated** — Verilator has no HPS — so that the OSD
 row actually updates needs checking on hardware.
@@ -549,20 +556,26 @@ integer-scaling modes. Native output is 64×128 in a 112×262 frame at 15.7 kHz 
 
 **Input, per the beta testers' list.** Start presses the cartridge's start key
 (per-CRC, from the manuals in the Readme; A1 default), Select is CLEAR. A
-Players setting (Auto/1/2) picks which stick drives keypad B's half of each
-profile — Auto reproduces the previously verified behaviour exactly. The J list
+Players setting (Auto/1/2) picks which stick drives keypad B's half of split
+profiles; permanently one-player profiles stay on gamepad 0 — Auto reproduces
+the previously verified behaviour exactly. The J list
 now carries A0–A9/B0–B9 as default-unbound buttons for direct custom mapping.
+The homebrew `tennis.st2` uses its single-player keypad-B `MAP_PADDLE` profile,
+which is distinct from the retail Tennis/Squash `MAP_CROSS` profile:
+up/down are B2/B8, and left/Fire/right select racket sizes B4/B5/B6.
 The Jaguar core's numstick (via ColecoAdam, `rtl/numstick.sv`) gives an
 analog-stick on-screen keypad, OSD-selected onto pad A or B; left row reduced
 to the single "0" the Studio II has. All equivalences verified in sim
 (stick == matching keypress, byte-identical frames).
 
-**Homebrew mapped.** All 8 Paul Robson games verified working in sim (both
-`.st2` and `.bin`, page $0C/$0D games included). They all fire/start on `0`, so
-two new profiles: `MAP_HOMEBREW` (8-way pad A with corner keys on diagonals for
-Berzerk, fire on B0 — never A0, which restarts Invaders) and `MAP_HB2P`
-(Hockey/Combat: cross + own-pad 0). The profile field is 4 bits internally; the
-OSD override stays 3.
+**Homebrew mapped, but not yet reliable on hardware.** The profiles cover all
+8 Paul Robson games (both `.st2` and `.bin`, including page `$0C/$0D` games),
+but Combat and Hockey show flicker/jitter, Scramble does not progress reliably,
+and Invaders has minor flicker. Resolving these homebrew issues is the next major
+core priority. They all fire/start on `0`, so the profiles are `MAP_HOMEBREW`
+(8-way pad A with corner keys on diagonals for Berzerk, fire on B0 — never A0,
+which restarts Invaders) and `MAP_HB2P` (Hockey/Combat: cross + own-pad 0). The
+profile field is 4 bits internally; the OSD override stays 3.
 
 **Extra button (MPT-02).** The Soundic/Hanimex MPT-02 Studio III machines had
 swappable joysticks with the official mapping: cross on 2/4/6/8, fire 5, second
@@ -697,18 +710,19 @@ garbage.
 
 ---
 
-## 12. Credit where it is due
+## 12. Credit
 
-This project builds on earlier work by Jason Coombes (JasonA-dev, June 2022 -
-March 2025), who created the original CDP1802 and CDP1861 Verilog, the keypad
-scheme, the memory map, and the initial Verilator harness. Flandango handled
-MiSTer framework integration and early Pixie work. Alan Steremberg and Elle Ball
-carried the later 2026 timing, video, controller/profile, and OSD work that
-brought the core to its current playable state. The module boundaries,
-`files.qip` layout, and sim structure remain recognisably theirs; this repo is
-an extension of that work, not a claim of sole authorship.
+Jason Coombes is the original author and primary contributor by far. He
+created the original CDP1802 and CDP1861 Verilog, the keypad scheme, the memory 
+map, and the initial Verilator harness. Flandango handled MiSTer framework 
+integration and early Pixie work. This repo is an extension of their work and 
+deeply depends on it.
 
-The accuracy work depends entirely on other people's emulators:
+Alan Steremberg and Elle Ball carried the later 2026 timing, video, 
+controller/profile, and OSD work that brought the core to its current playable 
+state. 
+
+Recent accuracy refinement work heavily references the following projects:
 
 | Who | What | How it was used here |
 |-----|------|----------------------|

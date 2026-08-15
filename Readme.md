@@ -87,7 +87,8 @@ once.
 | `GUNFIGHTER` | `B2` | `B8` | `B4` | `B6` | `B5` | `B0` |
 | `8WAY` | `2` | `8` | `4` | `6` | `5` | `0` |
 | `DOODLES` | `B2` | `B8` | `B4` | `B6` | `B5` | `B0` |
-| `UNMAPPED` | — | — | — | — | — | — |
+| `PADDLE` | `B2` | `B8` | `B4` | `B6` | `B5` | — |
+| `CLEAR_ONLY` | — | — | — | — | — | — |
 
 `CROSS` is the standard 2/4/6/8 cross with fire on `5` and extra on `0`. It matches the official MPT-02 joystick layout and applies to both keypads.
 
@@ -95,7 +96,14 @@ once.
 
 `GUNFIGHTER` is a full cross with fire on `5`; in one-player mode it collapses onto keypad B, while two-player mode splits across A and B. `8WAY` is `CROSS` plus diagonals (`1/3/7/9`). `DOODLES` uses the same idea but sends everything to keypad B only.
 
-`UNMAPPED` disables all controller-driven keypad presses; keyboard, on-screen numstick, and direct key bindings still work.
+`PADDLE` is single-player and keypad-B-only, for the homebrew `tennis.st2` (a
+different cartridge from the retail TV Arcade III Tennis/Squash, which uses
+`CROSS`). It maps racquet movement to `B2`/`B8`, and the left, Fire, and right
+buttons to the setup choices `B4`, `B5`, and `B6`, respectively.
+
+`CLEAR_ONLY` leaves the gamepad's Select button available for **CLEAR**, but
+disables all controller-driven keypad presses; keyboard, on-screen numstick, and
+direct key bindings still work.
 
 #### Which cartridges are mapped
 
@@ -118,7 +126,24 @@ Paul Robson’s homebrew games are mapped too:
 | Scramble | `HOMEBREW` | `A6` |
 | Hockey, Combat | `HB2P` | `A1` |
 
-The rest are intentionally left as `UNMAPPED` because they require only digit input, which a joystick cannot express cleanly:
+A handful of other homebrew titles are mapped individually, since none of the
+categories above fit them:
+
+| Homebrew | Profile | Start key |
+|----------|---------|-----------|
+| tennis.st2 | `PADDLE` | `A1` |
+| RCA_demo.st2 | `8WAY` | `A1` |
+| cas-190-bagua-blood-horoscope.st2 | `8WAY` (unverified) | `A1` |
+| flappy.st2 | `8WAY` (unverified) | `A1` |
+| Space Explorer.bin / space_explorer.st2 | `8WAY` (unverified) | `A1` |
+
+"Unverified" means the profile is a generic default, not a checked-against-the-
+manual mapping — nobody has run these through `tools/probe-keys.sh` or supplied
+the actual control scheme yet. If you know how one of these plays, open an
+issue or a PR with the details and it can get a proper profile the way
+`tennis.st2` did.
+
+The rest use `CLEAR_ONLY` because they require only digit input, which a joystick cannot express cleanly:
 
 - TV Arcade II – Fun with Numbers
 - TV Casino Series – Blackjack
@@ -137,7 +162,7 @@ Built-in BIOS games are detected by the first key pressed after reset:
 | Patterns | `A2` | `DOODLES` |
 | Freeway | `A3` | `FREEWAY` |
 | Bowling | `A4` | `BOWLING` |
-| Addition | `A5` | `UNMAPPED` |
+| Addition | `A5` | `CLEAR_ONLY` |
 
 #### Mapping: Auto or Manual
 
@@ -155,7 +180,8 @@ playing with. Switch **Mapping** to `Manual` and that same row becomes editable,
 starting from the detected profile instead of a stale selection — so overriding
 a profile means changing one row, from a sensible starting point.
 
-`None` leaves the pad with only Start; `Unmapped` silences it completely. Both
+`None` leaves the pad with only Start; `Clear-only` leaves only Select for
+**CLEAR**. Both
 still allow the keyboard, the on-screen numstick, and direct key bindings.
 
 #### Start, Select, and the Players setting
@@ -165,7 +191,7 @@ still allow the keyboard, the on-screen numstick, and direct key bindings.
 The **Players** setting decides which gamepad drives the B-side of a profile:
 
 - `1` = gamepad 0 handles everything
-- `2` = each gamepad owns its own keypad half
+- `2` = two-sided profiles split across the gamepads; profiles marked `1P` stay on gamepad 0
 - `Auto` = use the profile’s default layout
 
 | Profile | Default |
@@ -180,7 +206,8 @@ The **Players** setting decides which gamepad drives the B-side of a profile:
 | `GUNFIGHTER` | `1P` |
 | `8WAY` | `1P` |
 | `DOODLES` | `1P` |
-| `UNMAPPED` | n/a |
+| `PADDLE` | `1P` |
+| `CLEAR_ONLY` | n/a |
 
 The keyboard, on-screen numstick, and direct per-key bindings still work alongside the profile; a mapped joystick press and a pressed key can both act at once.
 
@@ -279,6 +306,14 @@ Setup, in order: each player picks racquet size on their own keyboard —
 In play: **2** moves your racquet up, **8** down. **0** pauses and resumes.
 First to 21, winning by two; if tied at 21 play continues until someone leads
 by two or reaches 200. Squash ends at 200.
+
+#### tennis.st2 (homebrew)
+
+Not the retail cartridge above — a different, single-player homebrew Tennis.
+**CLEAR**, then **A1** to start. All play is on keyboard B: **B4**/**B5**/**B6**
+pick racquet size once at the start, then **B2**/**B8** move the racquet up and
+down. The `PADDLE` joystick profile maps those same controls: up/down to
+**B2**/**B8**, and left/Fire/right to **B4**/**B5**/**B6**.
 
 #### Speedway / Tag
 
@@ -402,15 +437,15 @@ Checked against captures of real hardware in `refvideo/`:
   whose component values do not give a sane frequency.
 - Frames are pixel-identical to a reference emulator on 18 of 21 test cases.
 
-## Known issues
+## Known issues and work in progress
 
-- No PAL mode, and the BIOS is not embedded.
-- A previous note here reported that Paul Robson's homebrew games flicker badly.
-  It does not reproduce in simulation — all eight run for hundreds of frames
-  without a single blank one — and the memory-mirroring explanation that went
-  with it was wrong (`$0A00` has A9 = 1, so it is cartridge space, not a RAM
-  mirror). If you see it on real hardware, please report it; the trace needs to
-  start again from scratch. See CLAUDE.md §6.1.
+- No PAL mode (yet). All games run at NTSC speeds.
+- Analog and direct video are (hypothetically) enabled now, but untested.
+- Certain homebrew titles (Paul Robson titles: Combat, Hockey, Scramble) don't 
+work properly. Combat and Hockey have flickering or jittering graphical issues, and Scramble doesn't seem to get
+going as far as I can tell. Invaders has some minor flicker, but this might be
+accurate to hardware; would be good to get a reference video from ubersaurus.
+- BIOS is currently loaded externally. Consider possibility of embedding.
 
 ## Building
 

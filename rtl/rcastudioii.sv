@@ -173,8 +173,8 @@ reg  [9:0] playerB = 10'h0;
 // The profile is 4 bits internally; the OSD override (joy_override) is 4, so
 // the menu can force any of the 16 encoded profiles, including Gunfighter.
 // Keep the numeric values aligned with the OSD list so a user selection selects
-// the correct profile. MAP_PADDLE remains as a legacy alias for compatibility but
-// is not exposed in the menu because CROSS is a better default for Tennis/Squash.
+// the correct profile. PADDLE is distinct from CROSS, which remains the default
+// for the retail Tennis/Squash cartridge.
 localparam [3:0] MAP_NONE       = 4'd0;   // no controller mapping; keep keypad/OSK input only
 localparam [3:0] MAP_CROSS      = 4'd1;   // 2/8/4/6 + 5 fire, both pads
 localparam [3:0] MAP_SPACEWAR   = 4'd2;   // fire A2, steer B4/B6
@@ -190,9 +190,11 @@ localparam [3:0] MAP_HB2P       = 4'd10;  // 2P homebrew (Hockey, Combat): cross
                                           // fire-on-0, each player's own pad. Normally
                                           // chosen by CRC, but also exposed in the OSD
                                           // list as "2P Homebrew" for manual override.
-localparam [3:0] MAP_UNMAPPED   = 4'd11;  // explicit no-controller mapping: only Clear/Select
+localparam [3:0] MAP_CLEAR_ONLY = 4'd11;  // explicit no-controller mapping: only Clear/Select
                                           // from the pad; numstick/keyboard still work.
-localparam [3:0] MAP_PADDLE     = 4'd12;  // legacy alias for Tennis/Squash, retained for compatibility
+localparam [3:0] MAP_PADDLE     = 4'd12;  // homebrew tennis.st2: single-player, keypad B
+                                          // only. Up/down map to 2/8; left/fire/right map
+                                          // to the one-time racket-size choices B4/B5/B6.
 
 reg [3:0] map_profile = MAP_NONE;
 
@@ -229,14 +231,20 @@ reg [3:0] start_key = 4'd1;
 always @(posedge clk_sys) begin
 	if (dl_done) begin
 		case (cart_crc)
-			16'h977C: begin map_profile <= MAP_SPACEWAR;   start_key <= 4'd1; end // TV Arcade I - Space War
-			16'h88FB: begin map_profile <= MAP_CROSS;      start_key <= 4'd2; end // TV Arcade III - Tennis + Squash
-			16'hF837: begin map_profile <= MAP_BASEBALL;   start_key <= 4'd0; end // TV Arcade IV - Baseball
-			16'hD3E2: begin map_profile <= MAP_CROSS;      start_key <= 4'd1; end // Pinball
+			16'h977C: begin map_profile <= MAP_SPACEWAR;   start_key <= 4'd1; end // TV Arcade I - Space War (flat .bin)
+			16'h45B5: begin map_profile <= MAP_SPACEWAR;   start_key <= 4'd1; end // TV Arcade I - Space War (spacewar.st2, ajavamind pack -- paged repack of 977C)
+			16'h88FB: begin map_profile <= MAP_CROSS;      start_key <= 4'd2; end // TV Arcade III - Tennis + Squash (flat .bin; confirmed identical to ajavamind's TENNIS.BIN)
+			16'hF837: begin map_profile <= MAP_BASEBALL;   start_key <= 4'd0; end // TV Arcade IV - Baseball (flat .bin)
+			16'h2526: begin map_profile <= MAP_BASEBALL;   start_key <= 4'd0; end // TV Arcade IV - Baseball (baseball.st2, ajavamind pack -- inferred paged repack of F837 by naming/format pattern, not independently verified)
+			16'hD3E2: begin map_profile <= MAP_CROSS;      start_key <= 4'd1; end // Pinball (Europe)
+			16'h92BA: begin map_profile <= MAP_CROSS;      start_key <= 4'd1; end // Pinball (pinball.st2, ajavamind pack -- different dump/region from D3E2)
 			16'hE153: begin map_profile <= MAP_CROSS;      start_key <= 4'd1; end // Speedway + Tag (Europe)
-			16'hD0DA: begin map_profile <= MAP_CROSS;      start_key <= 4'd1; end // Speedway + Tag (USA)
+			16'hD0DA: begin map_profile <= MAP_CROSS;      start_key <= 4'd1; end // Speedway + Tag (USA, flat .bin)
+			16'h8404: begin map_profile <= MAP_CROSS;      start_key <= 4'd1; end // Speedway + Tag (speedway.st2, ajavamind pack -- paged repack of D0DA)
 			16'hD13E: begin map_profile <= MAP_CROSS;      start_key <= 4'd1; end // Star Wars
-			16'h3CDC: begin map_profile <= MAP_GUNFIGHTER; start_key <= 4'd1; end // Gunfighter + Moonship Battle
+			16'h03E6: begin map_profile <= MAP_CROSS;      start_key <= 4'd1; end // Star Wars (star-wars.st2, ajavamind pack -- different dump from D13E)
+			16'h3CDC: begin map_profile <= MAP_GUNFIGHTER; start_key <= 4'd1; end // Gunfighter + Moonship Battle (flat .bin)
+			16'h043E: begin map_profile <= MAP_GUNFIGHTER; start_key <= 4'd1; end // Gunfighter + Moonship Battle (gunfighter.st2, ajavamind pack -- paged repack of 3CDC)
 			// Paul Robson's homebrew (refs/studio2-games): all use 0 to fire or
 			// start, so CROSS's fire-on-5 is wrong for every one of them. Both
 			// the .st2 and its .bin conversion are listed -- the CRC covers the
@@ -257,14 +265,27 @@ always @(posedge clk_sys) begin
 			16'h5359, 16'hE00A: begin map_profile <= MAP_HOMEBREW; start_key <= 4'd0; end // Pacman
 			16'hBA0B: begin map_profile <= MAP_HOMEBREW; start_key <= 4'd6; end // Scramble (asm.bin build)
 			16'hE45F, 16'h1280: begin map_profile <= MAP_HOMEBREW; start_key <= 4'd6; end // Scramble
-			// Harvested CRCs (automatically added) — defaulting to MAP_8WAY/start 1 unless known
-			16'h1877: begin map_profile <= MAP_8WAY;      start_key <= 4'd1; end // RCA_demo.st2
-			16'h5479: begin map_profile <= MAP_CROSS;     start_key <= 4'd2; end // tennis.st2 (likely Tennis)
-			16'h264F: begin map_profile <= MAP_8WAY;      start_key <= 4'd1; end // cas-190/flappy/space_explorer/Visicom (multiple files share this CRC)
-			16'hC584: begin map_profile <= MAP_8WAY;      start_key <= 4'd1; end // Space Explorer.bin
+			// tennis.st2 (Elle Ball's cartridge pack): single-player, keypad B
+			// only -- up/down on 2/8, racket size on B4/B5/B6 at setup, start A1.
+			// Not the same cartridge as TV Arcade III (16'h88FB) above, which is
+			// the two-player retail Tennis/Squash and stays on MAP_CROSS.
+			16'hFB76: begin map_profile <= MAP_PADDLE; start_key <= 4'd1; end // tennis.st2
+			// Harvested CRCs -- verified 2026-08-15 against the actual files.
+			// The previous entries here (16'h1877, 16'h5479, 16'h264F, 16'hC584)
+			// were placeholder guesses, not values computed from real bytes, and
+			// none of them matched anything: they were dead code that always fell
+			// through to the default case below. Every cartridge now has its own,
+			// individually computed CRC. Controls are unverified for the three
+			// marked below -- no manual, not yet run through tools/probe-keys.sh
+			// -- so they keep the generic MAP_8WAY default until someone checks.
+			16'hE4C4: begin map_profile <= MAP_8WAY; start_key <= 4'd1; end // cas-190-bagua-blood-horoscope.st2 (controls unverified)
+			16'hD124: begin map_profile <= MAP_8WAY; start_key <= 4'd1; end // flappy.st2 (controls unverified)
+			16'h3EAF: begin map_profile <= MAP_8WAY; start_key <= 4'd1; end // RCA_demo.st2
+			16'h0C03: begin map_profile <= MAP_8WAY; start_key <= 4'd1; end // Space Explorer.bin (controls unverified)
+			16'h92C7: begin map_profile <= MAP_8WAY; start_key <= 4'd1; end // space_explorer.st2 (controls unverified)
 			// Number-entry games: digit-only input, cannot be driven by joystick
-			16'h1634: begin map_profile <= MAP_UNMAPPED; start_key <= 4'd1; end // TV Arcade II - Fun with Numbers, TV School House I
-			16'hB76F: begin map_profile <= MAP_UNMAPPED; start_key <= 4'd1; end // TV Casino Series - Blackjack, TV Bingo; TV Mystic Series - Biorhythm; TV School House II - Math Fun; Concentration Match; Demonstration Cartridge
+			16'h1634: begin map_profile <= MAP_CLEAR_ONLY; start_key <= 4'd1; end // TV Arcade II - Fun with Numbers, TV School House I
+			16'hB76F: begin map_profile <= MAP_CLEAR_ONLY; start_key <= 4'd1; end // TV Casino Series - Blackjack, TV Bingo; TV Mystic Series - Biorhythm; TV School House II - Math Fun; Concentration Match; Demonstration Cartridge
 			// Default to 8-way which mirrors the MPT-02 joystick layout + diagonals
 			// Start on 1, which is the most common start key
 			default: begin map_profile <= MAP_8WAY;     start_key <= 4'd1; end // Built-in games, or CRC not detected
@@ -301,7 +322,7 @@ always @(posedge clk_sys) begin
 		else if (builtin_padA[2] || (builtin_start_press && (active_start_key == 4'd2))) begin builtin_profile <= MAP_DOODLES; builtin_sel <= 1'b1; end  // Patterns: B-side 8-way
 		else if (builtin_padA[3]) begin builtin_profile <= MAP_FREEWAY; builtin_sel <= 1'b1; end  // Freeway
 		else if (builtin_padA[4]) begin builtin_profile <= MAP_BOWLING; builtin_sel <= 1'b1; end  // Bowling
-		else if (builtin_padA[5]) begin builtin_profile <= MAP_UNMAPPED; builtin_sel <= 1'b1; end  // Addition: digits
+		else if (builtin_padA[5]) begin builtin_profile <= MAP_CLEAR_ONLY; builtin_sel <= 1'b1; end  // Addition: digits
 	end
 end
 
@@ -334,10 +355,6 @@ function automatic [9:0] map_padA(input [3:0] prof, input [31:0] j);
 			if (j[4]) k[5] = 1'b1;
 			if (j[5]) k[0] = 1'b1;           // Extra
 		end
-		MAP_PADDLE: begin                    // racquet moves on 2/8 only
-			if (j[3]) k[2] = 1'b1;   if (j[2]) k[8] = 1'b1;
-			if (j[5]) k[0] = 1'b1;           // Extra: 0 pauses/resumes Tennis
-		end
 		MAP_SPACEWAR:                        // fire
 			if (j[4]) k[2] = 1'b1;
 		MAP_FREEWAY: begin                   // throttle/brake
@@ -369,7 +386,7 @@ function automatic [9:0] map_padA(input [3:0] prof, input [31:0] j);
 			if (j[1]) k[4] = 1'b1;   if (j[0]) k[6] = 1'b1;
 			if (j[4]) k[0] = 1'b1;
 		end
-		MAP_UNMAPPED: ;                     // no controller presses: on-screen keypad
+		MAP_CLEAR_ONLY: ;                   // no controller presses: on-screen keypad
 											  // and keyboard still work, but the stick stays quiet
 		MAP_GUNFIGHTER: begin                // 2P behaves like CROSS; Auto/1P uses the
 			if (j[3]) k[2] = 1'b1;   if (j[2]) k[8] = 1'b1;   // right-hand B-only mapping
@@ -405,6 +422,8 @@ function automatic [9:0] map_padA(input [3:0] prof, input [31:0] j);
 			if (j[4]) k[5] = 1'b1;
 			if (j[5]) k[0] = 1'b1;
 		end
+		MAP_PADDLE: ;                        // no A-side function: Start alone lives on
+										  // keypad A, gameplay is entirely keypad B
 		default: ;
 		endcase
 		map_padA = k;
@@ -421,10 +440,6 @@ function automatic [9:0] map_padB(input [3:0] prof, input [31:0] j);
 			if (j[1]) k[4] = 1'b1;   if (j[0]) k[6] = 1'b1;
 			if (j[4]) k[5] = 1'b1;
 			if (j[5]) k[0] = 1'b1;           // Extra
-		end
-		MAP_PADDLE: begin
-			if (j[3]) k[2] = 1'b1;   if (j[2]) k[8] = 1'b1;
-			if (j[5]) k[0] = 1'b1;           // Extra: 0 pauses/resumes Tennis
 		end
 		MAP_SPACEWAR: begin                  // steering
 			if (j[1]) k[4] = 1'b1;   if (j[0]) k[6] = 1'b1;
@@ -449,7 +464,7 @@ function automatic [9:0] map_padB(input [3:0] prof, input [31:0] j);
 			if (j[1]) k[4] = 1'b1;   if (j[0]) k[6] = 1'b1;
 			if (j[4]) k[0] = 1'b1;
 		end
-		MAP_UNMAPPED: ;                     // no controller presses: the on-screen keypad
+		MAP_CLEAR_ONLY: ;                   // no controller presses: the on-screen keypad
 											  // and keyboard still work, but the stick stays quiet
 		MAP_GUNFIGHTER: begin                // 2P behaves like CROSS; Auto/1P uses the
 			if (j[3]) k[2] = 1'b1;   if (j[2]) k[8] = 1'b1;   // right-hand B-only mapping
@@ -485,6 +500,11 @@ function automatic [9:0] map_padB(input [3:0] prof, input [31:0] j);
 			if (j[4]) k[5] = 1'b1;
 			if (j[5]) k[0] = 1'b1;
 		end
+		MAP_PADDLE: begin                    // vertical movement plus racket-size setup.
+			if (j[3]) k[2] = 1'b1;   if (j[2]) k[8] = 1'b1;
+			if (j[1]) k[4] = 1'b1;   if (j[0]) k[6] = 1'b1;
+			if (j[4]) k[5] = 1'b1;
+		end
 		default: ;                           // Bowling: keypad B unused
 		endcase
 		map_padB = k;
@@ -495,7 +515,7 @@ wire profile_1p = (profile == MAP_SPACEWAR) || (profile == MAP_FREEWAY) ||
                   (profile == MAP_BOWLING)  || (profile == MAP_NONE) ||
                   (profile == MAP_HOMEBREW) || (profile == MAP_GUNFIGHTER) ||
                   (profile == MAP_8WAY)     || (profile == MAP_DOODLES) ||
-                  (profile == MAP_UNMAPPED);
+                  (profile == MAP_CLEAR_ONLY) || (profile == MAP_PADDLE);
 wire one_player = (players == 2'd1) || ((players == 2'd0) && profile_1p);
 
 // Direct A0..A9/B0..B9 bindings and Start work from either stick: MiSTer maps
@@ -511,22 +531,23 @@ always @* begin
 end
 wire       start_press = joystick_0[6] | joystick_1[6];
 wire [3:0] active_start_key = ((profile == MAP_GUNFIGHTER) || (profile == MAP_DOODLES) || (profile == MAP_8WAY)) ? 4'd1 : start_key;
-wire [9:0] start_keys       = ((profile != MAP_UNMAPPED) && start_press) ? (10'd1 << active_start_key) : 10'd0;
+wire [9:0] start_keys       = ((profile != MAP_CLEAR_ONLY) && start_press) ? (10'd1 << active_start_key) : 10'd0;
 
-// Gunfighter and Doodles are the special cases: in Auto/1P they are B-only (2/4/6/8 +
+// Gunfighter and 8WAY are the special cases: in Auto/1P they are B-only (2/4/6/8 +
 // 5 + 0 on the right-hand pad) or 8-way on the B side, while in 2P they split exactly
-// like CROSS across both pads. The explicit Unmapped profile stays quiet unless the
-// user binds a direct A/B key manually.
-wire [9:0] joyA = ((profile == MAP_UNMAPPED) ? 10'd0
+// like CROSS across both pads. DOODLES and PADDLE are permanently B-only one-player
+// profiles, so gamepad 0 drives them regardless of Players. The explicit Clear-only
+// profile stays quiet unless the user binds a direct A/B key manually.
+wire [9:0] joyA = ((profile == MAP_CLEAR_ONLY) ? 10'd0
                 : ((profile == MAP_8WAY) && one_player) ? 10'd0
                 : ((profile == MAP_GUNFIGHTER) && one_player) ? 10'd0
                 : ((profile == MAP_DOODLES) ? 10'd0
                                           : ((profile == MAP_GUNFIGHTER) ? map_padA(MAP_CROSS, joystick_0)
                                                                         : map_padA(profile, joystick_0))));
-wire [9:0] joyB = ((profile == MAP_UNMAPPED) ? 10'd0
+wire [9:0] joyB = ((profile == MAP_CLEAR_ONLY) ? 10'd0
                 : ((profile == MAP_8WAY) && one_player) ? map_padB(MAP_8WAY, joystick_0)
                 : ((profile == MAP_GUNFIGHTER) && one_player) ? map_padB(MAP_CROSS, joystick_0)
-                : ((profile == MAP_DOODLES) ? map_padB(MAP_DOODLES, joystick_0)
+                : (((profile == MAP_DOODLES) || (profile == MAP_PADDLE)) ? map_padB(profile, joystick_0)
                                           : ((profile == MAP_GUNFIGHTER) ? map_padB(MAP_CROSS, joystick_1)
                                                                         : (one_player ? map_padB(profile, joystick_0)
                                                                                        : map_padB(profile, joystick_1)))));
