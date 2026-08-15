@@ -40,7 +40,7 @@ Each keypad is laid out on the host keyboard the way it sits on the console —
 a 3x4 block — so the shapes match rather than the digits:
 
 ```
-   Player A (left)        Player B (right)
+   Keypad A (left)        Keypad B (right)
     1  2  3                7  8  9
     Q  W  E                U  I  O
     A  S  D                J  K  L
@@ -168,22 +168,24 @@ get reused during play (`A5` rolls the ball in Bowling):
 
 | Game | Start | Profile |
 |------|-------|---------|
-| Doodles | `A1` | `8-way` |
+| Doodles | `A1` | `8WAY` |
 | Patterns | `A2` | `CROSS` |
 | Freeway | `A3` | `FREEWAY` |
 | Bowling | `A4` | `BOWLING` |
-| Addition | `A5` | none — the answers are digits |
+| Addition | `A5` | `Unmapped` — the answers are digits |
 
 #### Overriding it
 
 The table can only be as good as its entries, and an unknown cartridge falls back
 to `8-way`, which is the default profile. So the OSD has a **Joystick** setting:
 
-`Auto` (default) · `Cross` · `Paddle` · `Space War` · `Freeway` · `Bowling` · `Baseball` · `Homebrew` · `Gunfighter` · `8-way` · `Doodles` · `2P Homebrew`
+`Auto` (default) · `Cross` · `Paddle` · `Space War` · `Freeway` · `Bowling` · `Baseball` · `Homebrew` · `Gunfighter` · `8-way` · `Doodles` · `2P Homebrew` · `Unmapped`
 
 `Auto` uses the detection above; anything else forces that profile regardless of
-the cartridge. Useful for the unmapped titles, for a homebrew `.st2` the table has
-never seen, or simply if you prefer different controls.
+the cartridge. `Unmapped` suppresses all controller-driven keypad presses while
+still letting the numstick, keyboard, and direct per-key bindings send input when
+you intentionally bind them. Useful for the digit-only titles, for a homebrew
+`.st2` the table has never seen, or simply if you prefer different controls.
 
 #### Start, Select, and the Players setting
 
@@ -193,7 +195,7 @@ reset — every RCA manual begins "Press CLEAR".
 
 The **Players** OSD setting decides which gamepad drives keypad B's half of the
 profile. `1` runs everything from gamepad 0: `SPACEWAR`, `FREEWAY`, `BOWLING`,
-`HOMEBREW`, `GUNFIGHTER`, and `8-way` all act as one-player layouts, with the
+`HOMEBREW`, `GUNFIGHTER`, and `8WAY` all act as one-player layouts, with the
 single stick steering or firing from one side. `2` gives each gamepad its own
 keypad, so symmetric profiles like `CROSS`, `PADDLE`, `BASEBALL`, and `HB2P`
 split across pads A and B exactly as the cartridge expects. `Auto` (default)
@@ -237,7 +239,7 @@ manuals, and guessing would be worse than saying so.
 
 Regenerate it with `tools/probe-keys.sh`.
 
-| Cartridge | Starts with | Player A responds to | Player B responds to |
+| Cartridge | Starts with | Keypad A responds to | Keypad B responds to |
 |-----------|-------------|----------------------|----------------------|
 | 86677b (Europe) | `any` | — | — |
 | 87201 (Europe) | `any` | — | — |

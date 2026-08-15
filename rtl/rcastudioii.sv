@@ -168,7 +168,7 @@ reg  [9:0] playerB = 10'h0;
 // the menu can force any of the 16 encoded profiles, including Gunfighter.
 // MAP_HB2P exists solely for the two-player homebrews, which the CRC table selects
 // on its own.
-localparam [3:0] MAP_NONE       = 4'd0;   // keypad only
+localparam [3:0] MAP_NONE       = 4'd0;   // no controller mapping; keep keypad/OSK input only
 localparam [3:0] MAP_CROSS      = 4'd1;   // 2/8/4/6 + 5 fire, both pads
 localparam [3:0] MAP_PADDLE     = 4'd2;   // up/down only (Tennis, Squash)
 localparam [3:0] MAP_SPACEWAR   = 4'd3;   // fire A2, steer B4/B6
@@ -184,6 +184,8 @@ localparam [3:0] MAP_HB2P       = 4'd11;  // 2P homebrew (Hockey, Combat): cross
                                           // fire-on-0, each player's own pad. Normally
                                           // chosen by CRC, but also exposed in the OSD
                                           // list as "2P Homebrew" for manual override.
+localparam [3:0] MAP_UNMAPPED   = 4'd12;  // explicit no-controller mapping: only Clear/Select
+                                          // from the pad; numstick/keyboard still work.
 
 reg [3:0] map_profile = MAP_NONE;
 
@@ -267,7 +269,7 @@ always @(posedge clk_sys) begin
 		else if (playerA[2]) begin builtin_profile <= MAP_DOODLES; builtin_sel <= 1'b1; end  // Patterns: B-side 8-way
 		else if (playerA[3]) begin builtin_profile <= MAP_FREEWAY; builtin_sel <= 1'b1; end  // Freeway
 		else if (playerA[4]) begin builtin_profile <= MAP_BOWLING; builtin_sel <= 1'b1; end  // Bowling
-		else if (playerA[5]) begin builtin_profile <= MAP_NONE;    builtin_sel <= 1'b1; end  // Addition: digits
+		else if (playerA[5]) begin builtin_profile <= MAP_UNMAPPED; builtin_sel <= 1'b1; end  // Addition: digits
 	end
 end
 
@@ -332,6 +334,8 @@ function automatic [9:0] map_padA(input [3:0] prof, input [31:0] j);
 			if (j[1]) k[4] = 1'b1;   if (j[0]) k[6] = 1'b1;
 			if (j[4]) k[0] = 1'b1;
 		end
+		MAP_UNMAPPED: ;                     // no controller presses: on-screen keypad
+											  // and keyboard still work, but the stick stays quiet
 		MAP_GUNFIGHTER: begin                // 2P behaves like CROSS; Auto/1P uses the
 			if (j[3]) k[2] = 1'b1;   if (j[2]) k[8] = 1'b1;   // right-hand B-only mapping
 			if (j[1]) k[4] = 1'b1;   if (j[0]) k[6] = 1'b1;
@@ -398,6 +402,8 @@ function automatic [9:0] map_padB(input [3:0] prof, input [31:0] j);
 			if (j[1]) k[4] = 1'b1;   if (j[0]) k[6] = 1'b1;
 			if (j[4]) k[0] = 1'b1;
 		end
+		MAP_UNMAPPED: ;                     // no controller presses: the on-screen keypad
+											  // and keyboard still work, but the stick stays quiet
 		MAP_GUNFIGHTER: begin                // 2P behaves like CROSS; Auto/1P uses the
 			if (j[3]) k[2] = 1'b1;   if (j[2]) k[8] = 1'b1;   // right-hand B-only mapping
 			if (j[1]) k[4] = 1'b1;   if (j[0]) k[6] = 1'b1;
@@ -429,7 +435,7 @@ endfunction
 wire profile_1p = (profile == MAP_SPACEWAR) || (profile == MAP_FREEWAY) ||
                   (profile == MAP_BOWLING)  || (profile == MAP_NONE) ||
                   (profile == MAP_HOMEBREW) || (profile == MAP_GUNFIGHTER) ||
-                  (profile == MAP_DOODLES);
+                  (profile == MAP_DOODLES)  || (profile == MAP_UNMAPPED);
 wire one_player = (players == 2'd1) || ((players == 2'd0) && profile_1p);
 
 // Direct A0..A9/B0..B9 bindings and Start work from either stick: MiSTer maps
@@ -445,20 +451,23 @@ always @* begin
 end
 wire       start_press = joystick_0[6] | joystick_1[6];
 wire [3:0] active_start_key = ((profile == MAP_GUNFIGHTER) || (profile == MAP_DOODLES) || (profile == MAP_8WAY)) ? 4'd1 : start_key;
-wire [9:0] start_keys       = start_press ? (10'd1 << active_start_key) : 10'd0;
+wire [9:0] start_keys       = ((profile != MAP_UNMAPPED) && start_press) ? (10'd1 << active_start_key) : 10'd0;
 
 // Gunfighter and Doodles are the special cases: in Auto/1P they are B-only (2/4/6/8 +
 // 5 + 0 on the right-hand pad) or 8-way on the B side, while in 2P they split exactly
-// like CROSS across both pads.
-wire [9:0] joyA = ((profile == MAP_GUNFIGHTER) && one_player) ? 10'd0
+// like CROSS across both pads. The explicit Unmapped profile stays quiet unless the
+// user binds a direct A/B key manually.
+wire [9:0] joyA = ((profile == MAP_UNMAPPED) ? 10'd0
+                : ((profile == MAP_GUNFIGHTER) && one_player) ? 10'd0
                 : ((profile == MAP_DOODLES) ? 10'd0
                                           : ((profile == MAP_GUNFIGHTER) ? map_padA(MAP_CROSS, joystick_0)
-                                                                        : map_padA(profile, joystick_0)));
-wire [9:0] joyB = ((profile == MAP_GUNFIGHTER) && one_player) ? map_padB(MAP_CROSS, joystick_0)
+                                                                        : map_padA(profile, joystick_0))));
+wire [9:0] joyB = ((profile == MAP_UNMAPPED) ? 10'd0
+                : ((profile == MAP_GUNFIGHTER) && one_player) ? map_padB(MAP_CROSS, joystick_0)
                 : ((profile == MAP_DOODLES) ? map_padB(MAP_DOODLES, joystick_0)
                                           : ((profile == MAP_GUNFIGHTER) ? map_padB(MAP_CROSS, joystick_1)
                                                                         : (one_player ? map_padB(profile, joystick_0)
-                                                                                       : map_padB(profile, joystick_1))));
+                                                                                       : map_padB(profile, joystick_1)))));
 wire [9:0] joyA_active = joyA | directA | start_keys;
 wire [9:0] joyB_active = joyB | directB;
 
