@@ -216,7 +216,7 @@ localparam CONF_STR = {
 	// Tennis/Squash's CROSS profile.
 	// Order must match the localparams in rtl/rcastudioii.sv -- the row's value
 	// IS the profile number.
-	"D[2]O[5:2],Joystick,None,Cross,Space War,Freeway,Bowling,Baseball,Homebrew,Gunfighter,8-way,Doodles,2P Homebrew,Clear-only,Paddle;",
+	"D2O[5:2],Joystick,None,Cross,Space War,Freeway,Bowling,Baseball,Homebrew,Gunfighter,8-way,Doodles,2P Homebrew,Clear-only,Paddle;",
 	"O[8:7],Players,Auto,1,2;",
 	"O[10:9],Stick Keypad,Off,Pad A,Pad B;",
 	"-;",
