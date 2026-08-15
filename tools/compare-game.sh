@@ -45,10 +45,13 @@ echo "frames : $FRAMES   compared at: $SHOTS"
 echo
 
 # Each emulator prints its captured frames in shot order; split them into per-shot files.
-"$REF" --frames "$FRAMES" "${PRESS[@]}" "${shot_args[@]}" --ascii --quiet --outdir "$TMP" "${cart_ref[@]}" 2>/dev/null \
+# ${arr[@]+"${arr[@]}"} rather than "${arr[@]}": macOS ships bash 3.2, where an
+# empty array expansion under `set -u` is an unbound-variable error, which is
+# exactly the "-" (no cartridge, built-in games) case.
+"$REF" --frames "$FRAMES" ${PRESS[@]+"${PRESS[@]}"} "${shot_args[@]}" --ascii --quiet --outdir "$TMP" ${cart_ref[@]+"${cart_ref[@]}"} 2>/dev/null \
   | grep -E "^  [.#]+$" | sed 's/^  //' | tr '.' ' ' | awk '{for(i=0;i<4;i++) print}' > "$TMP/ref.txt"
 # the RTL sim defaults to ../rom/studio2.rom, which is relative to verilator/
-"$RTL" --bios "$ROOT/rom/studio2.rom" --frames "$FRAMES" "${PRESS[@]}" "${shot_args[@]}" --ascii --outdir "$TMP" --prefix r "${cart_rtl[@]}" 2>/dev/null \
+"$RTL" --bios "$ROOT/rom/studio2.rom" --frames "$FRAMES" ${PRESS[@]+"${PRESS[@]}"} "${shot_args[@]}" --ascii --outdir "$TMP" --prefix r ${cart_rtl[@]+"${cart_rtl[@]}"} 2>/dev/null \
   | grep -E "^ *[0-9]+ \|" | sed 's/^ *[0-9]* |//; s/|$//' > "$TMP/rtl.txt"
 
 nref=$(wc -l < "$TMP/ref.txt"); nrtl=$(wc -l < "$TMP/rtl.txt")

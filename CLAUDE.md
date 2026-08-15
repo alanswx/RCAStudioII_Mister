@@ -64,6 +64,11 @@ Studio 2 tech pages). Summary:
 0E00-0FFF  Cartridge  Multicart space (rarely used)
 ```
 RAM is mirrored everywhere A9=0 and no ROM/cart is decoded (0C00, 1000, 1400, …).
+There are only 512 bytes of it, so the mirror address is just A8-A0. The system
+ROM is *not* mirrored above `$0FFF`; MAME's `studio2.cpp` maps RAM at
+`0x0000-0x01ff` mirrored `0xfc00` across the whole 64K and then installs the ROM
+handlers over `$0000-$07FF` alone, which is the same statement. Implemented in
+`rtl/rcastudioii.sv`, tested by `tools/memdecode-test.sh`.
 
 ### I/O
 | Signal  | Meaning |
@@ -132,9 +137,9 @@ DMA-OUT cycles.** The current core implements none of them (§6.1).
 | File | Role |
 |------|------|
 | `RCAStudioII.sv` | MiSTer `emu` top: hps_io, PLL, OSD config string, video chain (video_mixer + video_freak), on-screen keypad |
-| `rtl/rcastudioii.sv` | Core glue: CPU + pixie + RAM + keypad + joystick profiles |
+| `rtl/rcastudioii.sv` | Core glue: CPU + pixie + memory decode + keypad + joystick profiles + cartridge loader |
 | `rtl/cdp1802.v` | The CPU: full BIOS instruction set, interrupts, DMA, machine-cycle timing |
-| `rtl/dpram.sv` | Dual-port block RAM |
+| `rtl/dpram.sv` | Dual-port block RAM — instantiated twice, as the 4 KB ROM/cartridge image and the 512 B RAM |
 | `rtl/numstick.sv` | Analog-stick on-screen keypad (Jaguar core's, via ColecoAdam) |
 | `rtl/pixie/pixie_video.v` | Thin wrapper |
 | `rtl/pixie/cdp1861.v` | The video: a real CDP1861, DMA-fed, no frame buffer |
@@ -176,8 +181,13 @@ tools/quartus-build.sh map      # analysis & synthesis only (~1.5 min)
 tools/quartus-build.sh clean
 ```
 
-Last known-good build: **0 errors**, timing closed (worst slack +0.423 ns),
-19 % of ALMs, 7 % of block RAM, whole flow ~6 minutes.
+Last known-good build: **0 errors**, timing closed (worst setup slack
++0.710 ns), 10,003 ALMs (24 %), 444 kbit of block RAM (8 %), whole flow
+~6 minutes. Most of that is the MiSTer
+framework — `rcastudioii` itself is ~1,140 ALMs (of which the CPU is ~600) and
+`numstick` another ~940. The "19 %" quoted here previously was measured before
+numstick landed; a same-day A/B put the memory decode at **+86 ALMs and
++4 kbit** over the pre-decode core, which is just the 512-byte RAM.
 
 **Do not run `quartus_sh --flow compile`.** The image is amd64 under emulation
 on Apple Silicon, and the qsf's `NUM_PARALLEL_PROCESSORS ALL` makes Quartus fork
@@ -277,42 +287,26 @@ same 2 KB as space-separated hex text (6144 bytes).
 Most of the original defect list is fixed — see §10 for what changed. What
 remains, ordered by impact.
 
-### 6.1 Homebrew flicker -- diagnosed: it is the missing memory mirroring (6.2)
+### 6.1 Homebrew flicker -- does not currently reproduce
 
-Paul Robson's homebrew flicker badly; retail titles are fine. Traced with
-`--frame-log` and state dumps against the reference emulator on `invaders.st2`:
+The previous entry here claimed Paul Robson's homebrew flickered (45 of 101
+frames blank on `invaders.st2`) and blamed the missing memory mirroring. Both
+halves of that turned out to be wrong, so the entry is kept as a warning rather
+than deleted.
 
-    frames 300-400   RTL: 45 of 101 blank, 29 distinct hashes
-                     ref:  0 blank,         2 distinct hashes
+Re-measured on 2026-08-15 across all eight homebrew titles, before *and* after
+the decode was implemented, the numbers are identical and clean:
 
-It is not the display enable and not lost DMA. `display_enabled` stays 1 across
-blank frames and `$0900` still holds the sprite data. What moves is **R(0)**:
+    invaders.st2   frames 300-400   0 blank, 53 distinct hashes (it is animating)
+    combat/hockey/scramble                   0 blank,  1 hash   (static, correct)
 
-    frame 332  R0=09F8   content
-    frame 334  R0=09F8   content
-    frame 336  R0=0800   blank        <- 09F8 + 8 = 0A00, then it lands at 0800
-    frame 340  R0=0800   blank
+The mirroring argument was also wrong on its own terms: `$0A00` has **A9 = 1**,
+so it is cartridge space, not a RAM mirror — the mirror is `$0C00-$0DFF`, where
+A9 = 0. If a flicker is seen on hardware, start the trace again from scratch;
+do not assume the R(0) story above.
 
-R(0) walks off the end of display RAM into `$0A00`. On real hardware that still
-reads RAM, because `docs/memorymap.txt` says RAM is mirrored "everywhere A9 = 0
-and where there is no ROM or cartridge ROM connected (@0C00, @1000, @1400 ...)",
-and `$0C00-$0DFF` is explicitly a duplicate of `$0800-$09FF`. This core has no
-memory decode at all -- one 4K dpram with the address truncated to
-`ram_a[11:0]` -- so `$0A00` reads cartridge space instead of mirrored RAM, the
-DMA streams whatever is there, and the picture drops out.
-
-Retail titles never expose this because their ISR keeps R(0) inside
-`$0900-$09FF`. The homebrew relies on the mirror.
-
-So 6.1 and 6.2 are the same bug: **fix the memory decode and the flicker should
-go with it.** Verify with the frame-log comparison above, which gives a clean
-pass/fail (blank-frame count should go to 0).
-
-### 6.2 No memory decode
-A single 4 KB dpram backs everything. The address is truncated to `ram_a[11:0]`,
-ROM and RAM share the array, and the only protection is `cpu_wr` allowing writes
-in `$800-$9FF`. The documented mirroring is not implemented, and the cartridge
-windows `$0A00-$0BFF`, `$0C00-$0DFF` and `$0E00-$0FFF` are not decoded.
+### 6.2 Memory decode -- done (2026-08-15)
+Implemented; see §10. `tools/memdecode-test.sh` covers it.
 
 ### 6.3 Top level — `RCAStudioII.sv`
 - No PAL support, and the BIOS is not embedded (the core is held in reset until
@@ -329,23 +323,21 @@ windows `$0A00-$0BFF`, `$0C00-$0DFF` and `$0E00-$0FFF` are not decoded.
 
 ## 7. Roadmap
 
-### 7.1 Memory decode
-Split ROM / cart / RAM with the documented mirroring and add the `$0A00-$0BFF`,
-`$0C00-$0DFF` and `$0E00-$0FFF` cartridge windows.
-
-### 7.2 Polish
+### 7.1 Polish
 PAL option, embedded BIOS, and any final top-level cleanup around default OSD
 behaviour and naming consistency.
 
-### 7.3 Controller/profile parity
+### 7.2 Controller/profile parity
 The profile system is intentionally explicit and tested across the common
 cartridges, but every new title is still a chance to discover a missing special
 case. Keep the profile table aligned with the actual manuals and the reference 
 emulator.
 
-### 7.4 Keep the comparison green
+### 7.3 Keep the comparison green
 Any RTL change should be re-checked against the reference emulator (§9) before
-committing. The regression is cheap — a few seconds per cartridge.
+committing. The regression is cheap — a few seconds per cartridge. Changes that
+touch memory should also run `tools/memdecode-test.sh`, which no cartridge in
+the corpus can substitute for (§9).
 
 ---
 
@@ -401,6 +393,19 @@ render the same structure and the same number of content lines but different
 game state, because the BIOS updates an RNG seed in the ISR and any timing
 difference deals different cards.
 
+Note on `86677b` and `87201`: the reference emulator renders **full-screen
+random noise** for both from the first frame, before any input. They are not
+working images there either, so neither side is a reference for the other, and
+their output is free to change without that meaning anything. Do not chase them.
+
+**What the frame comparison cannot see.** Nothing in the corpus — 18 retail
+cartridges, 8 homebrew, 5 TOSEC `.st2` — reads or writes a RAM mirror, or any
+address above `$0FFF`. The whole memory decode is therefore invisible to it:
+the old truncate-to-12-bits version scored exactly the same 18/21. That is what
+`tools/memdecode-test.sh` is for — a hand-assembled 90-byte native-1802
+cartridge that pokes each case and checks the result out of the simulated RAM.
+It fails 4 of its 8 checks against the pre-decode core.
+
 **The reference is authoritative for instruction *order*, not for cycle
 timing.** Its model gives the CPU zero cycles during all 128 display lines
 rather than 6 of every 14, so it runs ~952 instructions/frame where real
@@ -421,6 +426,46 @@ cartridges including an RCA test cart.
 ---
 
 ## 10. What changed
+
+### 2026-08-15 (memory decode)
+
+**The core finally decodes its address bus.** Everything used to come out of one
+4 KB dpram with the address truncated to `ram_a[11:0]`: ROM and RAM shared the
+array, `$1000` read the system ROM, the documented `$0C00-$0DFF` mirror did not
+exist, and a write outside `$0800-$09FF` was silently dropped. Now:
+
+- The ROM/cartridge image and the 512 bytes of RAM are separate arrays, so a
+  cartridge can no longer be written over.
+- RAM answers wherever **A9 = 0** and nothing else is decoded — `$0800-$09FF`,
+  `$0C00-$0DFF`, `$1000-$11FF`, `$1400-$15FF` and so on up through 64K, at
+  `A8-A0` inside the 512 bytes.
+- The system ROM is decoded at `$0000-$07FF` in the first 4 K bank only, and is
+  not mirrored above `$0FFF`.
+- `$0A00-$0BFF` / `$0E00-$0FFF` are cartridge windows; `$0C00-$0DFF` is the RAM
+  mirror unless the cartridge pages ROM over it. The `.st2` loader records which
+  of pages `$0A-$0F` it actually filled, which is what makes that distinction —
+  `asteroids`, `berzerk`, `pacman` and `scramble` page `$0C/$0D`, the other four
+  homebrew do not and get the mirror.
+- Undecoded space (A9 = 1 with no cartridge) reads back `$00`.
+
+Matched against **MAME** `src/mame/rca/studio2.cpp`, which states the same rule
+in its header comment and implements it as `map(0x0000, 0x01ff).mirror(0xfc00).ram()`
+plus ROM handlers installed over `$0000-$07FF` alone. MAME returns `$FF` for
+undecoded space (`unmap_value_high`); this core returns `$00` instead, matching
+the C reference emulator's flat array so the §9 frame comparison stays honest,
+and giving a blank scanline rather than a white one if a DMA wanders.
+
+Verified three ways: `tools/memdecode-test.sh` (new, 8 directed checks, 4 of
+which fail on the old core); the §9 comparison unchanged at 18/21; and an
+A/B of every image in the corpus — 5 built-in games, 18 retail cartridges,
+8 homebrew `.st2`, 8 TOSEC `.st2`, four frames each — byte-identical before and
+after except `86677b` and `87201`, which render noise in the reference emulator
+too. The `.st2` == `.bin` equivalence for the five TOSEC titles that exist in
+both formats still holds.
+
+Also here: `tools/compare-game.sh` could not run its no-cartridge (`-`) case on
+macOS, because bash 3.2 treats an empty array expansion under `set -u` as an
+unbound variable.
 
 ### 2026-08-14 (beta-tester round)
 

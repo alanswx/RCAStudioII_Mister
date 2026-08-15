@@ -34,7 +34,8 @@
 #define RS(sig)   (top->rootp->top__DOT__rcastudio__DOT__##sig)
 #define CPU(sig)  (top->rootp->top__DOT__rcastudio__DOT__cdp1802__DOT__##sig)
 #define PIX(sig)  (top->rootp->top__DOT__rcastudio__DOT__pixie_video__DOT__cdp1861__DOT__##sig)
-#define DPRAM     (top->rootp->top__DOT__rcastudio__DOT__dpram__DOT__mem)
+#define DPRAM     (top->rootp->top__DOT__rcastudio__DOT__dpram__DOT__mem)   // ROM/cart image, $0000-$0FFF
+#define SRAM      (top->rootp->top__DOT__rcastudio__DOT__sram__DOT__mem)    // the 512 bytes of RAM, $0800-$09FF
 
 static Vtop* top = nullptr;
 static vluint64_t main_time = 0;
@@ -350,13 +351,13 @@ static void dump_state(FILE* f, long frame, const FrameGrabber& fg, bool with_vr
         fprintf(f, "-- Display RAM $0900-$09FF --\n");
         for (int r = 0; r < 256; r += 16) {
             fprintf(f, "  %04X: ", 0x900 + r);
-            for (int c = 0; c < 16; c++) fprintf(f, "%02X ", DPRAM[0x900 + r + c]);
+            for (int c = 0; c < 16; c++) fprintf(f, "%02X ", SRAM[0x100 + r + c]);
             fprintf(f, "\n");
         }
         fprintf(f, "-- System RAM $0800-$08FF --\n");
         for (int r = 0; r < 256; r += 16) {
             fprintf(f, "  %04X: ", 0x800 + r);
-            for (int c = 0; c < 16; c++) fprintf(f, "%02X ", DPRAM[0x800 + r + c]);
+            for (int c = 0; c < 16; c++) fprintf(f, "%02X ", SRAM[r + c]);
             fprintf(f, "\n");
         }
     }

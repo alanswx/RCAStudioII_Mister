@@ -15,7 +15,10 @@ practice. Output is **pixel-identical to a reference emulator on 18 of 21 test
 frames**. The three that differ are memory/dice games whose BIOS-updated RNG
 seed diverges, not rendering faults.
 
-Still missing: full **memory decode/mirroring**, and PAL.
+The address bus is decoded properly: ROM, cartridge and the 512 bytes of RAM are
+separate, and the RAM mirrors appear where the hardware puts them.
+
+Still missing: **PAL**, and an embedded BIOS.
 
 ## Installing
 
@@ -384,11 +387,13 @@ Checked against captures of real hardware in `refvideo/`:
 
 ## Known issues
 
-- Paul Robson's homebrew games flicker badly. Diagnosed: R(0) walks past the end
-  of display RAM into `$0A00`, which on real hardware still reads RAM because it
-  is mirrored there, but this core has no memory decode yet so it reads cartridge
-  space instead. Retail titles keep R(0) inside `$0900-$09FF` and are unaffected.
-  Fixing the memory decode should fix the flicker — see CLAUDE.md §6.1.
+- No PAL mode, and the BIOS is not embedded.
+- A previous note here reported that Paul Robson's homebrew games flicker badly.
+  It does not reproduce in simulation — all eight run for hundreds of frames
+  without a single blank one — and the memory-mirroring explanation that went
+  with it was wrong (`$0A00` has A9 = 1, so it is cartridge space, not a RAM
+  mirror). If you see it on real hardware, please report it; the trace needs to
+  start again from scratch. See CLAUDE.md §6.1.
 
 ## Building
 

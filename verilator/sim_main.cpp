@@ -408,9 +408,14 @@ int main(int argc, char** argv, char** env) {
 		//ImGui::Begin("ROM");
 		//mem_edit.DrawContents(&top->rootp->top__DOT__rcastudio__DOT__Rom_StudioII__DOT__d, 2048, 0);
 		//ImGui::End();
-		ImGui::Begin("DPRAM");
+		// The ROM/cartridge image ($0000-$0FFF) and the 512 bytes of RAM are
+		// separate arrays -- see the memory decode in rtl/rcastudioii.sv.
+		ImGui::Begin("ROM / cartridge $0000-$0FFF");
 		mem_edit.DrawContents(&top->rootp->top__DOT__rcastudio__DOT__dpram__DOT__mem, 4096, 0);
-		ImGui::End();		
+		ImGui::End();
+		ImGui::Begin("RAM $0800-$09FF");
+		mem_edit.DrawContents(&top->rootp->top__DOT__rcastudio__DOT__sram__DOT__mem, 512, 0x800);
+		ImGui::End();
 		// The CDP1861 has no frame buffer: it holds only the 8 bytes DMA'd for the current line.
 		ImGui::Begin("CDP1861 Line Buffer");
 		mem_edit.DrawContents(&top->rootp->top__DOT__rcastudio__DOT__pixie_video__DOT__cdp1861__DOT__linebuf, 8, 0);

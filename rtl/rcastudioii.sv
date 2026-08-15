@@ -600,32 +600,62 @@ cosmac cosmac (
 );
 */
 
-////////////////// RAM //////////////////////////////////////////////////////////////////
+////////////////// MEMORY DECODE ////////////////////////////////////////////
+//
+// docs/memorymap.txt:
+//
+//   $0000-$07FF  ROM      system ROM, plus the built-in games at $0400-$07FF
+//                         (a cartridge takes that half over when plugged in)
+//   $0800-$09FF  RAM      512 bytes: system/program memory, then display memory
+//   $0A00-$0BFF  cart     multicart window
+//   $0C00-$0DFF  RAM/ROM  the RAM mirror by default; a cartridge may page ROM
+//                         over it (asteroids/berzerk/pacman/scramble .st2 do)
+//   $0E00-$0FFF  cart     multicart window
+//
+// The rule behind that table is one line: RAM answers wherever A9 = 0 and
+// nothing else is decoded, which is why it also reappears at $0C00, $1000,
+// $1400, $1800 and so on. A9 = 1 with no cartridge is open bus.
+//
+// This core previously had no decode at all -- one 4 KB array with the address
+// truncated to ram_a[11:0] -- so $1000 read the system ROM, the $0C00 mirror
+// did not exist, and a write at $0C00 was dropped.
+//
+// The ROM/cartridge image and the RAM are now separate arrays, so a cartridge
+// can no longer be scribbled on and the mirror costs nothing.
 
-reg          ram_cs;
-reg          ram_rd; // RAM read enable
-reg          ram_wr; // RAM write enable
-reg   [7:0]  ram_d;  // RAM write data
-reg  [15:0]  ram_a;  // RAM address
-reg   [7:0]  ram_q;  // RAM read data
+wire         ram_rd; // MRD_N
+wire         ram_wr; // MWR_N
+wire  [7:0]  ram_d;  // CPU write data
+wire [15:0]  ram_a;  // CPU address
+wire  [7:0]  ram_q;  // data returned to the CPU (and to the 1861 during DMA)
 
-/*
-wire  [7:0]  romDo_StudioII;
-wire [11:0]  romA;
+// Which of pages $0A-$0F the loaded cartridge actually supplies. Only $0C/$0D
+// change behaviour: with cartridge ROM paged there they are ROM, without it
+// they are the RAM mirror. Cleared when a new cartridge starts downloading;
+// deliberately not cleared on reset, since CLEAR does not unplug the cart.
+reg  [7:0]  cart_page = 8'h00;    // indexed by address bits [10:8]: page $08..$0F
 
-rom #(.AW(11), .FN("../rom/studio2.hex")) Rom_StudioII
-(
-	.clock      (clk_sys        ),
-	.ce         (1'b1           ),
-	.data_out   (romDo_StudioII ),
-	.a          (romA[10:0]     )
-);
-*/////////
+wire        bank0    = (ram_a[15:12] == 4'h0);
+wire        rom_sel  = bank0 && !ram_a[11];                        // $0000-$07FF
+wire        cart_sel = bank0 &&  ram_a[11] && cart_page[ram_a[10:8]];
+wire        ram_sel  = !rom_sel && !cart_sel && !ram_a[9];         // the A9 = 0 mirror
+wire        cpu_wr   = ram_wr && ram_sel;                          // RAM is the only writeable thing
 
-reg cpu_wr;
-//reg clk_mem;
-//assign clk_mem = ioctl_download ? clk_vid : clk_sys;
-assign cpu_wr = (ram_a[11:0] >= 12'h800 && ram_a[11:0] < 12'hA00) ? ram_wr : 1'b0;
+// Both arrays have one cycle of latency, so the read mux select has to be
+// delayed with the data. The CPU holds an address for a whole machine cycle
+// (32 clk_sys), so a registered select is settled long before it is sampled.
+wire [7:0]  rom_q;
+wire [7:0]  sram_q;
+reg         rom_sel_q, ram_sel_q;
+always @(posedge clk_sys) begin
+	rom_sel_q <= rom_sel | cart_sel;
+	ram_sel_q <= ram_sel;
+end
+// Open bus reads back as $00. The reference emulator's PC build returns the
+// zeroed byte of its flat 4 KB array for undecoded space, so this keeps the
+// frame comparison in §9 honest; it is also the quiet answer for a DMA that
+// wanders out of display RAM (blank scanline rather than a white one).
+assign ram_q = ram_sel_q ? sram_q : (rom_sel_q ? rom_q : 8'h00);
 
 
 ////////////////// SOUND ////////////////////////////////////////////////////
@@ -740,17 +770,29 @@ wire [11:0] cart_a    = st2_mode ? {st2_pg[3:0], ioctl_addr[7:0]}
                                  : (ioctl_addr[11:0] + 12'h400);
 wire        cart_we   = cart_dl && ioctl_wr && (!st2_mode || (st2_data && st2_pg_ok));
 
+// Pages $0A-$0F, the ones the decode has to be told about. Pages $08/$09 are
+// RAM and can never be claimed: st2_pg_ok already rejects them, and the
+// (A10|A9) term means an over-long raw .bin cannot claim them either.
+wire        cart_hi   = cart_a[11] && (cart_a[10] | cart_a[9]);
+
+always @(posedge clk_sys) begin
+	if (cart_dl && ioctl_wr && (ioctl_addr == 0)) cart_page <= 8'h00;   // new cartridge
+	if (cart_we && cart_hi)                       cart_page[cart_a[10:8]] <= 1'b1;
+end
+
 wire [11:0] dl_a  = bios_dl ? ioctl_addr[11:0] : cart_a;
 wire        dl_we = bios_dl ? ioctl_wr : cart_we;
 
+// The ROM/cartridge image: system ROM at $0000-$07FF, then whatever the
+// cartridge pages into $0800-$0FFF. Read-only to the CPU.
 dpram #(8, 12) dpram
 (
 	.clock(clk_sys),
 	.ram_cs(1'b1),
 	.address_a(ioctl_download ? dl_a : ram_a[11:0]),
-	.wren_a(dl_we | cpu_wr),
-	.data_a(ioctl_download ? ioctl_dout : ram_d),
-	.q_a(ram_q),
+	.wren_a(dl_we),
+	.data_a(ioctl_dout),
+	.q_a(rom_q),
 
 	// Port B was only ever the 1861's RAM scraper; the real part is fed by the CPU over DMA.
 	.ram_cs_b(1'b0),
@@ -760,94 +802,23 @@ dpram #(8, 12) dpram
 	.q_b()
 );
 
-////////////////// DMA //////////////////////////////////////////////////////////////////
+// The 512 bytes of RAM: $0800-$08FF program/system, $0900-$09FF display.
+// Selected by A9 = 0, so the address inside it is just A8-A0.
+dpram #(8, 9) sram
+(
+	.clock(clk_sys),
+	.ram_cs(1'b1),
+	.address_a(ram_a[8:0]),
+	.wren_a(cpu_wr),
+	.data_a(ram_d),
+	.q_a(sram_q),
 
-//0000-02FF	ROM 	      RCA System ROM : Interpreter
-//0300-03FF	ROM	        RCA System ROM : Always present
-//0400-07FF	ROM	        Games Programs, built in (no cartridge)
-//0400-07FF	Cartridge	  Cartridge Games (when cartridge plugged in)
-//0800-08FF	RAM	        System Memory, Program Memory etc.
-//0900-09FF	RAM	        Display Memory
-//0A00-0BFF	Cartridge	  (MultiCart) Available for Cartridge games if required, probably isn't.
-//0C00-0DFF	RAM/ROM	    Duplicate of 800-9FF - the RAM is double mapped in the default set up. 
-//                      This RAM can be disabled and ROM can be put here instead, 
-//                      so assume this is ROM for emulation purposes.
-//0E00-0FFF	Cartridge	  (MultiCart) Available for Cartridge games if required, probably isn't.
-
-/*
-wire rom_cs   = ram_a ==? 16'b0000_00xx_xxxx_xxxx;
-wire cart_cs  = ram_a ==? 16'b0000_01xx_xxxx_xxxx; 
-wire pram_cs  = ram_a ==? 16'b0000_1000_xxxx_xxxx; 
-wire vram_cs  = ram_a ==? 16'b0000_1001_xxxx_xxxx; 
-wire mcart_cs = ram_a ==? 16'b0000_101x_xxxx_xxxx; 
-*/
-
-//wire [15:0] AB = dma_busy ? dma_addr : ram_a;
-//wire  [7:0] DO = dma_busy ? dma_dout : ram_d;
-//wire pram_we = pram_cs ? dma_busy ? ~dma_write : ~ram_wr : 1'b1;
-//wire vram_we = vram_cs ? dma_busy ? ~dma_write : ~ram_wr : 1'b1;
-
-/*
-always @(negedge clk_sys) begin
-  DI <= rom_cs   ? ram_d :
-        cart_cs  ? ram_d :
-        pram_cs  ? ram_d :
-        vram_cs  ? ram_d :        
-        mcart_cs ? ram_d : 
-        8'hff;     
-end
-*/
-
-//reg        portb_ce;
-//reg        portb_wr;
-//reg  [7:0] portb_din;
-//reg  [7:0] portb_dout;
-//reg [15:0] portb_addr;
-//always @(posedge clk_sys) begin
-//  portb_ce  <= 1'b0;
-//  portb_wr  <= 1'b0;
-//  if(ioctl_download) begin
-//    portb_ce   <= ioctl_download;
-//    portb_wr   <= ioctl_wr;
-//    portb_din  <= ioctl_dout;
-//    portb_addr <= ioctl_index==0 ? ioctl_addr[15:0] : (16'h0400 + ioctl_addr[15:0]);
-//  end
-//  else if(vram_addr >= 'h0900) begin
-//    portb_ce   <= 1'b1;
-//    portb_addr <= vram_addr;
-//    video_din  <= portb_dout;        
-//  end
-//end
-
-// internal games still there if (0x402==2'hd1 && 0x403==2'h0e && 0x404==2'hd2 && 0x405==2'h39)
-// 0x40e = game 1
-// 0x439 = game 2
-// 0x48b = game 3
-// 0x48d = game 4
-// 0x48f = game 5
-/*
-wire        dma_rdy = DMAO;
-reg         dma_ctrl = 1'b1;
-reg  [15:0] dma_addr;
-reg   [7:0] DI;
-wire  [7:0] dma_dout;
-reg   [7:0] dma_length = 8'b1;
-
-dma dma (
-  .clk      (clk_sys),      // I
-  .rdy      (dma_rdy),      // I
-  .ctrl     (dma_ctrl),     // I
-  .src_addr (ram_a),        // I 15:0
-  .dst_addr (ram_a),        // I 15:0
-  .addr     (dma_addr),     // O 15:0 => to AB
-  .din      (DI),           // I 7:0
-  .dout     (dma_dout),     // I 7:0
-  .length   (dma_length),   // I
-  .busy     (dma_busy),     // O
-  .sel      (dma_sel),      // O
-  .write    (dma_write)     // O
+	.ram_cs_b(1'b0),
+	.wren_b(1'b0),
+	.address_b(9'd0),
+	.data_b(),
+	.q_b()
 );
-*/
-/////////////////////////////////////////////////////////////////////////////////////////
+
 
 endmodule
