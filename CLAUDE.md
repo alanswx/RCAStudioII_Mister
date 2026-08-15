@@ -122,10 +122,11 @@ DMA-OUT cycles.** The current core implements none of them (§6.1).
 ### Files actually compiled (`files.qip`)
 | File | Role |
 |------|------|
-| `RCAStudioII.sv` | MiSTer `emu` top: hps_io, PLL, OSD config string, video out |
-| `rtl/rcastudioii.sv` | Core glue: CPU + pixie + RAM + keypad |
+| `RCAStudioII.sv` | MiSTer `emu` top: hps_io, PLL, OSD config string, video chain (video_mixer + video_freak), on-screen keypad |
+| `rtl/rcastudioii.sv` | Core glue: CPU + pixie + RAM + keypad + joystick profiles |
 | `rtl/cdp1802.v` | The CPU: full BIOS instruction set, interrupts, DMA, machine-cycle timing |
 | `rtl/dpram.sv` | Dual-port block RAM |
+| `rtl/numstick.sv` | Analog-stick on-screen keypad (Jaguar core's, via ColecoAdam) |
 | `rtl/pixie/pixie_video.v` | Thin wrapper |
 | `rtl/pixie/cdp1861.v` | The video: a real CDP1861, DMA-fed, no frame buffer |
 
@@ -144,9 +145,12 @@ Note `rtl/pixie/cdp1861.v` is the *live* video module; the old
 
 ### Clocks
 `rtl/pll/pll_0002.v`: `outclk_0 = 7.040229 MHz` (`clk_sys`),
-`outclk_1 = 42.241379 MHz` (`clk_vid`). 7.040229 = 4 × 1.760229 MHz.
-`RCAStudioII.sv` divides `clk_sys` by 4 into `clk_1m76` — which
-`rcastudioii.sv` then never uses.
+`outclk_1 = 42.241379 MHz` (`clk_vid`, now unused). 7.040229 = 4 × 1.760229 MHz.
+`RCAStudioII.sv` divides `clk_sys` by 4 into the `ce_pix` enable — the 1.76 MHz
+pixel/CPU timebase everything inside `rcastudioii.sv` is gated on. The Verilator
+sim ties `ce_pix` high instead (one pixel per clock): frame contents are
+identical, the sim is just 4× cheaper per frame. Don't "fix" either side to
+match the other.
 
 ---
 
@@ -271,23 +275,11 @@ in `$800-$9FF`. The documented mirroring is not implemented, and the cartridge
 windows `$0A00-$0BFF`, `$0C00-$0DFF` and `$0E00-$0FFF` are not decoded.
 
 ### 6.2 Top level — `RCAStudioII.sv`
-- `VIDEO_ARX`/`VIDEO_ARY` are 0; should be 4:3 with the usual status-bit
-  selector (the correct version is commented out immediately above).
-- `CLK_VIDEO = clk_vid` (42.24 MHz) with `CE_PIXEL = 1'b1`, but the 1861
-  produces pixels in the 7.04 MHz `clk_sys` domain. `CE_PIXEL` must pulse once
-  per real pixel, or `CLK_VIDEO` should come from `clk_sys`.
-- `clk_1m76` is assigned in an `always` block but declared `wire`, and nothing
-  consumes it. `rcastudioii.sv` still takes `clk_1m76`/`clk_vid` inputs it never
-  uses.
-- No PAL support, no aspect/scanline options, no `Clear` button in the OSD, and
-  the BIOS is not embedded (the core is held in reset until one is loaded).
+- No PAL support, and the BIOS is not embedded (the core is held in reset until
+  one is loaded). The rest of the old list — aspect ratio, `CE_PIXEL`, the dead
+  `clk_1m76` — is fixed; see §10 (2026-08-14).
 
-### 6.3 Keypad mapping
-PS/2 scancode only, no joystick/gamepad support. The
-mapping is a straight number-row / `P Q W E R T Y U I O` split rather than the
-3x4 keypad layout MAME uses.
-
-### 6.4 Minor
+### 6.3 Minor
 - `sys/` is shared framework code and must not be edited; the remaining Quartus
   warnings (unused SDRAM/SDIO pins, open-drain removal) all originate there and
   are present in every MiSTer core.
@@ -302,7 +294,7 @@ Split ROM / cart / RAM with the documented mirroring and add the `$0A00-$0BFF`,
 `$0C00-$0DFF` and `$0E00-$0FFF` cartridge windows.
 
 ### 7.2 Polish
-Aspect ratio, `CE_PIXEL`, joystick mapping, PAL option, embedded BIOS.
+PAL option, embedded BIOS.
 
 ### 7.3 Keep the comparison green
 Any RTL change should be re-checked against the reference emulator (§9) before
@@ -381,7 +373,80 @@ cartridges including an RCA test cart.
 
 ---
 
-## 10. What changed (2026-08-12)
+## 10. What changed
+
+### 2026-08-14 (beta-tester round)
+
+**The machine ran 4× too fast on hardware.** `ce_pix` — the 1.76 MHz timebase
+the whole core is gated on — was tied high in the FPGA top, so the console ran
+at 7.04 MHz: 240 Hz frames, 4× game speed, 4× beeper pitch. The Verilator
+regression never saw it because the sim ties `ce_pix` high on purpose and
+frame-relative behaviour is unchanged. The top now divides clk_sys by 4
+(sim output verified bit-identical before/after). This is the likely root of
+most beta-tester complaints, "homebrew not working properly" included.
+
+**Real video chain.** `CLK_VIDEO = clk_sys` with `CE_PIXEL` from `video_mixer`
+(GAMMA=1, scandoubler for 31 kHz analog when forced) into `video_freak`:
+aspect-ratio OSD options (4:3 default, full-screen, custom) and the four
+integer-scaling modes. Native output is 64×128 in a 112×262 frame at 15.7 kHz /
+59.98 Hz.
+
+**Input, per the beta testers' list.** Start presses the cartridge's start key
+(per-CRC, from the manuals in the Readme; A1 default), Select is CLEAR. A
+Players setting (Auto/1/2) picks which stick drives keypad B's half of each
+profile — Auto reproduces the previously verified behaviour exactly. The J list
+now carries A0–A9/B0–B9 as default-unbound buttons for direct custom mapping.
+The Jaguar core's numstick (via ColecoAdam, `rtl/numstick.sv`) gives an
+analog-stick on-screen keypad, OSD-selected onto pad A or B; left row reduced
+to the single "0" the Studio II has. All equivalences verified in sim
+(stick == matching keypress, byte-identical frames).
+
+**Homebrew mapped.** All 8 Paul Robson games verified working in sim (both
+`.st2` and `.bin`, page $0C/$0D games included). They all fire/start on `0`, so
+two new profiles: `MAP_HOMEBREW` (8-way pad A with corner keys on diagonals for
+Berzerk, fire on B0 — never A0, which restarts Invaders) and `MAP_HB2P`
+(Hockey/Combat: cross + own-pad 0). The profile field is 4 bits internally; the
+OSD override stays 3.
+
+**Extra button (MPT-02).** The Soundic/Hanimex MPT-02 Studio III machines had
+swappable joysticks with the official mapping: cross on 2/4/6/8, fire 5, second
+button 0. Fire/Extra mirror that; Extra presses same-pad 0 in CROSS and PADDLE
+only (0 pauses Tennis) — never HOMEBREW, where A0 restarts Invaders. J-list
+bits: 4=Fire 5=Extra 6=Start 7=Select, A0..A9=17:8, B0..B9=27:18.
+
+**OSD fixed.** The Joystick option did nothing because `J1,Fire;` sat mid-list:
+Main's menu draw pass skips `J` entries but its selection pass counts anything
+`>= 'A'`, so every row after it acted on the previous entry. Non-OSD entries
+(`J`/`jn`/`V`) must be last, per the docs.
+
+### 2026-08-12
+
+**Joystick support, mapped per cartridge.** A CRC16 of the image is taken during
+`ioctl_download` and looked up at the end of the transfer to pick one of six
+profiles. This is necessary rather than ornamental: the Studio II has no
+joystick, so each game chose its own keys -- Tennis moves the racquet on 2/8 but
+uses 4/5/6 for racquet size, and Space War fires on keypad A while steering on
+keypad B. Presses are OR'd with the keyboard. Unknown cartridges get `CROSS`.
+
+The five BIOS built-ins have no cartridge to CRC, so they are told apart by the
+key that starts them (A1 Doodles, A2 Patterns, A3 Freeway, A4 Bowling, A5
+Addition), latching on the first press after reset only -- those keys are reused
+during play. An OSD "Joystick" setting overrides the whole thing, since the table
+can only be as good as its entries.
+
+Eight cartridges are mapped explicitly; ten are deliberately left on the default
+because they are number-entry games a stick cannot drive, or are unidentified.
+See the Readme for the breakdown and the reasoning.
+
+Verified by equivalence rather than inspection: driving the stick produces
+byte-identical frames to the matching keypress and both differ from no input,
+including the asymmetric Space War case where fire lands on keypad A and steering
+on keypad B.
+
+**3x4 keypad layout** contributed by Elle Ball (@meauxdal), cherry-picked from
+their fork -- no PR was opened. Player A's layout matches the C reference
+emulator's table exactly, which helps the comparison harness.
+
 
 **Sound.** The beeper is implemented: a square wave gated by the 1802's Q line,
 with the pitch decay `docs/sound.txt` describes (NE555 astable whose control pin
@@ -476,7 +541,7 @@ garbage.
 
 ---
 
-## 11. Credit where it is due
+## 12. Credit where it is due
 
 The core is Jason Coombes' (JasonA-dev, June 2022 - March 2025) — the first
 CDP1802 and CDP1861 Verilog, the keypad, the memory map and the Verilator

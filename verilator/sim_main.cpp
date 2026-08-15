@@ -11,8 +11,8 @@ bool headless = false;
 
 // Scripted keypad input, same --press KEY@FRAME[:HOLD] syntax as the headless sim. Scancodes match
 // the PS/2 table in rtl/rcastudioii.sv: player A is the number row, player B is P,Q,W,E,R,T,Y,U,I,O.
-static const uint8_t PS2_A[10] = { 0x45,0x16,0x1E,0x26,0x25,0x2E,0x36,0x3D,0x3E,0x46 };
-static const uint8_t PS2_B[10] = { 0x4D,0x15,0x1D,0x24,0x2D,0x2C,0x35,0x3C,0x43,0x44 };
+static const uint8_t PS2_A[10] = { 0x22,0x16,0x1E,0x26,0x15,0x1D,0x24,0x1C,0x1B,0x23 };   // keypad A, 3x4 layout: X=0, 123 / QWE / ASD
+static const uint8_t PS2_B[10] = { 0x41,0x3D,0x3E,0x46,0x3C,0x43,0x44,0x3B,0x42,0x4B };   // keypad B, 3x4 layout: ,=0, 789 / UIO / JKL
 static std::multimap<long, std::pair<uint8_t,bool>> key_sched;   // frame -> (scancode, pressed)
 static bool ps2_toggle = false;
 

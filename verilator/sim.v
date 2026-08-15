@@ -6,6 +6,10 @@ module top(
    input clk_48 /*verilator public_flat*/,
    input clk_24,
    input [11:0]  inputs/*verilator public_flat*/,
+   input [31:0]  joystick_0/*verilator public_flat*/,
+   input [31:0]  joystick_1/*verilator public_flat*/,
+   input [2:0]   joy_override/*verilator public_flat*/,
+   input [1:0]   players/*verilator public_flat*/,
 
    output [7:0] VGA_R/*verilator public_flat*/,
    output [7:0] VGA_G/*verilator public_flat*/,
@@ -33,7 +37,7 @@ module top(
 );
    
    // Core inputs/outputs
-   wire audio;   // 1-bit beeper, gated by the 1802's Q line
+wire audio;   // 1-bit beeper, gated by the 1802's Q line
    wire [3:0] led/*verilator public_flat*/;
 
    wire VSync, HSync;
@@ -56,6 +60,10 @@ module top(
    assign AUDIO_L = audio ? 16'sd6000 : -16'sd6000;
    assign AUDIO_R = AUDIO_L;
 
+// The sim keeps ce_pix tied high: one pixel per clk_48 edge. Frame content is
+// identical to hardware (everything inside the core is gated on ce_pix), the
+// sim just doesn't burn 4 host cycles per pixel. RCAStudioII.sv divides by 4
+// for the real 1.76MHz timebase.
 wire ce_pix = 1'b1;
 wire reset = ioctl_download;
 
@@ -63,26 +71,9 @@ wire key_strobe = old_keystb ^ ps2_key[10];
 reg old_keystb = 0;
 always @(posedge clk_48) old_keystb <= ps2_key[10];
 
-// clk_1m76: clk_sys / 4, mirroring the divider in RCAStudioII.sv
-reg [1:0] div = 2'd0;
-reg clk_1m76 = 1'b0;
-always @(posedge clk_48) begin
-   if (reset) begin
-      div      <= 2'd0;
-      clk_1m76 <= 1'b0;
-   end
-   else if (div == 2'd1) begin
-      clk_1m76 <= ~clk_1m76;
-      div      <= 2'd0;
-   end
-   else div <= div + 1'b1;
-end
-
 rcastudioii rcastudio
 (
 	.clk_sys(clk_48),
-	.clk_1m76(clk_1m76),
-	.clk_vid(clk_24),
 	.reset(reset),
 	
 	.ioctl_download(ioctl_download),
@@ -102,7 +93,13 @@ rcastudioii rcastudio
 	.video_de(video_de),
 
 	.video(video),
-	.audio(audio)
+	.audio(audio),
+	.joystick_0(joystick_0),
+	.joystick_1(joystick_1),
+	.joy_override(joy_override),
+	.players(players),
+	.osk_a(10'd0),
+	.osk_b(10'd0)
 );
 
 endmodule

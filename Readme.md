@@ -36,15 +36,178 @@ The Studio II has two 10-key keypads. The left one is player A (read through
 `EF3`), the right is player B (`EF4`); software scans them by writing the key
 number to `OUT 2` and testing the flags — see `docs/keyboard.txt`.
 
-| | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
+Each keypad is laid out on the host keyboard the way it sits on the console —
+a 3x4 block — so the shapes match rather than the digits:
+
+```
+   Player A (left)        Player B (right)
+    1  2  3                7  8  9
+    Q  W  E                U  I  O
+    A  S  D                J  K  L
+       X                      ,
+```
+
+| Keypad key | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 0 |
 |---|---|---|---|---|---|---|---|---|---|---|
-| **Player A** | `0` | `1` | `2` | `3` | `4` | `5` | `6` | `7` | `8` | `9` |
-| **Player B** | `P` | `Q` | `W` | `E` | `R` | `T` | `Y` | `U` | `I` | `O` |
+| **Player A** | `1` | `2` | `3` | `Q` | `W` | `E` | `A` | `S` | `D` | `X` |
+| **Player B** | `7` | `8` | `9` | `U` | `I` | `O` | `J` | `K` | `L` | `,` |
 
 **CLEAR** — the console reset button every manual asks for — is **F3**, or
 **Clear** in the OSD.
 
 With no cartridge, the five BIOS built-in games are selected with keys **1**–**5** on keyboard A — see below.
+
+### Joystick
+
+A gamepad works, but not through a fixed mapping. The Studio II has no joystick —
+every game invents its own keypad controls — so Tennis moves the racquet on
+**2/8** while using **4/5/6** to pick racquet *size*, and Space War fires on
+keypad **A** but steers on keypad **B**. One mapping cannot serve both.
+
+So the core takes a **CRC16 of the cartridge as it loads** and selects a profile
+from a table in `rtl/rcastudioii.sv`. Joystick presses are OR'd with the
+keyboard, so both work at once.
+
+#### Profiles
+
+| Profile | Up | Down | Left | Right | Fire | Extra |
+|---------|----|------|------|-------|------|-------|
+| `CROSS` | `2` | `8` | `4` | `6` | `5` | `0` |
+| `PADDLE` | `2` | `8` | — | — | — | `0` pause |
+| `SPACEWAR` | — | — | `B4` | `B6` | `A2` | — |
+| `FREEWAY` | `A2` throttle | `A8` brake | `B4` | `B6` | — | — |
+| `BOWLING` | `A2` hook | `A8` hook | — | — | `A5` roll | — |
+| `BASEBALL` | `B2` curve | `B8` curve | — | — | `A5` bat / `B5` pitch | — |
+| `HOMEBREW` | `2` | `8` | `4` | `6` | `B0` | — |
+| `HB2P` | `2` | `8` | `4` | `6` | `0` (own pad) | — |
+
+`CROSS` applies to both keypads (joystick 1 drives keypad B). Every mapping comes
+from the RCA manuals, not guesswork.
+
+`CROSS` is also, it turns out, the closest thing to an *official* mapping: the
+Soundic **Victory Home TV Programmer** and Hanimex **Jeu TV Programmable** —
+both MPT-02 Studio III machines — had detachable keypads that could be swapped
+for joysticks, mapped exactly this way: cross on `2/4/6/8`, fire on `5`, and a
+second button on `0`. That second button is the gamepad's **Extra**. It only
+presses `0` where `0` is documented and harmless — `CROSS`, and `PADDLE` where
+`0` pauses Tennis — never in `HOMEBREW`, where `A0` restarts Invaders; bind
+B0/A0 directly if a game needs more. `HOMEBREW` is for Paul Robson's games, which
+all fire or start on `0`; it is also 8-way — a held diagonal presses the corner
+key (`1/3/7/9`), which is how Berzerk moves diagonally. Fire lands on `B0`, never
+`A0`, because `A0` restarts Invaders. `HB2P` is the two-player variant (Hockey,
+Combat): the plain cross plus fire-on-`0`, on each player's own pad. It is chosen
+by CRC only — the OSD override list stops at `Homebrew`.
+
+#### Which cartridges are mapped
+
+| Cartridge | Profile | Start key |
+|-----------|---------|-----------|
+| TV Arcade I – Space War | `SPACEWAR` | `A1` |
+| TV Arcade III – Tennis / Squash | `PADDLE` | `A2` (Tennis) |
+| TV Arcade IV – Baseball | `BASEBALL` | `A0` |
+| TV Arcade Series – Gunfighter / Moonship Battle | `CROSS` | `A1` |
+| TV Arcade Series – Speedway / Tag (USA and Europe) | `CROSS` | `A1` |
+| Star Wars | `CROSS` | `A1` |
+| Pinball | `CROSS` | `A1` |
+
+Paul Robson's homebrew games are mapped too — both the `.st2` and its flat
+`.bin` conversion, which hash differently because the CRC covers the file as
+downloaded:
+
+| Homebrew | Profile | Start key |
+|----------|---------|-----------|
+| Asteroids, Berzerk | `HOMEBREW` | `A5` (starts each level) |
+| Invaders, Kaboom, Pacman | `HOMEBREW` | `A0` |
+| Scramble | `HOMEBREW` | `A6` (starts each level) |
+| Hockey, Combat | `HB2P` | `A1` (game select) |
+
+#### Which are deliberately *not* mapped
+
+Ten cartridges fall through to the `CROSS` default. That is intentional for most
+of them, and a joystick simply cannot express what they need:
+
+**Number-entry games** — the input *is* a digit, so a four-way stick has nothing
+sensible to say. Use the keypad:
+
+- TV Arcade II – Fun with Numbers (3-digit guesses)
+- TV Casino Series – Blackjack (bet `1`–`9`/`0`, hit `1`, double `2`, stand `0`)
+- TV Casino Series – TV Bingo
+- TV Mystic Series – Biorhythm (birth and start dates)
+- TV School House I, and II – Math Fun (arithmetic answers)
+- Concentration Match (grid squares chosen by number)
+
+**Unidentified** — no manual and no confirmed controls, so any mapping would be
+a guess:
+
+- `86677b (Europe)`, `87201 (Europe)`, Demonstration Cartridge
+
+These three are also the ones whose frames diverge from the reference emulator,
+so treat them as untested rather than working.
+
+#### Built-in games
+
+There is no cartridge to CRC, so the five BIOS games are told apart by the key
+that starts them — only the first such press after reset counts, since those keys
+get reused during play (`A5` rolls the ball in Bowling):
+
+| Game | Start | Profile |
+|------|-------|---------|
+| Doodles | `A1` | `CROSS` |
+| Patterns | `A2` | `CROSS` |
+| Freeway | `A3` | `FREEWAY` |
+| Bowling | `A4` | `BOWLING` |
+| Addition | `A5` | none — the answers are digits |
+
+#### Overriding it
+
+The table can only be as good as its entries, and an unknown cartridge falls back
+to `CROSS`, which is a guess. So the OSD has a **Joystick** setting:
+
+`Auto` (default) · `Cross` · `Paddle` · `Space War` · `Freeway` · `Bowling` · `Baseball` · `Homebrew`
+
+`Auto` uses the detection above; anything else forces that profile regardless of
+the cartridge. Useful for the unmapped titles, for a homebrew `.st2` the table has
+never seen, or simply if you prefer different controls.
+
+#### Start, Select, and the Players setting
+
+**Start** presses the cartridge's start key (the tables above; `A1` for anything
+unknown, which is what most cartridges use). **Select** is **CLEAR**, the console
+reset — every RCA manual begins "Press CLEAR".
+
+The **Players** OSD setting decides which stick drives keypad B's half of the
+profile. `1` runs everything from gamepad 0 — Space War steers and fires from
+one stick, and a `CROSS` game mirrors the stick onto both pads. `2` gives each
+gamepad its own keypad. `Auto` (default) keeps each profile's natural
+arrangement: the single-player profiles (`SPACEWAR`, `FREEWAY`, `BOWLING`,
+`HOMEBREW`) act as one-player, the symmetric ones (`CROSS`, `PADDLE`,
+`BASEBALL`, `HB2P`) as two.
+
+#### Binding any key directly
+
+The button list also carries **A0–A9** and **B0–B9** — all twenty keypad keys as
+individual buttons, plus Select for CLEAR (21 inputs). None of them has a
+default binding, so they are inert until you map one in *Define buttons*; after
+that they work on top of whatever profile is active. This is the escape hatch
+when a profile does not fit: bind exactly the keys the game wants to whatever
+buttons you like, no keyboard needed.
+
+#### On-screen keypad (analog sticks)
+
+The OSD's **Stick Keypad** setting (`Off` · `Pad A` · `Pad B`) overlays the
+Jaguar core's numstick, via the Coleco Adam: nudge the **right stick** for a
+1–9 grid, the **left stick** for `0`, hold ~half a second and the key is
+pressed. Presses land on the keypad the OSD names. The sticks belong to
+gamepad 0, except that Pad B in a two-player game belongs to gamepad 1. It is
+the slowest input, but reaches every key with no keyboard and no setup —
+number-entry games included.
+
+#### Adding a cartridge
+
+```sh
+tools/cart-crc.sh "software/carts/Some Game.bin"
+```
+then add one line to the `cart_crc` case in `rtl/rcastudioii.sv`.
 
 ### Per-cartridge
 
@@ -248,6 +411,17 @@ cards), **2** doubles — double the bet, exactly one more card — and **0** st
 Dealer draws on 16 or less and stands on 17, except a soft 17. A natural
 blackjack pays 2 to 1, an ordinary win 1 to 1, a tie returns your bet.
 
+## Accuracy
+
+Checked against captures of real hardware in `refvideo/`:
+
+- **Speed** — beep length is a CPU-timed loop, so it measures CPU speed directly.
+  Real hardware's Star Wars beeps are 115–130 ms; this core's are 117 ms.
+- **Beeper pitch** — 547 Hz, measured from the spectrum of a direct capture
+  (545–549 Hz across every beep) rather than taken from the hardware notes,
+  whose component values do not give a sane frequency.
+- Frames are pixel-identical to a reference emulator on 18 of 21 test cases.
+
 ## Building
 
 Quartus **17.0.x** only. If you do not have it installed, the build runs in the
@@ -301,6 +475,8 @@ CPU instruction tracing and VRAM dumps — see `--help`.
   on.
 - **Flandango** ([@Flandango](https://github.com/Flandango)) — MiSTer framework
   compatibility and early Pixie video work (September 2022).
+- **Elle Ball** ([@meauxdal](https://github.com/meauxdal)) — the 3x4 keypad
+  layout, so the host keys sit the way the console's keypads do (August 2026).
 - **Alan Steremberg** ([@alanswx](https://github.com/alanswx)) — 1802
   interrupts, DMA and machine-cycle timing; the DMA-driven CDP1861; the
   reference-emulator comparison harness (August 2026).
