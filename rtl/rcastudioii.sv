@@ -180,6 +180,7 @@ localparam [3:0] MAP_HOMEBREW   = 4'd7;   // Paul Robson's 1P games: 8-way on pa
 localparam [3:0] MAP_HB2P       = 4'd8;   // 2P homebrew (Hockey, Combat): cross
                                           // plus fire-on-0, each player's own pad
 localparam [3:0] MAP_GUNFIGHTER = 4'd9;   // vertical cross: 2/8 + fire 5, one-player
+localparam [3:0] MAP_8WAY       = 4'd10;  // CROSS plus diagonals: 1/3/7/9, fire 5 + extra 0
 
 reg [3:0] map_profile = MAP_NONE;
 
@@ -213,13 +214,13 @@ reg [3:0] start_key = 4'd1;
 always @(posedge clk_sys) begin
 	if (dl_done) begin
 		case (cart_crc)
-			16'h977C: begin map_profile <= MAP_SPACEWAR; start_key <= 4'd1; end // TV Arcade I - Space War
-			16'h88FB: begin map_profile <= MAP_PADDLE;   start_key <= 4'd2; end // TV Arcade III - Tennis + Squash (2 = Tennis)
-			16'hF837: begin map_profile <= MAP_BASEBALL; start_key <= 4'd0; end // TV Arcade IV - Baseball
-			16'hD3E2: begin map_profile <= MAP_CROSS;    start_key <= 4'd1; end // Pinball
-			16'hE153: begin map_profile <= MAP_CROSS;    start_key <= 4'd1; end // Speedway + Tag (Europe)
-			16'hD0DA: begin map_profile <= MAP_CROSS;    start_key <= 4'd1; end // Speedway + Tag (USA)
-			16'hD13E: begin map_profile <= MAP_CROSS;    start_key <= 4'd1; end // Star Wars
+			16'h977C: begin map_profile <= MAP_SPACEWAR;   start_key <= 4'd1; end // TV Arcade I - Space War
+			16'h88FB: begin map_profile <= MAP_PADDLE;     start_key <= 4'd2; end // TV Arcade III - Tennis + Squash (2 = Tennis)
+			16'hF837: begin map_profile <= MAP_BASEBALL;   start_key <= 4'd0; end // TV Arcade IV - Baseball
+			16'hD3E2: begin map_profile <= MAP_CROSS;      start_key <= 4'd1; end // Pinball
+			16'hE153: begin map_profile <= MAP_CROSS;      start_key <= 4'd1; end // Speedway + Tag (Europe)
+			16'hD0DA: begin map_profile <= MAP_CROSS;      start_key <= 4'd1; end // Speedway + Tag (USA)
+			16'hD13E: begin map_profile <= MAP_CROSS;      start_key <= 4'd1; end // Star Wars
 			16'h3CDC: begin map_profile <= MAP_GUNFIGHTER; start_key <= 4'd1; end // Gunfighter + Moonship Battle
 			// Paul Robson's homebrew (refs/studio2-games): all use 0 to fire or
 			// start, so CROSS's fire-on-5 is wrong for every one of them. Both
@@ -233,7 +234,9 @@ always @(posedge clk_sys) begin
 			16'hDFCF, 16'h8551: begin map_profile <= MAP_HOMEBREW; start_key <= 4'd0; end // Kaboom
 			16'h5359, 16'hE00A: begin map_profile <= MAP_HOMEBREW; start_key <= 4'd0; end // Pacman
 			16'hE45F, 16'h1280: begin map_profile <= MAP_HOMEBREW; start_key <= 4'd6; end // Scramble
-			default:  begin map_profile <= MAP_CROSS;    start_key <= 4'd1; end // unknown cart: the common case
+			// Default to 8-way which mirrors the MPT-02 joystick layout + diagonals
+			// Start on 1, which is the most common start key
+			default: begin map_profile <= MAP_8WAY;     start_key <= 4'd1; end // Built-in games, or CRC not detected
 		endcase
 	end
 end
@@ -257,8 +260,8 @@ always @(posedge clk_sys) begin
 		builtin_profile <= MAP_NONE;
 	end
 	else if (no_cart && !builtin_sel) begin
-		if      (playerA[1]) begin builtin_profile <= MAP_CROSS;   builtin_sel <= 1'b1; end  // Doodles
-		else if (playerA[2]) begin builtin_profile <= MAP_CROSS;   builtin_sel <= 1'b1; end  // Patterns
+		if      (playerA[1]) begin builtin_profile <= MAP_8WAY;    builtin_sel <= 1'b1; end  // Doodles
+		else if (playerA[2]) begin builtin_profile <= MAP_8WAY;    builtin_sel <= 1'b1; end  // Patterns
 		else if (playerA[3]) begin builtin_profile <= MAP_FREEWAY; builtin_sel <= 1'b1; end  // Freeway
 		else if (playerA[4]) begin builtin_profile <= MAP_BOWLING; builtin_sel <= 1'b1; end  // Bowling
 		else if (playerA[5]) begin builtin_profile <= MAP_NONE;    builtin_sel <= 1'b1; end  // Addition: digits
@@ -332,6 +335,14 @@ function automatic [9:0] map_padA(input [3:0] prof, input [31:0] j);
 			if (j[4]) k[5] = 1'b1;
 			if (j[5]) k[0] = 1'b1;
 		end
+		MAP_8WAY: begin                      // CROSS + 8-way diagonals: 1/3/7/9 on corners
+			if (j[3] && j[1]) k[1] = 1'b1;   if (j[3] && j[0]) k[3] = 1'b1;
+			if (j[2] && j[1]) k[7] = 1'b1;   if (j[2] && j[0]) k[9] = 1'b1;
+			if (j[3]) k[2] = 1'b1;           if (j[2]) k[8] = 1'b1;
+			if (j[1]) k[4] = 1'b1;           if (j[0]) k[6] = 1'b1;
+			if (j[4]) k[5] = 1'b1;
+			if (j[5]) k[0] = 1'b1;
+		end
 		default: ;
 		endcase
 		map_padA = k;
@@ -382,6 +393,14 @@ function automatic [9:0] map_padB(input [3:0] prof, input [31:0] j);
 			if (j[4]) k[5] = 1'b1;
 			if (j[5]) k[0] = 1'b1;
 		end
+		MAP_8WAY: begin                      // CROSS + 8-way diagonals: 1/3/7/9 on corners
+			if (j[3] && j[1]) k[1] = 1'b1;   if (j[3] && j[0]) k[3] = 1'b1;
+			if (j[2] && j[1]) k[7] = 1'b1;   if (j[2] && j[0]) k[9] = 1'b1;
+			if (j[3]) k[2] = 1'b1;           if (j[2]) k[8] = 1'b1;
+			if (j[1]) k[4] = 1'b1;           if (j[0]) k[6] = 1'b1;
+			if (j[4]) k[5] = 1'b1;
+			if (j[5]) k[0] = 1'b1;
+		end
 		default: ;                           // Bowling: keypad B unused
 		endcase
 		map_padB = k;
@@ -405,11 +424,12 @@ always @* begin
 	end
 end
 wire       start_press = joystick_0[6] | joystick_1[6];
-wire [3:0] active_start_key = (profile == MAP_GUNFIGHTER) ? 4'd1 : start_key;
+wire [3:0] active_start_key = ((profile == MAP_GUNFIGHTER) || (profile == MAP_8WAY)) ? 4'd1 : start_key;
 wire [9:0] start_keys       = start_press ? (10'd1 << active_start_key) : 10'd0;
 
-// Gunfighter is a special case: in Auto/1P it is B-only (2/4/6/8 + 5 + 0 on the
-// right-hand pad), while in 2P it splits exactly like CROSS across both pads.
+// Gunfighter and 8WAY are the special cases: in Auto/1P they are B-only (2/4/6/8 +
+// 5 + 0 on the right-hand pad) or 8-way cross, while in 2P they split exactly like
+// CROSS across both pads.
 wire [9:0] joyA = ((profile == MAP_GUNFIGHTER) && one_player) ? 10'd0
                 : ((profile == MAP_GUNFIGHTER) ? map_padA(MAP_CROSS, joystick_0)
                                               : map_padA(profile, joystick_0));

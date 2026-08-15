@@ -123,7 +123,7 @@ downloaded:
 
 #### Which are deliberately *not* mapped
 
-Ten cartridges fall through to the `CROSS` default. That is intentional for most
+Ten cartridges fall through to the `8-way` default. That is intentional for most
 of them, and a joystick simply cannot express what they need:
 
 **Number-entry games** — the input *is* a digit, so a four-way stick has nothing
@@ -152,7 +152,7 @@ get reused during play (`A5` rolls the ball in Bowling):
 
 | Game | Start | Profile |
 |------|-------|---------|
-| Doodles | `A1` | `CROSS` |
+| Doodles | `A1` | `8-way` |
 | Patterns | `A2` | `CROSS` |
 | Freeway | `A3` | `FREEWAY` |
 | Bowling | `A4` | `BOWLING` |
@@ -161,9 +161,9 @@ get reused during play (`A5` rolls the ball in Bowling):
 #### Overriding it
 
 The table can only be as good as its entries, and an unknown cartridge falls back
-to `CROSS`, which is a guess. So the OSD has a **Joystick** setting:
+to `8-way`, which is the default profile. So the OSD has a **Joystick** setting:
 
-`Auto` (default) · `Cross` · `Paddle` · `Space War` · `Freeway` · `Bowling` · `Baseball` · `Homebrew` · `Gunfighter`
+`Auto` (default) · `Cross` · `Paddle` · `Space War` · `Freeway` · `Bowling` · `Baseball` · `Homebrew` · `Gunfighter` · `8-way`
 
 `Auto` uses the detection above; anything else forces that profile regardless of
 the cartridge. Useful for the unmapped titles, for a homebrew `.st2` the table has
@@ -177,12 +177,12 @@ reset — every RCA manual begins "Press CLEAR".
 
 The **Players** OSD setting decides which gamepad drives keypad B's half of the
 profile. `1` runs everything from gamepad 0: `SPACEWAR`, `FREEWAY`, `BOWLING`,
-`HOMEBREW`, and `GUNFIGHTER` all act as one-player layouts, with the single
-stick steering or firing from one side. `2` gives each gamepad its own keypad,
-so symmetric profiles like `CROSS`, `PADDLE`, `BASEBALL`, and `HB2P` split
-across pads A and B exactly as the cartridge expects. `Auto` (default) keeps
-the profile's natural arrangement: one-player layouts are treated as one-player,
-while the symmetric layouts stay two-player.
+`HOMEBREW`, `GUNFIGHTER`, and `8-way` all act as one-player layouts, with the
+single stick steering or firing from one side. `2` gives each gamepad its own
+keypad, so symmetric profiles like `CROSS`, `PADDLE`, `BASEBALL`, and `HB2P`
+split across pads A and B exactly as the cartridge expects. `Auto` (default)
+keeps the profile's natural arrangement: one-player layouts are treated as
+one-player, while the symmetric layouts stay two-player.
 
 #### Binding any key directly
 

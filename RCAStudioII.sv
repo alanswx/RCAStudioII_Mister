@@ -201,9 +201,9 @@ localparam CONF_STR = {
 	"RCA-StudioII;v2;",
 	"-;",
 	"F1,ST2BINROM,Load Cartridge;",
-	"F0,ROM,Load BIOS;",
+	"F0,ROM,Load Firmware;",
 	"-;",
-	"O[5:2],Joystick,Auto,Cross,Paddle,Space War,Freeway,Bowling,Baseball,Homebrew,Gunfighter;",
+	"O[5:2],Joystick,Auto,Cross,Paddle,Space War,Freeway,Bowling,Baseball,Homebrew,Gunfighter,8-way;",
 	"O[8:7],Players,Auto,1,2;",
 	"O[10:9],Stick Keypad,Off,Pad A,Pad B;",
 	"-;",
@@ -240,7 +240,7 @@ wire  [15:0] joystick_l_analog_1, joystick_r_analog_1;
 // m_vdc->reset(), and Emma 02 resets its Pixie on the same path. Folding it into
 // this core's `reset` gives both, since that net feeds the CPU's CLEAR_N and the
 // pixie. Mapped to F3 (0x04) to match MAME's KEYCODE_F3, and to the OSD "Clear"
-// button; F3 is free because player A uses the number row and player B P-O.
+// button.
 reg clear_key = 1'b0;
 always @(posedge clk_sys) begin
 	reg old_stb;
@@ -296,10 +296,6 @@ pll pll
 
 // The CDP1861 emits one pixel per CPU clock: 1.7897725 MHz nominal, 1.760229 MHz
 // here (clk_sys/4, and the real Studio II's RC oscillator was tuned by eye anyway).
-// This enable IS the machine's timebase -- the CPU divides it by 8 into machine
-// cycles -- so it must not be tied high: that ran the whole console 4x too fast
-// on hardware (240 Hz frames, 4x beeper pitch), though the Verilator regression
-// never saw it because frame-relative behaviour is unchanged.
 reg [1:0] ce_cnt = 2'd0;
 always @(posedge clk_sys) ce_cnt <= ce_cnt + 2'd1;
 wire ce_pix = (ce_cnt == 2'd0);
