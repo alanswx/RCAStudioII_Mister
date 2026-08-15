@@ -75,95 +75,57 @@ keyboard, so both work at once.
 |---------|----|------|------|-------|------|-------|
 | `CROSS` | `2` | `8` | `4` | `6` | `5` | `0` |
 | `SPACEWAR` | — | — | `B4` | `B6` | `A2` | — |
-| `FREEWAY` | `A2` throttle | `A8` brake | `B4` | `B6` | — | — |
-| `BOWLING` | `A2` hook | `A8` hook | — | — | `A5` roll | — |
-| `BASEBALL` | `B2` curve | `B8` curve | — | — | `A5` bat / `B5` pitch | — |
+| `FREEWAY` | `A2` | `A8` | `B4` | `B6` | — | — |
+| `BOWLING` | `A2` | `A8` | — | — | `A5` | — |
+| `BASEBALL` | `B2` | `B8` | — | — | `A5` / `B5` | — |
 | `HOMEBREW` | `2` | `8` | `4` | `6` | `B0` | — |
-| `HB2P` | `2` | `8` | `4` | `6` | `0` (own pad) | — |
+| `HB2P` | `2` | `8` | `4` | `6` | `0` | — |
 | `GUNFIGHTER` | `B2` | `B8` | `B4` | `B6` | `B5` | `B0` |
 | `8WAY` | `2` | `8` | `4` | `6` | `5` | `0` |
 | `DOODLES` | `B2` | `B8` | `B4` | `B6` | `B5` | `B0` |
 | `UNMAPPED` | — | — | — | — | — | — |
 
-`CROSS` applies to both keypads (joystick 0 drives keypad A, joystick 1 drives keypad B).
+`CROSS` is the standard 2/4/6/8 cross with fire on `5` and extra on `0`. It matches the official MPT-02 joystick layout and applies to both keypads.
 
-`CROSS` is also, it turns out, the closest thing to an *official* mapping: the
-Soundic **Victory Home TV Programmer** and Hanimex **Jeu TV Programmable** —
-both MPT-02 Studio III machines — had detachable keypads that could be swapped
-for joysticks, mapped exactly this way: cross on `2/4/6/8`, fire on `5`, and a
-second button on `0`. That second button is the gamepad's **Extra**. It only
-presses `0` where `0` is documented and harmless — `CROSS` — never in
-`HOMEBREW`, where `A0` restarts Invaders; bind B0/A0 directly if a game needs
-more. `HOMEBREW` is for Paul Robson's games, which
-all fire or start on `0`; it is also 8-way — a held diagonal presses the corner
-key (`1/3/7/9`), which is how Berzerk moves diagonally. Fire lands on `B0`, never
-`A0`, because `A0` restarts Invaders. `HB2P` is the two-player variant (Hockey,
-Combat): the plain cross plus fire-on-`0`, on each player's own pad. Cartridges
-pick it automatically by CRC, and it's also available as **2P Homebrew** in the
-OSD override list for manual use.
+`SPACEWAR`, `FREEWAY`, and `BOWLING` are asymmetric one-player layouts, with the relevant inputs split across keypad A/B as shown above. `BASEBALL` uses a bat on A and pitch/curve on B. `HOMEBREW` is Paul Robson’s 8-way layout; fire is on `B0`, and diagonals use `1/3/7/9` to match the corner keys. `HB2P` is the two-player homebrew variant with fire on `0` on each player’s own pad.
 
-`GUNFIGHTER` covers the Gunfighter / Moonship Battle cartridge: a full cross plus
-fire-on-`5`, same layout as `CROSS`. Gunfighter itself only reads up/down and fire,
-but Moonship Battle needs all four directions, so the profile carries the full
-cross for both. In one-player it collapses onto keypad B alone — a single stick
-plays the right-hand gunfighter — while two-player splits normally across A and B.
-`8WAY` is `CROSS` plus the diagonals (`1/3/7/9`) on both pads; it is the default
-fallback for any cartridge the CRC table doesn't recognize, so most joysticks
-end up here without you choosing it. `DOODLES` is the same 8-way-plus-cross
-layout, but everything lands on keypad B only — Doodles and Patterns are both
-read entirely from keypad B, so keypad A is left untouched to avoid interfering
-with anything.
+`GUNFIGHTER` is a full cross with fire on `5`; in one-player mode it collapses onto keypad B, while two-player mode splits across A and B. `8WAY` is `CROSS` plus diagonals (`1/3/7/9`). `DOODLES` uses the same idea but sends everything to keypad B only.
 
-`UNMAPPED` suppresses all controller presses — it sends zero input from the gamepad.
-Use it for digit-only games that cannot be driven by a cross or stick. The keyboard,
-on-screen numstick, and direct key bindings still work normally. It is also
-available as **Unmapped** in the OSD override list.
+`UNMAPPED` disables all controller-driven keypad presses; keyboard, on-screen numstick, and direct key bindings still work.
 
 #### Which cartridges are mapped
 
 | Cartridge | Profile | Start key |
 |-----------|---------|-----------|
 | TV Arcade I – Space War | `SPACEWAR` | `A1` |
-| TV Arcade III – Tennis / Squash | `CROSS` | `A2` (Tennis) |
+| TV Arcade III – Tennis / Squash | `CROSS` | `A2` |
 | TV Arcade IV – Baseball | `BASEBALL` | `A0` |
 | TV Arcade Series – Gunfighter / Moonship Battle | `GUNFIGHTER` | `A1` |
-| TV Arcade Series – Speedway / Tag (USA and Europe) | `CROSS` | `A1` |
+| TV Arcade Series – Speedway / Tag | `CROSS` | `A1` |
 | Star Wars | `CROSS` | `A1` |
 | Pinball | `CROSS` | `A1` |
 
-Paul Robson's homebrew games are mapped too — both the `.st2` and its flat
-`.bin` conversion, which hash differently because the CRC covers the file as
-downloaded:
+Paul Robson’s homebrew games are mapped too:
 
 | Homebrew | Profile | Start key |
 |----------|---------|-----------|
-| Asteroids, Berzerk | `HOMEBREW` | `A5` (starts each level) |
+| Asteroids, Berzerk | `HOMEBREW` | `A5` |
 | Invaders, Kaboom, Pacman | `HOMEBREW` | `A0` |
-| Scramble | `HOMEBREW` | `A6` (starts each level) |
-| Hockey, Combat | `HB2P` | `A1` (game select) |
+| Scramble | `HOMEBREW` | `A6` |
+| Hockey, Combat | `HB2P` | `A1` |
 
-#### Which are mapped to UNMAPPED
+The rest are intentionally left as `UNMAPPED` because they require only digit input, which a joystick cannot express cleanly:
 
-The following cartridges are explicitly mapped to `UNMAPPED` — they require only
-digit input, so a joystick cannot express what they need. Use the keypad, keyboard,
-on-screen numstick, or bind individual keys:
+- TV Arcade II – Fun with Numbers
+- TV Casino Series – Blackjack
+- TV Casino Series – TV Bingo
+- TV Mystic Series – Biorhythm
+- TV School House I
+- TV School House II – Math Fun
+- Concentration Match
+- Demonstration Cartridge
 
-**Number-entry games:**
-
-- TV Arcade II – Fun with Numbers (3-digit guesses) | CRC `0x1634`
-- TV Casino Series – Blackjack (bet `1`–`9`/`0`) | CRC `0xB76F`
-- TV Casino Series – TV Bingo | CRC `0xB76F`
-- TV Mystic Series – Biorhythm (birth and start dates) | CRC `0xB76F`
-- TV School House I (arithmetic answers) | CRC `0x1634`
-- TV School House II – Math Fun (arithmetic answers) | CRC `0xB76F`
-- Concentration Match (grid squares by number) | CRC `0xB76F`
-- Demonstration Cartridge (autoplay) | CRC `0xB76F`
-
-#### Built-in games
-
-There is no cartridge to CRC, so the five BIOS games are told apart by the key
-that starts them — only the first such press after reset counts, since those keys
-get reused during play (`A5` rolls the ball in Bowling):
+Built-in BIOS games are detected by the first key pressed after reset:
 
 | Game | Start | Profile |
 |------|-------|---------|
@@ -173,33 +135,33 @@ get reused during play (`A5` rolls the ball in Bowling):
 | Bowling | `A4` | `BOWLING` |
 | Addition | `A5` | `UNMAPPED` |
 
-#### Overriding it
-
-The table can only be as good as its entries, and an unknown cartridge falls back
-to `8-way`, which is the default profile. So the OSD has a **Joystick** setting:
-
-`Auto` (default) · `Cross` · `Space War` · `Freeway` · `Bowling` · `Baseball` · `Homebrew` · `Gunfighter` · `8-way` · `Doodles` · `2P Homebrew` · `Unmapped`
-
-`Auto` uses the detection above; anything else forces that profile regardless of
-the cartridge. `Unmapped` suppresses all controller-driven keypad presses while
-still letting the numstick, keyboard, and direct per-key bindings send input when
-you intentionally bind them. Useful for the digit-only titles, for a homebrew
-`.st2` the table has never seen, or simply if you prefer different controls.
+`Auto` uses this table; any override forces a specific profile regardless of cartridge. `Unmapped` disables controller-driven keypad presses while still allowing the keyboard, on-screen numstick, and direct key bindings.
 
 #### Start, Select, and the Players setting
 
-**Start** presses the cartridge's start key (the tables above; `A1` for anything
-unknown, which is what most cartridges use). **Select** is **CLEAR**, the console
-reset — every RCA manual begins "Press CLEAR".
+**Start** presses the cartridge’s start key from the table above. **Select** is the console’s **CLEAR** reset.
 
-The **Players** OSD setting decides which gamepad drives keypad B's half of the
-profile. `1` runs everything from gamepad 0: `SPACEWAR`, `FREEWAY`, `BOWLING`,
-`HOMEBREW`, `GUNFIGHTER`, and `8WAY` all act as one-player layouts, with the
-single stick steering or firing from one side. `2` gives each gamepad its own
-keypad, so symmetric profiles like `CROSS`, `BASEBALL`, and `HB2P` split
-across pads A and B exactly as the cartridge expects. `AUTO` (default)
-keeps the profile's natural arrangement: one-player layouts are treated as
-one-player, while the symmetric layouts stay two-player.
+The **Players** setting decides which gamepad drives the B-side of a profile:
+
+- `1` = gamepad 0 handles everything
+- `2` = each gamepad owns its own keypad half
+- `Auto` = use the profile’s default layout
+
+| Profile | Default |
+|---------|---------|
+| `SPACEWAR` | `1P` |
+| `FREEWAY` | `1P` |
+| `BOWLING` | `1P` |
+| `HOMEBREW` | `1P` |
+| `CROSS` | `2P` |
+| `BASEBALL` | `2P` |
+| `HB2P` | `2P` |
+| `GUNFIGHTER` | `1P` |
+| `8WAY` | `1P` |
+| `DOODLES` | `1P` |
+| `UNMAPPED` | n/a |
+
+The keyboard, on-screen numstick, and direct per-key bindings still work alongside the profile; a mapped joystick press and a pressed key can both act at once.
 
 #### Binding any key directly
 
@@ -258,21 +220,19 @@ Notes on the measurements:
 
 - `any` means the cartridge draws regardless of which key is pressed — these are
   demos or menu-driven titles rather than games with a start button.
-- A dash means no key changed the outcome in the window tested. That can mean
-  the title genuinely ignores that keypad, or that it needs a longer or
-  different input sequence than the probe used.
-- `86677b`, `87201` and `Demonstration Cartridge` show no response on either
-  keypad.
+- A dash means no key changed the outcome in the window tested during 
+simulation.
+- Demonstration Cartridge` plays automatically; doesn't respond to either keypad. 
+- `86677b` and `87201` are labeled as "BIOS" files; it isn't clear if they work
+on the core currently.
 
 ### How to play
 
 Instructions below are from the original RCA manuals — the text ones at
 [Digit Press](https://www.digitpress.com/library/manuals/rcastudio2/index.html)
-and the scanned ones in `docs/*.zip`. Nothing here is guessed.
+and the scanned ones in `docs/*.zip`.
 
-Manuals are in `docs/` as PDFs and scan zips. Cartridges with **no** manual
-available — Pinball, TV Bingo, Concentration Match, TV School House I and II,
-and the unidentified `86677b`/`87201` — are only in the measured table above.
+Manuals are in `docs/` as PDFs and scan zips.
 
 Every manual begins **"Press CLEAR"**. CLEAR is the Studio II's console reset
 button (see `docs/RCA_Studio_II_Service_Manual.pdf`, Figure 1); press **F3**,
