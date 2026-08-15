@@ -384,7 +384,11 @@ Checked against captures of real hardware in `refvideo/`:
 
 ## Known issues
 
-- Paul Robson's homebrew games seem to flicker badly at the moment.
+- Paul Robson's homebrew games flicker badly. Diagnosed: R(0) walks past the end
+  of display RAM into `$0A00`, which on real hardware still reads RAM because it
+  is mirrored there, but this core has no memory decode yet so it reads cartridge
+  space instead. Retail titles keep R(0) inside `$0900-$09FF` and are unaffected.
+  Fixing the memory decode should fix the flicker — see CLAUDE.md §6.1.
 
 ## Building
 

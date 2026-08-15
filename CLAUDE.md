@@ -277,9 +277,36 @@ same 2 KB as space-separated hex text (6144 bytes).
 Most of the original defect list is fixed — see §10 for what changed. What
 remains, ordered by impact.
 
-### 6.1 Homebrew issues
-Paul Robson's homebrew games flicker badly. All retail titles seem to work now,
-so this is a good thing to tackle next.
+### 6.1 Homebrew flicker -- diagnosed: it is the missing memory mirroring (6.2)
+
+Paul Robson's homebrew flicker badly; retail titles are fine. Traced with
+`--frame-log` and state dumps against the reference emulator on `invaders.st2`:
+
+    frames 300-400   RTL: 45 of 101 blank, 29 distinct hashes
+                     ref:  0 blank,         2 distinct hashes
+
+It is not the display enable and not lost DMA. `display_enabled` stays 1 across
+blank frames and `$0900` still holds the sprite data. What moves is **R(0)**:
+
+    frame 332  R0=09F8   content
+    frame 334  R0=09F8   content
+    frame 336  R0=0800   blank        <- 09F8 + 8 = 0A00, then it lands at 0800
+    frame 340  R0=0800   blank
+
+R(0) walks off the end of display RAM into `$0A00`. On real hardware that still
+reads RAM, because `docs/memorymap.txt` says RAM is mirrored "everywhere A9 = 0
+and where there is no ROM or cartridge ROM connected (@0C00, @1000, @1400 ...)",
+and `$0C00-$0DFF` is explicitly a duplicate of `$0800-$09FF`. This core has no
+memory decode at all -- one 4K dpram with the address truncated to
+`ram_a[11:0]` -- so `$0A00` reads cartridge space instead of mirrored RAM, the
+DMA streams whatever is there, and the picture drops out.
+
+Retail titles never expose this because their ISR keeps R(0) inside
+`$0900-$09FF`. The homebrew relies on the mirror.
+
+So 6.1 and 6.2 are the same bug: **fix the memory decode and the flicker should
+go with it.** Verify with the frame-log comparison above, which gives a clean
+pass/fail (blank-frame count should go to 0).
 
 ### 6.2 No memory decode
 A single 4 KB dpram backs everything. The address is truncated to `ram_a[11:0]`,
