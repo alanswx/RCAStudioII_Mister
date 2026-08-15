@@ -277,18 +277,22 @@ same 2 KB as space-separated hex text (6144 bytes).
 Most of the original defect list is fixed — see §10 for what changed. What
 remains, ordered by impact.
 
-### 6.1 No memory decode
+### 6.1 Homebrew issues
+Paul Robson's homebrew games flicker badly. All retail titles seem to work now,
+so this is a good thing to tackle next.
+
+### 6.2 No memory decode
 A single 4 KB dpram backs everything. The address is truncated to `ram_a[11:0]`,
 ROM and RAM share the array, and the only protection is `cpu_wr` allowing writes
 in `$800-$9FF`. The documented mirroring is not implemented, and the cartridge
 windows `$0A00-$0BFF`, `$0C00-$0DFF` and `$0E00-$0FFF` are not decoded.
 
-### 6.2 Top level — `RCAStudioII.sv`
+### 6.3 Top level — `RCAStudioII.sv`
 - No PAL support, and the BIOS is not embedded (the core is held in reset until
   one is loaded). The rest of the old list — aspect ratio, `CE_PIXEL`, the dead
   `clk_1m76` — is fixed; see §10 (2026-08-14).
 
-### 6.3 Minor
+### 6.4 Minor
 - `sys/` is shared framework code and must not be edited; the remaining Quartus
   warnings (unused SDRAM/SDIO pins, open-drain removal) all originate there and
   are present in every MiSTer core.
@@ -309,8 +313,8 @@ behaviour and naming consistency.
 ### 7.3 Controller/profile parity
 The profile system is intentionally explicit and tested across the common
 cartridges, but every new title is still a chance to discover a missing special
-case. Keep the profile table and the solid defaults (8-way / Doodles /
-Gunfighter) aligned with the actual manuals and the reference emulator.
+case. Keep the profile table aligned with the actual manuals and the reference 
+emulator.
 
 ### 7.4 Keep the comparison green
 Any RTL change should be re-checked against the reference emulator (§9) before

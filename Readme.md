@@ -382,6 +382,10 @@ Checked against captures of real hardware in `refvideo/`:
   whose component values do not give a sane frequency.
 - Frames are pixel-identical to a reference emulator on 18 of 21 test cases.
 
+## Known issues
+
+- Paul Robson's homebrew games seem to flicker badly at the moment.
+
 ## Building
 
 Quartus **17.0.x** only. If you do not have it installed, the build runs in the
