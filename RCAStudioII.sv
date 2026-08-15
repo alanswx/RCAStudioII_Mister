@@ -216,7 +216,7 @@ localparam CONF_STR = {
 	// Tennis/Squash's CROSS profile.
 	// Order must match the localparams in rtl/rcastudioii.sv -- the row's value
 	// IS the profile number.
-	"O[5:2],Joystick,None,Cross,Space War,Freeway,Bowling,Baseball,Homebrew,Gunfighter,8-way,Doodles,2P Homebrew,Clear-only,Paddle;",
+	"D[2]O[5:2],Joystick,None,Cross,Space War,Freeway,Bowling,Baseball,Homebrew,Gunfighter,8-way,Doodles,2P Homebrew,Clear-only,Paddle;",
 	"O[8:7],Players,Auto,1,2;",
 	"O[10:9],Stick Keypad,Off,Pad A,Pad B;",
 	"-;",
@@ -251,12 +251,10 @@ wire  [31:0] joystick_0, joystick_1;
 wire  [15:0] joystick_l_analog_0, joystick_r_analog_0;
 wire  [15:0] joystick_l_analog_1, joystick_r_analog_1;
 
-// CLEAR is the Studio II's console button. On real hardware it drives the 1802's
-// CLEAR pin and resets the CDP1861: MAME's studio2 machine_reset() does exactly
-// m_vdc->reset(), and Emma 02 resets its Pixie on the same path. Folding it into
-// this core's `reset` gives both, since that net feeds the CPU's CLEAR_N and the
-// pixie. Mapped to F3 (0x04) to match MAME's KEYCODE_F3, and to the OSD "Clear"
-// button.
+// CLEAR is the Studio II's console button. It resets the CPU and blanks/clears
+// the display, but the Pixie's timing generator must keep running or HDMI/analog
+// displays can lose sync. Mapped to F3 (0x04), the OSD "Clear" button, and
+// gamepad Select.
 reg clear_key = 1'b0;
 always @(posedge clk_sys) begin
 	reg old_stb;
@@ -322,8 +320,9 @@ wire ce_pix = (ce_cnt == 2'd0);
 // Select on the gamepad is CLEAR, same as F3 and the OSD button: every RCA
 // manual begins "Press CLEAR", so it belongs on the pad next to Start.
 wire joy_clear = joystick_0[7] | joystick_1[7];
+wire clear_request = status[1] | clear_key | joy_clear;
 
-wire reset = RESET | status[0] | status[1] | clear_key | joy_clear | buttons[1] | ioctl_download | download_reset | ~rom_loaded;
+wire reset = RESET | status[0] | clear_request | buttons[1] | ioctl_download | download_reset | ~rom_loaded;
 
 // reset after download
 reg [7:0] download_reset_cnt;
@@ -374,7 +373,7 @@ rcastudioii rcastudio
 	.players(status[8:7]),
 	.osk_a(osk_a),
 	.osk_b(osk_b),
-	.clear_key(clear_key)
+	.clear_key(clear_request)
 );
 
 ////////////////// Joystick profile -> OSD ///////////////////////////////////
@@ -433,9 +432,9 @@ always @(posedge clk_sys) begin
 	end
 end
 
-// Gray-out the Joystick OSD option when Mapping is set to Auto. status_menumask
-// is keyed by an option's first status bit, not by the option's visual row;
-// Joystick is O[5:2], hence bit 2.
+// Gray-out the Joystick OSD option when Mapping is set to Auto. CONF_STR's
+// D[2] prefix consumes this bit from status_menumask; bit 2 is the first status
+// bit of the Joystick O[5:2] option.
 assign status_menumask = (!status[6]) ? 16'h0004 : 16'h0000;
 
 assign CLK_VIDEO = clk_sys;
