@@ -265,8 +265,8 @@ always @(posedge clk_sys) begin
 		builtin_profile <= MAP_NONE;
 	end
 	else if (no_cart && !builtin_sel) begin
-		if      (playerA[1]) begin builtin_profile <= MAP_DOODLES; builtin_sel <= 1'b1; end  // Doodles: B-side 8-way
-		else if (playerA[2]) begin builtin_profile <= MAP_DOODLES; builtin_sel <= 1'b1; end  // Patterns: B-side 8-way
+		if      (playerA[1] || (start_press && (active_start_key == 4'd1))) begin builtin_profile <= MAP_DOODLES; builtin_sel <= 1'b1; end  // Doodles: B-side 8-way
+		else if (playerA[2] || (start_press && (active_start_key == 4'd2))) begin builtin_profile <= MAP_DOODLES; builtin_sel <= 1'b1; end  // Patterns: B-side 8-way
 		else if (playerA[3]) begin builtin_profile <= MAP_FREEWAY; builtin_sel <= 1'b1; end  // Freeway
 		else if (playerA[4]) begin builtin_profile <= MAP_BOWLING; builtin_sel <= 1'b1; end  // Bowling
 		else if (playerA[5]) begin builtin_profile <= MAP_UNMAPPED; builtin_sel <= 1'b1; end  // Addition: digits
@@ -435,7 +435,8 @@ endfunction
 wire profile_1p = (profile == MAP_SPACEWAR) || (profile == MAP_FREEWAY) ||
                   (profile == MAP_BOWLING)  || (profile == MAP_NONE) ||
                   (profile == MAP_HOMEBREW) || (profile == MAP_GUNFIGHTER) ||
-                  (profile == MAP_DOODLES)  || (profile == MAP_UNMAPPED);
+                  (profile == MAP_8WAY)     || (profile == MAP_DOODLES) ||
+                  (profile == MAP_UNMAPPED);
 wire one_player = (players == 2'd1) || ((players == 2'd0) && profile_1p);
 
 // Direct A0..A9/B0..B9 bindings and Start work from either stick: MiSTer maps
@@ -458,11 +459,13 @@ wire [9:0] start_keys       = ((profile != MAP_UNMAPPED) && start_press) ? (10'd
 // like CROSS across both pads. The explicit Unmapped profile stays quiet unless the
 // user binds a direct A/B key manually.
 wire [9:0] joyA = ((profile == MAP_UNMAPPED) ? 10'd0
+                : ((profile == MAP_8WAY) && one_player) ? 10'd0
                 : ((profile == MAP_GUNFIGHTER) && one_player) ? 10'd0
                 : ((profile == MAP_DOODLES) ? 10'd0
                                           : ((profile == MAP_GUNFIGHTER) ? map_padA(MAP_CROSS, joystick_0)
                                                                         : map_padA(profile, joystick_0))));
 wire [9:0] joyB = ((profile == MAP_UNMAPPED) ? 10'd0
+                : ((profile == MAP_8WAY) && one_player) ? map_padB(MAP_8WAY, joystick_0)
                 : ((profile == MAP_GUNFIGHTER) && one_player) ? map_padB(MAP_CROSS, joystick_0)
                 : ((profile == MAP_DOODLES) ? map_padB(MAP_DOODLES, joystick_0)
                                           : ((profile == MAP_GUNFIGHTER) ? map_padB(MAP_CROSS, joystick_1)
