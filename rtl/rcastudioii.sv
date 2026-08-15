@@ -417,6 +417,8 @@ wire [9:0] joyB = ((profile == MAP_GUNFIGHTER) && one_player) ? map_padB(MAP_CRO
                 : ((profile == MAP_GUNFIGHTER) ? map_padB(MAP_CROSS, joystick_1)
                                               : (one_player ? map_padB(profile, joystick_0)
                                                              : map_padB(profile, joystick_1)));
+wire [9:0] joyA_active = joyA | directA | start_keys;
+wire [9:0] joyB_active = joyB | directB;
 
 ////////////////// CPU //////////////////////////////////////////////////////////////////
 
@@ -424,8 +426,8 @@ wire [9:0] joyB = ((profile == MAP_GUNFIGHTER) && one_player) ? map_padB(MAP_CRO
 // guard the index: keylatch 10-15 used to read off the end of the 10-bit playerA/playerB vectors.
 wire  [3:0] EF;
 wire        key_valid = (keylatch < 4'd10);
-wire  [9:0] padA = playerA | joyA | osk_a;
-wire  [9:0] padB = playerB | joyB | osk_b;
+wire  [9:0] padA = playerA | joyA_active | osk_a;
+wire  [9:0] padB = playerB | joyB_active | osk_b;
 assign EF = {key_valid & padB[keylatch], key_valid & padA[keylatch], 1'b1, EFx};
 
 // The Studio II has no input port that returns data -- the keypads are read through EF3/EF4,
