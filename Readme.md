@@ -80,6 +80,9 @@ keyboard, so both work at once.
 | `BASEBALL` | `B2` curve | `B8` curve | — | — | `A5` bat / `B5` pitch | — |
 | `HOMEBREW` | `2` | `8` | `4` | `6` | `B0` | — |
 | `HB2P` | `2` | `8` | `4` | `6` | `0` (own pad) | — |
+| `GUNFIGHTER` | `2` | `8` | `4` | `6` | `5` | `0` |
+| `8WAY` | `2` | `8` | `4` | `6` | `5` | `0` |
+| `DOODLES` | `B2` | `B8` | `B4` | `B6` | `B5` | `B0` |
 
 `CROSS` applies to both keypads (joystick 1 drives keypad B). Every mapping comes
 from the RCA manuals, not guesswork.
@@ -98,6 +101,18 @@ key (`1/3/7/9`), which is how Berzerk moves diagonally. Fire lands on `B0`, neve
 Combat): the plain cross plus fire-on-`0`, on each player's own pad. Cartridges
 pick it automatically by CRC, and it's also available as **2P Homebrew** in the
 OSD override list for manual use.
+
+`GUNFIGHTER` covers the Gunfighter / Moonship Battle cartridge: a full cross plus
+fire-on-`5`, same layout as `CROSS`. Gunfighter itself only reads up/down and fire,
+but Moonship Battle needs all four directions, so the profile carries the full
+cross for both. In one-player it collapses onto keypad B alone — a single stick
+plays the right-hand gunfighter — while two-player splits normally across A and B.
+`8WAY` is `CROSS` plus the diagonals (`1/3/7/9`) on both pads; it is the default
+fallback for any cartridge the CRC table doesn't recognize, so most joysticks
+end up here without you choosing it. `DOODLES` is the same 8-way-plus-cross
+layout, but everything lands on keypad B only — Doodles and Patterns are both
+read entirely from keypad B, so keypad A is left untouched to avoid interfering
+with anything.
 
 #### Which cartridges are mapped
 
