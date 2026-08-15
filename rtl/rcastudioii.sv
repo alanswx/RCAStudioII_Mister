@@ -43,6 +43,7 @@ module rcastudioii
 	input        [9:0] osk_a,          // on-screen keypad presses for keypad A (bit = key)
 	input        [9:0] osk_b,          // and for keypad B
 	input  reg         ce_pix,
+	input              clear_key,      // CLEAR button input from top-level; keep video alive during CLEAR
 
 	output reg         HBlank,
 	output reg         HSync,
@@ -70,7 +71,8 @@ wire        Locked;
 pixie_video pixie_video (
     // front end, CDP1802 bus clock domain
     .clk        (clk_sys),    // I
-    .reset      (reset),      // I
+    .reset      (reset & ~clear_key),      // I: keep pixie running while CLEAR (clear_key==1) so VSYNC doesn't lose sync
+
     .clk_enable (ce_pix),     // I
     .cpu_ce     (cpu_ce),     // I  CPU machine-cycle enable, for sampling DMA bytes
 
@@ -80,7 +82,8 @@ pixie_video pixie_video (
     // interrupts from reset instead of from the moment the BIOS enabled it. The earlier commented
     // version keyed off io_n[0] alone, which cannot tell INP 1 from OUT 1.
     .disp_on    (io_inp && (io_n == 3'd1)),  // I
-    .disp_off   (io_out && (io_n == 3'd1)),  // I
+    .disp_off   ((io_out && (io_n == 3'd1)) || clear_key),  // I: also blank display while CLEAR is asserted
+
 
     .data_in    (ram_q),      // I [7:0]  byte the CPU delivers during a DMA-OUT cycle
 
@@ -227,7 +230,7 @@ always @(posedge clk_sys) begin
 	if (dl_done) begin
 		case (cart_crc)
 			16'h977C: begin map_profile <= MAP_SPACEWAR;   start_key <= 4'd1; end // TV Arcade I - Space War
-			16'h88FB: begin map_profile <= MAP_CROSS;      start_key <= 4'd2; end // TV Arcade III - Tennis + Squash: CROSS is the better default and a superset of PADDLE.
+			16'h88FB: begin map_profile <= MAP_CROSS;      start_key <= 4'd2; end // TV Arcade III - Tennis + Squash
 			16'hF837: begin map_profile <= MAP_BASEBALL;   start_key <= 4'd0; end // TV Arcade IV - Baseball
 			16'hD3E2: begin map_profile <= MAP_CROSS;      start_key <= 4'd1; end // Pinball
 			16'hE153: begin map_profile <= MAP_CROSS;      start_key <= 4'd1; end // Speedway + Tag (Europe)
@@ -832,6 +835,42 @@ dpram #(8, 12) dpram
 
 // The 512 bytes of RAM: $0800-$08FF program/system, $0900-$09FF display.
 // Selected by A9 = 0, so the address inside it is just A8-A0.
+// Add a port-B writer used to clear VRAM on CLEAR without resetting the Pixie
+reg [8:0] clear_addr_b = 9'd0;
+reg       clear_active = 1'b0;
+reg       ram_cs_b_sig = 1'b0;
+reg       wren_b_sig = 1'b0;
+reg [8:0] address_b_sig = 9'd0;
+reg [7:0] data_b_sig = 8'd0;
+
+always @(posedge clk_sys) begin
+    // Default: inactive
+    ram_cs_b_sig <= 1'b0;
+    wren_b_sig  <= 1'b0;
+    address_b_sig <= 9'd0;
+    data_b_sig <= 8'd0;
+
+    // Start a clear sequence when CLEAR is asserted (and not already active)
+    if (clear_key && !clear_active) begin
+        clear_active <= 1'b1;
+        clear_addr_b <= 9'd256; // VRAM starts at offset 256 in the 512-byte RAM
+    end
+    else if (clear_active) begin
+        // Write zero to current VRAM address
+        ram_cs_b_sig <= 1'b1;
+        wren_b_sig   <= 1'b1;
+        address_b_sig <= clear_addr_b;
+        data_b_sig   <= 8'd0;
+        if (clear_addr_b == 9'd511) begin
+            // Finished clearing VRAM; deassert clear_active on next cycle
+            clear_active <= 1'b0;
+        end
+        else begin
+            clear_addr_b <= clear_addr_b + 1'b1;
+        end
+    end
+end
+
 dpram #(8, 9) sram
 (
 	.clock(clk_sys),
@@ -841,10 +880,10 @@ dpram #(8, 9) sram
 	.data_a(ram_d),
 	.q_a(sram_q),
 
-	.ram_cs_b(1'b0),
-	.wren_b(1'b0),
-	.address_b(9'd0),
-	.data_b(),
+	.ram_cs_b(ram_cs_b_sig),
+	.wren_b(wren_b_sig),
+	.address_b(address_b_sig),
+	.data_b(data_b_sig),
 	.q_b()
 );
 

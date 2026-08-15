@@ -240,6 +240,9 @@ wire forced_scandoubler;
 wire  [21:0] gamma_bus;
 wire   [1:0] buttons;
 wire [127:0] status;
+// Menu mask to gray-out/disable specific OSD rows. Bit i -> disable row i (0-based)
+// Joystick row is the second O-row in CONF_STR (index 1), so bit 1 will gray it when set.
+wire  [15:0] status_menumask;
 wire  [10:0] ps2_key;
 wire  [31:0] joystick_0, joystick_1;
 wire  [15:0] joystick_l_analog_0, joystick_r_analog_0;
@@ -284,6 +287,7 @@ hps_io #(.CONF_STR(CONF_STR)) hps_io
 	.status(status),
 	.status_in(status_in),
 	.status_set(status_set),
+	.status_menumask(status_menumask),
 
 	.ps2_key(ps2_key),
 	.joystick_0(joystick_0),
@@ -366,7 +370,8 @@ rcastudioii rcastudio
 	.auto_profile(auto_profile),
 	.players(status[8:7]),
 	.osk_a(osk_a),
-	.osk_b(osk_b)
+	.osk_b(osk_b),
+	.clear_key(clear_key)
 );
 
 ////////////////// Joystick profile -> OSD ///////////////////////////////////
@@ -419,6 +424,10 @@ always @(posedge clk_sys) begin
 		status_set   <= 1'b1;
 	end
 end
+
+// Gray-out the Joystick OSD row when Mapping is set to Auto
+// CONF_STR's O-rows: 0 = Mapping, 1 = Joystick, ... -> mask bit 1 disables (gray) the Joystick row
+assign status_menumask = (!status[6]) ? 16'h0002 : 16'h0000;
 
 assign CLK_VIDEO = clk_sys;
 
