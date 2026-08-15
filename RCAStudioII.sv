@@ -198,17 +198,17 @@ assign BUTTONS = 0;
 
 `include "build_id.v"
 localparam CONF_STR = {
-	"RCA-StudioII;;",
-	"-;",	
-	"F0,rom,Load Bios;",
+	"RCA-StudioII;v2;",
+	"-;",
 	"F1,ST2BINROM,Load Cartridge;",
+	"F0,rom,Load Bios;",
 	"-;",
 	"O[5:2],Joystick,Auto,Cross,Paddle,Space War,Freeway,Bowling,Baseball,Homebrew,Gunfighter;",
 	"O[8:7],Players,Auto,1,2;",
 	"O[10:9],Stick Keypad,Off,Pad A,Pad B;",
 	"-;",
 	"O[122:121],Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
-	"O[6:5],Scale,Normal,V-Integer,Narrower HV-Integer,Wider HV-Integer;",
+	"O[12:11],Scale,Normal,V-Integer,Narrower HV-Integer,Wider HV-Integer;",
 	"-;",
 //	"T[0],Reset;",
 	"T[1],Clear;",
@@ -465,7 +465,7 @@ video_freak video_freak
 	.ARY((!ar) ? 12'd3 : 12'd0),
 	.CROP_SIZE(12'd0),
 	.CROP_OFF(5'd0),
-	.SCALE({1'b0, status[6:5]})
+	.SCALE({1'b0, status[12:11]})
 );
 
 //reg  [26:0] act_cnt;

@@ -175,13 +175,14 @@ never seen, or simply if you prefer different controls.
 unknown, which is what most cartridges use). **Select** is **CLEAR**, the console
 reset — every RCA manual begins "Press CLEAR".
 
-The **Players** OSD setting decides which stick drives keypad B's half of the
-profile. `1` runs everything from gamepad 0 — Space War steers and fires from
-one stick, and a `CROSS` game mirrors the stick onto both pads. `2` gives each
-gamepad its own keypad. `Auto` (default) keeps each profile's natural
-arrangement: the single-player profiles (`SPACEWAR`, `FREEWAY`, `BOWLING`,
-`HOMEBREW`) act as one-player, the symmetric ones (`CROSS`, `PADDLE`,
-`BASEBALL`, `HB2P`) as two.
+The **Players** OSD setting decides which gamepad drives keypad B's half of the
+profile. `1` runs everything from gamepad 0: `SPACEWAR`, `FREEWAY`, `BOWLING`,
+`HOMEBREW`, and `GUNFIGHTER` all act as one-player layouts, with the single
+stick steering or firing from one side. `2` gives each gamepad its own keypad,
+so symmetric profiles like `CROSS`, `PADDLE`, `BASEBALL`, and `HB2P` split
+across pads A and B exactly as the cartridge expects. `Auto` (default) keeps
+the profile's natural arrangement: one-player layouts are treated as one-player,
+while the symmetric layouts stay two-player.
 
 #### Binding any key directly
 
@@ -227,14 +228,14 @@ Regenerate it with `tools/probe-keys.sh`.
 | Concentration Match (Europe) | `any` | `1 2 3 4 5 6 7 8 9` | `1 2 3 4 5 6 7 8` |
 | Demonstration Cartridge (USA) | `any` | — | — |
 | Pinball (Europe) | `1 2` | — | `1` |
-| Speedway + Tag (Europe) | `1 2` | `2 4 8` | `2 4 8` |
+| Speedway + Tag (Europe) | `1 2` | `2 4 6 8` | `2 4 6 8` |
 | Star Wars (Europe) | `1 2 3` | `1 2 3` | `1 2 3` |
 | TV Arcade I - Space War (USA) | `1 3` | `2` | — |
 | TV Arcade II - Fun with Numbers (USA) | `1 2 3` | — | `1 2 3 4 5 6 7 8` |
 | TV Arcade III - Tennis + Squash (USA) | `1 2` | — | `4 5 6` |
 | TV Arcade IV - Baseball (USA) | `0` | — | `2 5 8` |
 | TV Arcade Series - Gunfighter + Moonship Battle (USA, Europe) | `1 2 3` | — | `2 5 8` |
-| TV Arcade Series - Speedway + Tag (USA) | `1 2` | `2 4 8` | `2 4 8` |
+| TV Arcade Series - Speedway + Tag (USA) | `1 2` | `2 4 6 8` | `2 4 6 8` |
 | TV Casino Series - Blackjack (USA) | `1 2` | — | `0` |
 | TV Casino Series - TV Bingo (USA, Europe) | `1 2` | `1` | — |
 | TV Mystic Series - Biorhythm (USA, Europe) | `0` | — | `1 2 3 4 5 6 7 8 0` |
