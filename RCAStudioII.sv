@@ -203,12 +203,12 @@ localparam CONF_STR = {
 	"F0,rom,Load Bios;",
 	"F1,ST2BINROM,Load Cartridge;",
 	"-;",
-O[5:2],Joystick,Auto,Cross,Paddle,Space War,Freeway,Bowling,Baseball,Homebrew,Gunfighter;
-O[8:7],Players,Auto,1,2;
-O[10:9],Stick Keypad,Off,Pad A,Pad B;
--;
-O[122:121],Aspect ratio,Original,Full Screen,[ARC1],[ARC2];
-O[6:5],Scale,Normal,V-Integer,Narrower HV-Integer,Wider HV-Integer;
+	"O[5:2],Joystick,Auto,Cross,Paddle,Space War,Freeway,Bowling,Baseball,Homebrew,Gunfighter;",
+	"O[8:7],Players,Auto,1,2;",
+	"O[10:9],Stick Keypad,Off,Pad A,Pad B;",
+	"-;",
+	"O[122:121],Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
+	"O[6:5],Scale,Normal,V-Integer,Narrower HV-Integer,Wider HV-Integer;",
 	"-;",
 //	"T[0],Reset;",
 	"T[1],Clear;",
