@@ -8,20 +8,20 @@ A MiSTer FPGA core for the **RCA Studio II** (1977) — the RCA CDP1802
 ## Status
 
 Playable. The CDP1802 has the full instruction set the BIOS needs, interrupts
-and DMA, and runs at true machine-cycle timing. The video is a real CDP1861 —
-no frame buffer, fed by DMA through `R(0)` exactly as the hardware does.
+and DMA, and runs at machine-cycle timing. The video is a real CDP1861. No frame buffer, fed by DMA through `R(0)` exactly as the hardware does.
 
-Output is **pixel-identical to a reference emulator on 18 of 21 test frames**.
-The three that differ are memory/dice games whose BIOS-updated RNG seed
-diverges, not rendering faults.
+The beeper and the RTL ST2 cartridge loader are both implemented and used in
+practice. Output is **pixel-identical to a reference emulator on 18 of 21 test
+frames**. The three that differ are memory/dice games whose BIOS-updated RNG
+seed diverges, not rendering faults.
 
-Not yet implemented: full **memory decode/mirroring**, and PAL.
+Still missing: full **memory decode/mirroring**, and PAL.
 
 ## Installing
 
 Copy a release from `releases/` to `/media/fat/_Console/` on your MiSTer.
 
-The BIOS is **not** embedded. Load it from the OSD each boot:
+BIOS is **not** embedded. Name it `boot.rom` and place it in `/media/fat/games/`, or load it manually from the OSD.
 
 | OSD slot | File | Loads at |
 |----------|------|----------|
@@ -33,8 +33,8 @@ The core is held in reset until a BIOS is loaded.
 
 ## Controls
 
-The Studio II has two 10-key keypads. The left one is keypad A (read through
-`EF3`), the right is kaypad B (`EF4`); software scans them by writing the key
+The Studio II has two 10-key keypads. Keypad A is on the left (read through
+`EF3`), the right is keypad B (`EF4`); software scans them by writing the key
 number to `OUT 2` and testing the flags — see `docs/keyboard.txt`.
 
 Each keypad is laid out on the host keyboard the way it sits on the console —

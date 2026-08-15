@@ -9,19 +9,20 @@ Guidance for working in this repo. Read this before changing RTL.
 A MiSTer FPGA core for the **RCA Studio II** (1977), an RCA CDP1802 ("COSMAC")
 based console with CDP1861 "Pixie" video.
 
-Originally written by **Jason Coombes** (JasonA-dev) from June 2022, with MiSTer
-framework integration by **Flandango**. The 2026 interrupt/DMA/timing and video
-work is by **Alan Steremberg**; the 2026 controller/profile work, 3x4 input
-layout, and the OSD/config tuning are by **Elle Ball**. Credit for the
-emulators and hardware references this core is built and checked against is in
-§11 — read it before assuming any timing number here was derived from first
-principles.
+This repo continues and extends earlier work by **Jason Coombes** (original
+core), **Flandango** (MiSTer integration), **Alan Steremberg** (2026 CPU/video
+and DMA timing work), and **Elle Ball** (2026 controller/profile and input
+layout work). The current playable core is a collaborative continuation of that
+foundation, not a rewrite from scratch. Credit for the emulators and hardware
+references this core is built and checked against is in §11 — read it before
+assuming any timing number here was derived from first principles.
 
 **State of the core: playable.** The CPU has the full instruction set the BIOS
 needs, interrupts and DMA; the video is a real CDP1861 driven by DMA, not a RAM
 scraper. Frames are **pixel-identical to the reference emulator on 18 of 21**
 test cases (§9), the built-in BIOS games and controller profiles are in place,
-and the core builds clean in Quartus with timing closed (§4).
+the beeper and RTL ST2 loader are implemented, and the core builds clean in
+Quartus with timing closed (§4).
 
 Recent additions that matter for day-to-day use include the OSD-managed joystick
 profile system, the wider 4-bit override path, the default 8-way profile,
@@ -29,8 +30,7 @@ Gunfighter/8-way/Doodles special cases, the unmapped profile for digit-entry
 software, and config-versioning so old saved menu state does not silently map to
 the wrong fields.
 
-What is still missing: **sound** (`Q` is unused), the **ST2 cartridge loader**
-in RTL, proper **memory decode/mirroring**, and PAL. See §6.
+What is still missing: proper **memory decode/mirroring** and **PAL**. See §6.
 
 Licence: GPL-2.0-or-later (file headers). Note `rtl/reference/cosmac.vhdl` and
 its translation `rtl/cosmac.v` are Eric Smith's GPL-3.0 code — compatible with
@@ -559,14 +559,14 @@ garbage.
 
 ## 12. Credit where it is due
 
-The core is Jason Coombes' (JasonA-dev, June 2022 - March 2025) — the first
-CDP1802 and CDP1861 Verilog, the keypad, the memory map and the Verilator
-harness. Flandango did the MiSTer framework integration and early Pixie work.
-Alan Steremberg did the 2026 interrupt/DMA/timing/video correctness work, and
-Elle Ball contributed the 2026 controller profile work, 3x4 keypad layout, and
-OSD/config refinements. Everything in §10 is a modification of their design, not
-a rewrite from scratch: the module boundaries, the `files.qip` layout and the
-sim structure are theirs.
+This project builds on earlier work by Jason Coombes (JasonA-dev, June 2022 -
+March 2025), who created the original CDP1802 and CDP1861 Verilog, the keypad
+scheme, the memory map, and the initial Verilator harness. Flandango handled
+MiSTer framework integration and early Pixie work. Alan Steremberg and Elle Ball
+carried the later 2026 timing, video, controller/profile, and OSD work that
+brought the core to its current playable state. The module boundaries,
+`files.qip` layout, and sim structure remain recognisably theirs; this repo is
+an extension of that work, not a claim of sole authorship.
 
 The accuracy work depends entirely on other people's emulators:
 
