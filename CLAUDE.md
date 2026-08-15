@@ -11,14 +11,23 @@ based console with CDP1861 "Pixie" video.
 
 Originally written by **Jason Coombes** (JasonA-dev) from June 2022, with MiSTer
 framework integration by **Flandango**. The 2026 interrupt/DMA/timing and video
-work is by **Alan Steremberg**. Credit for the emulators and hardware references
-this core is built and checked against is in §11 — read it before assuming any
-timing number here was derived from first principles.
+work is by **Alan Steremberg**; the 2026 controller/profile work, 3x4 input
+layout, and the OSD/config tuning are by **Elle Ball**. Credit for the
+emulators and hardware references this core is built and checked against is in
+§11 — read it before assuming any timing number here was derived from first
+principles.
 
 **State of the core: playable.** The CPU has the full instruction set the BIOS
 needs, interrupts and DMA; the video is a real CDP1861 driven by DMA, not a RAM
 scraper. Frames are **pixel-identical to the reference emulator on 18 of 21**
-test cases (§9), and the core builds clean in Quartus with timing closed (§4).
+test cases (§9), the built-in BIOS games and controller profiles are in place,
+and the core builds clean in Quartus with timing closed (§4).
+
+Recent additions that matter for day-to-day use include the OSD-managed joystick
+profile system, the wider 4-bit override path, the default 8-way profile,
+Gunfighter/8-way/Doodles special cases, the unmapped profile for digit-entry
+software, and config-versioning so old saved menu state does not silently map to
+the wrong fields.
 
 What is still missing: **sound** (`Q` is unused), the **ST2 cartridge loader**
 in RTL, proper **memory decode/mirroring**, and PAL. See §6.
@@ -294,9 +303,16 @@ Split ROM / cart / RAM with the documented mirroring and add the `$0A00-$0BFF`,
 `$0C00-$0DFF` and `$0E00-$0FFF` cartridge windows.
 
 ### 7.2 Polish
-PAL option, embedded BIOS.
+PAL option, embedded BIOS, and any final top-level cleanup around default OSD
+behaviour and naming consistency.
 
-### 7.3 Keep the comparison green
+### 7.3 Controller/profile parity
+The profile system is intentionally explicit and tested across the common
+cartridges, but every new title is still a chance to discover a missing special
+case. Keep the profile table and the solid defaults (8-way / Doodles /
+Gunfighter) aligned with the actual manuals and the reference emulator.
+
+### 7.4 Keep the comparison green
 Any RTL change should be re-checked against the reference emulator (§9) before
 committing. The regression is cheap — a few seconds per cartridge.
 
@@ -546,8 +562,11 @@ garbage.
 The core is Jason Coombes' (JasonA-dev, June 2022 - March 2025) — the first
 CDP1802 and CDP1861 Verilog, the keypad, the memory map and the Verilator
 harness. Flandango did the MiSTer framework integration and early Pixie work.
-Everything in §10 is a modification of their design, not a rewrite from scratch:
-the module boundaries, the `files.qip` layout and the sim structure are theirs.
+Alan Steremberg did the 2026 interrupt/DMA/timing/video correctness work, and
+Elle Ball contributed the 2026 controller profile work, 3x4 keypad layout, and
+OSD/config refinements. Everything in §10 is a modification of their design, not
+a rewrite from scratch: the module boundaries, the `files.qip` layout and the
+sim structure are theirs.
 
 The accuracy work depends entirely on other people's emulators:
 

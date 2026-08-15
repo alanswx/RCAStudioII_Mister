@@ -495,11 +495,14 @@ CPU instruction tracing and VRAM dumps — see `--help`.
   on.
 - **Flandango** ([@Flandango](https://github.com/Flandango)) — MiSTer framework
   compatibility and early Pixie video work (September 2022).
-- **Elle Ball** ([@meauxdal](https://github.com/meauxdal)) — the 3x4 keypad
-  layout, so the host keys sit the way the console's keypads do (August 2026).
 - **Alan Steremberg** ([@alanswx](https://github.com/alanswx)) — 1802
   interrupts, DMA and machine-cycle timing; the DMA-driven CDP1861; the
-  reference-emulator comparison harness (August 2026).
+  reference-emulator comparison harness; and the 2026 timing/video work that
+  brought the core to its current playable state (August 2026).
+- **Elle Ball** ([@meauxdal](https://github.com/meauxdal)) — the 3x4 keypad
+  layout, the expanded modern joystick profile system, and the 2026 OSD/profile
+  work for Gunfighter, 8-way, Doodles/Patterns, default profile tuning, and
+  config compatibility checks (August 2026).
 
 ### Emulators and hardware references
 
