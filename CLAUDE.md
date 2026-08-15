@@ -428,6 +428,37 @@ cartridges including an RCA test cart.
 
 ## 10. What changed
 
+### 2026-08-15 — DMA honoured at instruction boundaries only (the real flicker)
+
+There are two builds of Paul Robson's Invaders in circulation; the one in
+`software/` runs clean, the other (user library, 756/1024 payload bytes differ)
+blanked 26 of every 28 frames in this core while MAME ran it clean. The chain:
+the game waits on the ISR frame counter in a 6-cycle loop, so the interrupt
+entry phase drifts each frame; the CPU was inserting the 1861's DMA burst
+*mid-instruction* (between S0 and S1), which for some phases put the burst one
+machine cycle early relative to the BIOS ISR's cycle-counted `PLO R0/SEX/DEC`
+display loop — its `GLO R0` then sampled the row pointer before the line's
+burst instead of after, R(0) rewound to $0900 every line, and the frame showed
+whatever was at $0900 for a frame the game never drew into. VRAM was fine the
+whole time.
+
+A real 1802 honours DMA and interrupts only *between* instructions
+(`rtl/reference/cosmac.vhdl` `state_fetch` → always `state_execute`; MAME's
+cosmac does the same). Fixed in `rtl/cdp1802.v` (FETCH no longer yields to DMA;
+`resume_exec` deleted) with the matching 1861 change: `DMAO` now stays asserted
+until its 8 cycles are actually serviced rather than for a positional window,
+dropping at the 7th acknowledge because the CPU commits one more cycle after
+the request falls — holding it a cycle longer ran 9 cycles/line and R(0)
+drifted +1 a line (Doodles lost its dot; that is the symptom to check).
+
+Verified: the whole corpus — 5 built-ins, 8 homebrews in both formats — is
+**pixel-identical to the pre-fix RTL** at the test frames, the memory-decode
+directed test passes, and the second Invaders build goes from 328 blank frames
+of 540 to zero, matching MAME. Diagnosed with three new headless-sim tools:
+`--trace-r0` (per-scanline R0/DMAO/INT), `--trace-cyc FROM:TO` (per-machine-
+cycle state/register-writeback), and `--swap FILE@FRAME` (mid-run cartridge
+load, like an OSD swap).
+
 ### 2026-08-15 (OSD shows the detected profile)
 
 **"Auto" is gone from the Joystick list.** It was a value inside the profile

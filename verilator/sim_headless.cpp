@@ -406,6 +406,8 @@ static void usage(const char* argv0) {
 "                         27:18 B0..B9) at frame F for H frames.\n"
 "    --joy2 MASK@F[:H]    same, joystick 1\n"
 "    --players N          OSD Players setting: 0 auto, 1 one player, 2 two\n"
+"    --swap FILE@FRAME    download another cartridge at frame F, like an OSD\n"
+"                         load while the machine is running\n"
 "    --press KEY@F[:H]    press KEY at frame F, hold H frames (default 4).\n"
 "                         KEY is a0..a9 (player A) or b0..b9 (player B),\n"
 "                         or a raw hex PS/2 scancode like 0x16.\n"
@@ -446,9 +448,12 @@ int main(int argc, char** argv) {
     bool want_ppm = false, want_ascii = false, want_vram = false;
     bool shot_last = false, frame_log = false, quiet = false;
     long trace_cpu = 0, trace_from = 0;
+    bool trace_r0 = false;
+    unsigned long long trace_cyc_from = 0, trace_cyc_to = 0;
     bool trace_q = false;
     uint32_t joy_mask = 0; long joy_from = -1, joy_to = -1;
     uint32_t joy2_mask = 0; long joy2_from = -1, joy2_to = -1;
+    std::string swap_file; long swap_frame = -1; bool swap_done = false;
     uint8_t  joy_override = 0;   // applied once top exists
     bool     joy_manual   = false;
     uint8_t  players_mode = 0;
@@ -477,6 +482,13 @@ int main(int argc, char** argv) {
         else if (a == "--shot")       parse_list(next("--shot"), shots);
         else if (a == "--dump")       parse_list(next("--dump"), dumps);
         else if (a == "--trace-cpu")  trace_cpu = atol(next("--trace-cpu"));
+        else if (a == "--trace-r0")   trace_r0 = true;
+        else if (a == "--trace-cyc") {
+            std::string t = next("--trace-cyc");   // FROM:TO in sim time
+            size_t co = t.find(':');
+            trace_cyc_from = strtoull(t.c_str(), nullptr, 0);
+            trace_cyc_to = (co != std::string::npos) ? strtoull(t.c_str()+co+1, nullptr, 0) : trace_cyc_from + 4000;
+        }
         else if (a == "--trace-from") trace_from = atol(next("--trace-from"));
         else if (a == "--shot-every") shot_every = atoi(next("--shot-every"));
         else if (a == "--dump-every") dump_every = atoi(next("--dump-every"));
@@ -503,6 +515,13 @@ int main(int argc, char** argv) {
             joy2_from = atol(rest.c_str()); joy2_to = joy2_from + hold;
         }
         else if (a == "--players")    players_mode = (uint8_t)atoi(next("--players"));
+        else if (a == "--swap") {
+            std::string t = next("--swap");
+            size_t at = t.rfind('@');
+            if (at == std::string::npos) { fprintf(stderr,"error: --swap needs FILE@FRAME\n"); exit(1); }
+            swap_file = t.substr(0, at);
+            swap_frame = atol(t.c_str() + at + 1);
+        }
         else if (a == "--joy-map") { joy_override = (uint8_t)atoi(next("--joy-map")); joy_manual = true; }
         else if (a == "--trace-q")    trace_q = true;
         else if (a == "--frame-log")  frame_log = true;
@@ -581,6 +600,11 @@ int main(int argc, char** argv) {
     while (fg.frame <= frames && cycles < max_cycles && !Verilated::gotFinish()) {
 
         // --- rising edge ---
+        if (!swap_done && swap_frame >= 0 && fg.frame >= swap_frame) {
+            io.add(swap_file, 1);
+            io.finished = false;
+            swap_done = true;
+        }
         io.tick();
         top->joystick_0 = (fg.frame >= joy_from && fg.frame < joy_to) ? joy_mask : 0;
         top->joystick_1 = (fg.frame >= joy2_from && fg.frame < joy2_to) ? joy2_mask : 0;
@@ -621,6 +645,31 @@ int main(int argc, char** argv) {
                        CPU(IE), CPU(Q), CPU(EF));
                 if (--trace_cpu == 0) printf("[trace-cpu limit reached]\n");
             }
+        }
+
+        // Machine-cycle trace: one line per cpu_ce, in a time window.
+        if (trace_cyc_from && main_time >= trace_cyc_from && main_time < trace_cyc_to) {
+            if (RS(cpu_ce)) {
+                static const char* SN[] = {"RESET","FETCH","EXEC","EX3","B2","B3","SKIP","DMAI","DMAO","INTR","IDLE"};
+                int st = CPU(state);
+                printf("cyc %08llu st=%-5s Ra=%X Rwd=%04X R0=%04X R1=%04X dmao=%d v=%d h=%d sc=%d\n",
+                       (unsigned long long)main_time, st<=10?SN[st]:"?",
+                       (int)((CPU(action)>>2)&0xF), (int)CPU(Rwd), CPU(R)[0], CPU(R)[1],
+                       (int)PIX(DMAO), (int)PIX(vcount), (int)PIX(hcount), (int)CPU(SC));
+            }
+        }
+
+        // Per-scanline R0 trace: one line per HSync, while enabled.
+        if (trace_r0 && fg.frame >= trace_from) {
+            static bool prev_hs2 = false;
+            bool hs = top->VGA_HS;
+            if (hs && !prev_hs2)
+                printf("%08llu line f=%ld v=%3d R0=%04X dmao=%d int=%d efx=%d de=%d\n",
+                       (unsigned long long)main_time,
+                       fg.frame, (int)PIX(vcount), CPU(R)[0],
+                       (int)PIX(DMAO), (int)PIX(INT), (int)PIX(EFx),
+                       (int)RS(pixie_video__DOT__cdp1861__DOT__display_enabled));
+            prev_hs2 = hs;
         }
 
         // Sample video on the rising edge (ce_pix is tied high in sim.v)
