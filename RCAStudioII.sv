@@ -201,7 +201,7 @@ localparam CONF_STR = {
 	"RCA-StudioII;v3;",
 	"-;",
 	"F1,ST2BINROM,Load Cartridge;",
-	"F0,ROM,Load Firmware;",
+	"F0,BINROM,Load Firmware;",
 	"-;",
 	// Mapping picks who owns the Joystick row below it. On Auto the core drives
 	// that row: it writes the profile it detected back into the menu through
