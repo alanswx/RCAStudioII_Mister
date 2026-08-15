@@ -32,8 +32,8 @@ The core is held in reset until a BIOS is loaded.
 
 ## Controls
 
-The Studio II has two 10-key keypads. The left one is player A (read through
-`EF3`), the right is player B (`EF4`); software scans them by writing the key
+The Studio II has two 10-key keypads. The left one is keypad A (read through
+`EF3`), the right is kaypad B (`EF4`); software scans them by writing the key
 number to `OUT 2` and testing the flags — see `docs/keyboard.txt`.
 
 Each keypad is laid out on the host keyboard the way it sits on the console —
@@ -49,8 +49,8 @@ a 3x4 block — so the shapes match rather than the digits:
 
 | Keypad key | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 0 |
 |---|---|---|---|---|---|---|---|---|---|---|
-| **Player A** | `1` | `2` | `3` | `Q` | `W` | `E` | `A` | `S` | `D` | `X` |
-| **Player B** | `7` | `8` | `9` | `U` | `I` | `O` | `J` | `K` | `L` | `,` |
+| **Keypad A** | `1` | `2` | `3` | `Q` | `W` | `E` | `A` | `S` | `D` | `X` |
+| **Keypad B** | `7` | `8` | `9` | `U` | `I` | `O` | `J` | `K` | `L` | `,` |
 
 **CLEAR** — the console reset button every manual asks for — is **F3**, or
 **Clear** in the OSD.
@@ -172,7 +172,7 @@ get reused during play (`A5` rolls the ball in Bowling):
 | Patterns | `A2` | `CROSS` |
 | Freeway | `A3` | `FREEWAY` |
 | Bowling | `A4` | `BOWLING` |
-| Addition | `A5` | `Unmapped` — the answers are digits |
+| Addition | `A5` | `UNMAPPED` — the answers are digits |
 
 #### Overriding it
 
@@ -198,7 +198,7 @@ profile. `1` runs everything from gamepad 0: `SPACEWAR`, `FREEWAY`, `BOWLING`,
 `HOMEBREW`, `GUNFIGHTER`, and `8WAY` all act as one-player layouts, with the
 single stick steering or firing from one side. `2` gives each gamepad its own
 keypad, so symmetric profiles like `CROSS`, `PADDLE`, `BASEBALL`, and `HB2P`
-split across pads A and B exactly as the cartridge expects. `Auto` (default)
+split across pads A and B exactly as the cartridge expects. `AUTO` (default)
 keeps the profile's natural arrangement: one-player layouts are treated as
 one-player, while the symmetric layouts stay two-player.
 
