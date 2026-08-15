@@ -144,12 +144,17 @@ wire line_displayed = (vcount >= DISPLAY_START) && (vcount < DISPLAY_END);
 // ---------------------------------------------------------------------------
 // DMA request and byte capture
 // ---------------------------------------------------------------------------
-// The request stays up until 8 cycles have actually been serviced on this line, rather than for a
-// fixed slice of the line. That matters: R(0) advances by 8 per displayed line, and the Studio II
-// ISR re-points it for each of the 4 scanlines in a group. Tying the request to a fixed window let
-// the CPU miss cycles when it was mid-instruction (865 of the 1024 bytes a frame), so R(0) drifted
-// and ended up reading unmapped space instead of display RAM.
-assign DMAO = display_enabled && line_displayed && (hcount >= DMA_START) && (hcount < DMA_END);
+// The request stays up until 8 cycles have actually been serviced on this line,
+// not for a fixed slice of it. The CPU only honours DMA between instructions
+// (see cdp1802.v FETCH), so the burst can begin up to a few machine cycles
+// after the request; a positional window would then cut the burst short and
+// R(0) would fall behind the display.
+// Drop the request at the 7th acknowledge: the CPU commits one more DMA cycle
+// after the request falls (the state decision samples DMAO before the count
+// updates), which is what delivers the 8th byte. Holding it through the 8th
+// ack ran a 9th cycle -- R(0) then advanced by 9 a line and the ISR's
+// rewind-by-8 arithmetic unravelled.
+assign DMAO = display_enabled && line_displayed && (hcount >= DMA_START) && (dma_cnt < 4'd7);
 
 reg  [7:0] linebuf [0:7];   // filled by DMA during this line, shown 8 pixels behind
 reg  [3:0] dma_cnt;
@@ -162,9 +167,10 @@ always @(posedge clk) begin
         if (ce_pix && (hcount == PIXELS_PER_LINE - 1)) begin
             dma_cnt <= 4'd0;                          // new line, refill from byte 0
         end
-        // Latch on the CPU's DMA state code alone. Gating on DMAO too dropped the last byte
-        // of each line: that cycle completes one machine cycle after the request window shuts.
-        if (cpu_ce && (SC == 2'b10)) begin            // the CPU acknowledged with a DMA cycle
+        // Latch on the CPU's DMA state code alone -- the acknowledging cycle
+        // completes one machine cycle after the request drops, so gating on
+        // DMAO here would lose the last byte of the line.
+        if (cpu_ce && (SC == 2'b10) && (dma_cnt < 4'd8)) begin
             linebuf[dma_cnt[2:0]] <= data_in;
             dma_cnt   <= dma_cnt + 4'd1;
         end

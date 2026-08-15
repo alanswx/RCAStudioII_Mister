@@ -127,7 +127,6 @@ module cdp1802 (
   reg   [7:0] D;                  // data register (accumulator)
   reg         DF;                 // data flag (ALU carry)
   reg   [7:0] B;                  // used for hi-byte of long branch
-  reg         resume_exec;        // a DMA burst stole a cycle before this instruction's S1
   wire  [3:0] I, N;               // the current instruction
 
 
@@ -184,7 +183,15 @@ module cdp1802 (
   // state_n is assigned on every path: leaving DMA_IN/DMA_OUT unassigned inferred a latch.
   always @*
     case (state)
-    FETCH:      state_n = (dma_in_req | dma_out_req) ? next_cycle : EXECUTE;
+    // A real 1802 honours DMA only between instructions -- fetch always
+    // proceeds to its execute (reference: cosmac.vhdl state_fetch, and MAME's
+    // cosmac). Stealing cycles between S0 and S1 shifted the DMA burst one
+    // machine cycle early relative to the instruction stream, which broke the
+    // BIOS ISR's cycle-counted display loop for some interrupt-entry phases:
+    // its GLO R0 sampled the row pointer before the line's burst instead of
+    // after, so R(0) never advanced and whole frames went dark (the homebrew
+    // "flicker", diagnosed on Space Invaders rev 2).
+    FETCH:      state_n = EXECUTE;
     EXECUTE:
       casez ({I, N})
       8'h00:    state_n = IDLE;                       // IDL: hold until DMA or interrupt
@@ -194,10 +201,8 @@ module cdp1802 (
     BRANCH3:    state_n = next_cycle;
     SKIP:       state_n = next_cycle;
     IDLE:       state_n = (next_cycle == FETCH) ? IDLE : next_cycle;
-    // After a DMA burst, resume the execute cycle we stole it from, if any.
     DMA_IN,
-    DMA_OUT:    state_n = (dma_in_req | dma_out_req) ? next_cycle :
-                          resume_exec                ? EXECUTE    : next_cycle;
+    DMA_OUT:    state_n = next_cycle;
     INTERRUPT:  state_n = FETCH;
     default:    state_n = FETCH;
     endcase
@@ -346,7 +351,6 @@ module cdp1802 (
         T     <= 8'd0;
         IE    <= 1'b1;
         IR    <= 8'd0;
-        resume_exec <= 1'b0;
         R[0]  <= 16'd0;
         state <= RESET;
       end
@@ -358,11 +362,8 @@ module cdp1802 (
       // instructions per frame than a real Studio II (CLAUDE.md 6.1/7.3).
       if (WAIT_N && clk_enable) begin
         state <= state_n;
-        if (state == FETCH) begin
+        if (state == FETCH)
           IR <= ram_q;                                  // opcode for the coming EXECUTE
-          resume_exec <= (dma_in_req | dma_out_req);    // owe an EXECUTE after the burst
-        end
-        else if (state == EXECUTE) resume_exec <= 1'b0;
         if (state == EXECUTE && !((I == 4'h7) && (N[3:1] == 3'b000)))
           {Q, P, X} <= {Q_n, P_n, X_n};
         R[Ra] <= Rwd;
