@@ -518,16 +518,15 @@ wire [9:0] start_keys       = ((profile != MAP_CLEAR_ONLY) && start_press) ? (10
 // like CROSS across both pads. DOODLES and PADDLE are permanently B-only one-player
 // profiles, so gamepad 0 drives them regardless of Players. The explicit Clear-only
 // profile stays quiet unless the user binds a direct A/B key manually.
-wire [9:0] joyA = ((profile == MAP_CLEAR_ONLY) ? 10'd0
-                : ((profile == MAP_8WAY) && one_player) ? 10'd0
+wire [9:0] joyA = ((profile == MAP_UNMAPPED) ? 10'd0
                 : ((profile == MAP_GUNFIGHTER) && one_player) ? 10'd0
                 : ((profile == MAP_DOODLES) ? 10'd0
                                           : ((profile == MAP_GUNFIGHTER) ? map_padA(MAP_CROSS, joystick_0)
                                                                         : map_padA(profile, joystick_0))));
-wire [9:0] joyB = ((profile == MAP_CLEAR_ONLY) ? 10'd0
-                : ((profile == MAP_8WAY) && one_player) ? map_padB(MAP_8WAY, joystick_0)
+
+wire [9:0] joyB = ((profile == MAP_UNMAPPED) ? 10'd0
                 : ((profile == MAP_GUNFIGHTER) && one_player) ? map_padB(MAP_CROSS, joystick_0)
-                : (((profile == MAP_DOODLES) || (profile == MAP_PADDLE)) ? map_padB(profile, joystick_0)
+                : ((profile == MAP_DOODLES) ? map_padB(MAP_DOODLES, joystick_0)
                                           : ((profile == MAP_GUNFIGHTER) ? map_padB(MAP_CROSS, joystick_1)
                                                                         : (one_player ? map_padB(profile, joystick_0)
                                                                                        : map_padB(profile, joystick_1)))));
