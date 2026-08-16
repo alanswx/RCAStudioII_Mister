@@ -664,9 +664,9 @@ int main(int argc, char** argv) {
             static bool prev_hs2 = false;
             bool hs = top->VGA_HS;
             if (hs && !prev_hs2)
-                printf("%08llu line f=%ld v=%3d R0=%04X dmao=%d int=%d efx=%d de=%d\n",
+                printf("%08llu line f=%ld v=%3d R0=%04X pc=%04X dmao=%d int=%d efx=%d de=%d\n",
                        (unsigned long long)main_time,
-                       fg.frame, (int)PIX(vcount), CPU(R)[0],
+                       fg.frame, (int)PIX(vcount), CPU(R)[0], CPU(R)[CPU(P)],
                        (int)PIX(DMAO), (int)PIX(INT), (int)PIX(EFx),
                        (int)RS(pixie_video__DOT__cdp1861__DOT__display_enabled));
             prev_hs2 = hs;

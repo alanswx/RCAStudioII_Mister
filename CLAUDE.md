@@ -434,6 +434,30 @@ cartridges including an RCA test cart.
 
 ## 10. What changed
 
+### 2026-08-15 — the Invaders-rev-1 vertical wobble is the game's own dirty redraw
+
+The 2000-build Space Invaders (the library copy; NOT the clean 2013 rebuild in
+software/) shows a 1-row vertical wobble with a small fragment at the top of
+the screen, in ~14-frame runs. Full diagnosis, because it looks exactly like a
+core bug and is not:
+
+- VRAM at every frame boundary is identical and clean across both phases
+  (dump 140-145, --vram). The fragment exists only *during* the game's tick --
+  drawn and erased mid-tick -- and R0/DMA per-line traces are byte-identical
+  across wobble and clean frames. The display path is exonerated.
+- The tick (~1750 instructions) always spans two frames' game windows (893
+  instructions each, part of the hardware-true 1321/frame), so the display
+  interrupt always samples a mid-tick moment. Whether that moment lands inside
+  the dirty interval depends on sub-frame phase and march direction; MAME's
+  equally arbitrary phase happens to miss it, ours happens to hit it. The 2013
+  rebuild never shows it in either. Chasing MAME's phase (e.g. moving our DMA
+  window origin) would risk the pixel-locked corpus to hide one legacy build's
+  authored marginality; don't.
+
+Diagnosed with --trace-r0 (which now also prints the PC per scanline) plus
+--vram boundary dumps. If someone reports "Invaders bounces", first ask which
+md5 they are running: 4edb3371... is the clean rebuild, 350e8332... wobbles.
+
 ### 2026-08-15 — the Cx row decoded as all-long-branch (Race), and Elle's list
 
 Elle's problem list was Combat, Hockey, Scramble, Race. Triage against MAME:
