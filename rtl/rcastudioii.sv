@@ -445,8 +445,8 @@ function automatic [9:0] map_padB(input [3:0] prof, input [31:0] j);
 			if (j[4]) k[0] = 1'b1;
 		end
 		MAP_CLEAR_ONLY: ;                   // no controller presses: the on-screen keypad
-											  // and keyboard still work, but the stick stays quiet
-		MAP_GUNFIGHTER: begin                // 2P behaves like CROSS; Auto/1P uses the
+											// and keyboard still work, but the stick stays quiet
+		MAP_GUNFIGHTER: begin               // 2P behaves like CROSS; Auto/1P uses the
 			if (j[3]) k[2] = 1'b1;   if (j[2]) k[8] = 1'b1;   // right-hand B-only mapping
 			if (j[1]) k[4] = 1'b1;   if (j[0]) k[6] = 1'b1;
 			if (j[4]) k[5] = 1'b1;
@@ -513,18 +513,19 @@ wire       start_press = joystick_0[6] | joystick_1[6];
 wire [3:0] active_start_key = ((profile == MAP_GUNFIGHTER) || (profile == MAP_DOODLES) || (profile == MAP_8WAY)) ? 4'd1 : start_key;
 wire [9:0] start_keys       = ((profile != MAP_CLEAR_ONLY) && start_press) ? (10'd1 << active_start_key) : 10'd0;
 
-// Gunfighter and 8WAY are the special cases: in Auto/1P they are B-only (2/4/6/8 +
-// 5 + 0 on the right-hand pad) or 8-way on the B side, while in 2P they split exactly
-// like CROSS across both pads. DOODLES and PADDLE are permanently B-only one-player
-// profiles, so gamepad 0 drives them regardless of Players. The explicit Clear-only
-// profile stays quiet unless the user binds a direct A/B key manually.
-wire [9:0] joyA = ((profile == MAP_UNMAPPED) ? 10'd0
+// Gunfighter is the special case: in Auto/1P it is B-only (2/4/6/8 + 5 + 0 on
+// the right-hand pad), while in 2P it splits exactly like CROSS across both
+// pads. DOODLES and PADDLE are permanently B-only one-player profiles, so
+// gamepad 0 drives them regardless of Players. 8WAY follows the normal CROSS
+// path (A-side in 1P). The explicit Clear-only profile stays quiet unless the
+// user binds a direct A/B key manually.
+wire [9:0] joyA = ((profile == MAP_NONE) ? 10'd0
                 : ((profile == MAP_GUNFIGHTER) && one_player) ? 10'd0
                 : ((profile == MAP_DOODLES) ? 10'd0
                                           : ((profile == MAP_GUNFIGHTER) ? map_padA(MAP_CROSS, joystick_0)
                                                                         : map_padA(profile, joystick_0))));
 
-wire [9:0] joyB = ((profile == MAP_UNMAPPED) ? 10'd0
+wire [9:0] joyB = ((profile == MAP_NONE) ? 10'd0
                 : ((profile == MAP_GUNFIGHTER) && one_player) ? map_padB(MAP_CROSS, joystick_0)
                 : ((profile == MAP_DOODLES) ? map_padB(MAP_DOODLES, joystick_0)
                                           : ((profile == MAP_GUNFIGHTER) ? map_padB(MAP_CROSS, joystick_1)

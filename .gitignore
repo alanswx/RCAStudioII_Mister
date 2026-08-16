@@ -60,3 +60,6 @@ output_files/
 
 # hardware capture videos used for accuracy checks (large, local reference)
 refvideo/
+/dse
+RCAStudioII.dse
+dse_local_job_24632.log
