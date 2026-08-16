@@ -90,19 +90,30 @@ localparam EFX_BOT_START     = DISPLAY_END   - 4;     // 204
 localparam DMA_START         = 16;
 localparam DMA_END           = DMA_START + 64;        // 80  (8 machine cycles)
 // The CPU sees the request at the machine-cycle boundary *before* it can run the DMA cycle, so
-// byte 0 is only latched at hcount 31 (the DMA cycle spans 24..31). Displaying from 24 showed the
-// previous line's bytes, which put the whole image one scanline late and wrapped the bottom row.
-localparam ACTIVE_START      = DMA_START + 16;        // 32  (two machine cycles behind the request)
-localparam ACTIVE_END        = ACTIVE_START + 64;     // 96
+// the earliest burst latches byte 0 at hcount 31 (DMA cycle 24..31). But the burst phase is set
+// by the ISR's cycle-counted preamble, and interrupt entry lands 0 or 1 machine cycle late
+// depending on which instruction the main program was in when INT asserted -- so byte 0 arrives
+// at hcount 31 on some frames and 39 on others, for the same software. Reading the line buffer
+// at 32+8k only tolerated the early phase: on late frames every slot was read 8 pixels before
+// its byte landed, so each line replayed the previous line's buffer -- the picture dropped one
+// scanline and the top line showed the previous frame's bottom row (Robson's 2000-build
+// Invaders wobbled vertically every ~14 frames as its wait loop drifted across the two phases).
+// Reading at 40+8k accepts both phases with identical output. The real 1861 shifts bytes out as
+// DMA delivers them, so on hardware the late phase is an 8-pixel horizontal nudge a CRT hides;
+// holding a fixed window one cycle later gives the same tolerance without the jitter.
+localparam ACTIVE_START      = DMA_START + 24;        // 40  (three machine cycles behind the request)
+localparam ACTIVE_END        = ACTIVE_START + 64;     // 104
 // The shifter is aligned to the 8-pixel byte boundaries above; the visible window is tuned
 // separately so byte 0's first pixel lands on the first visible column.
 localparam DE_START          = ACTIVE_START;
 localparam DE_END            = DE_START + 64;
 
-// HSync must sit in the blanking interval. At 84..92 it overlapped the active window (which ends
-// at 92), so the line's column counter reset mid-picture and the image came out rotated.
-localparam HSYNC_START       = 100;
-localparam HSYNC_END         = 108;
+// HSync must sit in the blanking interval. At 84..92 it overlapped the active window, so the
+// line's column counter reset mid-picture and the image came out rotated. With the active
+// window now ending at 104 (last pixel out at 104), only 105..111 is left free -- a 7-pixel
+// HSync, ~4.0us at this dot clock, close enough to NTSC's 4.7us.
+localparam HSYNC_START       = 105;
+localparam HSYNC_END         = 112;
 localparam VSYNC_START       = 254;
 localparam VSYNC_END         = 258;
 
@@ -189,7 +200,7 @@ always @(posedge clk) begin
         if (in_active) begin
             // Reload on each 8-pixel boundary inside the active window.
             if (hcount[2:0] == 3'd0)
-                shift_reg <= linebuf[hcount[5:3] - 3'd4];   // ACTIVE_START/8 == 4
+                shift_reg <= linebuf[hcount[5:3] - 3'd5];   // ACTIVE_START/8 == 5
             else
                 shift_reg <= {shift_reg[6:0], 1'b0};
         end

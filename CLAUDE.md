@@ -434,29 +434,48 @@ cartridges including an RCA test cart.
 
 ## 10. What changed
 
-### 2026-08-15 — the Invaders-rev-1 vertical wobble is the game's own dirty redraw
+### 2026-08-15 — the Invaders wobble WAS a core bug: fixed-slot shifter vs ISR entry jitter
 
-The 2000-build Space Invaders (the library copy; NOT the clean 2013 rebuild in
-software/) shows a 1-row vertical wobble with a small fragment at the top of
-the screen, in ~14-frame runs. Full diagnosis, because it looks exactly like a
-core bug and is not:
+**This entry supersedes (and reverses) the earlier "the wobble is the game's
+own dirty redraw" diagnosis from the same day.** That analysis correctly showed
+VRAM clean at every frame boundary and R0 per-line traces identical across
+phases, and wrongly concluded the display path was exonerated. Both
+observations were true and the conclusion still wrong, because the defect
+lived *below* the per-line traces, in sub-line phase:
 
-- VRAM at every frame boundary is identical and clean across both phases
-  (dump 140-145, --vram). The fragment exists only *during* the game's tick --
-  drawn and erased mid-tick -- and R0/DMA per-line traces are byte-identical
-  across wobble and clean frames. The display path is exonerated.
-- The tick (~1750 instructions) always spans two frames' game windows (893
-  instructions each, part of the hardware-true 1321/frame), so the display
-  interrupt always samples a mid-tick moment. Whether that moment lands inside
-  the dirty interval depends on sub-frame phase and march direction; MAME's
-  equally arbitrary phase happens to miss it, ours happens to hit it. The 2013
-  rebuild never shows it in either. Chasing MAME's phase (e.g. moving our DMA
-  window origin) would risk the pixel-locked corpus to hide one legacy build's
-  authored marginality; don't.
+- The 1802 honours interrupts only at instruction boundaries, so the ISR's
+  whole cycle-counted stream lands 0 or 1 machine cycle late depending on
+  which instruction the game's main loop was in when INT asserted. Robson's
+  2000-build Invaders (md5 350e8332...) drifts across both phases in ~14-frame
+  runs; most software sits in one phase forever, which is why 18/21 never saw
+  it.
+- The 1861's DMA burst therefore latches byte k at hcount 31+8k on some frames
+  and 39+8k on others (`--trace-cyc` on line 80 shows it directly). The
+  shifter read the line buffer at fixed 32+8k — one pixel of tolerance — so on
+  late frames every slot was read 8 px before its byte landed and each line
+  displayed the *previous line's* buffer: picture down one scanline, and
+  screen row 0 replaying the previous frame's bottom row ($09F8 = the `# #`
+  fragment). "The bottom line draws at the top" was literal.
+- Fix (rtl/pixie/cdp1861.v): read the buffer one machine cycle later
+  (ACTIVE_START 32→40, DE follows, HSync moved to 105..111 to stay in
+  blanking). Both phases now render identically; the real 1861 shifts bytes
+  out as DMA delivers them, so on silicon the late phase is an 8-px horizontal
+  nudge a CRT hides — the fixed window one cycle later gives the same
+  tolerance with zero jitter. A burst can still theoretically land two cycles
+  late ([40+]); no known software does.
 
-Diagnosed with --trace-r0 (which now also prints the PC per scanline) plus
---vram boundary dumps. If someone reports "Invaders bounces", first ask which
-md5 they are running: 4edb3371... is the clean rebuild, 350e8332... wobbles.
+Verified: A/B old-vs-new RTL over 5 built-ins, 18 retail carts, 15 homebrew
+`.st2` and the 2013 Invaders rebuild — byte-identical everywhere except the
+2000 Invaders (73 of 74 late frames are exactly the old frame shifted up one
+scanline; fragment frames 76→0, topmost content row constant) and **Combat**,
+whose diffs have the same one-scanline-shift signature: Elle's reported Combat
+jitter was this same bug. memdecode test passes. New sim flag `--trace-vwr`
+logs CPU writes to the display page's top/bottom rows with the writing PC
+(`VWR_ALL=1` env widens it to the whole page).
+
+Also learned the hard way: this build starts/restarts on **B0**, not A0 —
+keysend keycode 51 (comma) on the MiSTer, `--press b0@F` in the sims. A0 does
+nothing at the game-over "00000" screen.
 
 ### 2026-08-15 — the Cx row decoded as all-long-branch (Race), and Elle's list
 

@@ -415,6 +415,8 @@ static void usage(const char* argv0) {
 "  Tracing\n"
 "    --trace-cpu N        log the first N instructions executed (PC, opcode, regs)\n"
 "    --trace-from F       only start the CPU trace at frame F\n"
+"    --trace-vwr          log CPU writes to the display page's top/bottom two rows\n"
+"                         with the writing PC (VWR_ALL=1 env: the whole page)\n"
 "\n"
 "  Misc\n"
 "    --trace-q            log every Q (beeper) edge with its frame number\n"
@@ -449,6 +451,7 @@ int main(int argc, char** argv) {
     bool shot_last = false, frame_log = false, quiet = false;
     long trace_cpu = 0, trace_from = 0;
     bool trace_r0 = false;
+    bool trace_vwr = false;
     unsigned long long trace_cyc_from = 0, trace_cyc_to = 0;
     bool trace_q = false;
     uint32_t joy_mask = 0; long joy_from = -1, joy_to = -1;
@@ -483,6 +486,7 @@ int main(int argc, char** argv) {
         else if (a == "--dump")       parse_list(next("--dump"), dumps);
         else if (a == "--trace-cpu")  trace_cpu = atol(next("--trace-cpu"));
         else if (a == "--trace-r0")   trace_r0 = true;
+        else if (a == "--trace-vwr")  trace_vwr = true;
         else if (a == "--trace-cyc") {
             std::string t = next("--trace-cyc");   // FROM:TO in sim time
             size_t co = t.find(':');
@@ -657,6 +661,24 @@ int main(int argc, char** argv) {
                        (int)((CPU(action)>>2)&0xF), (int)CPU(Rwd), CPU(R)[0], CPU(R)[1],
                        (int)PIX(DMAO), (int)PIX(vcount), (int)PIX(hcount), (int)CPU(SC));
             }
+        }
+
+        // VRAM write trace: log CPU writes into the display page's top and
+        // bottom two rows ($0900-$090F, $09F0-$09FF), with the PC that did it.
+        if (trace_vwr && fg.frame >= trace_from) {
+            static bool prev_wr = false;
+            bool wr = RS(cpu_wr) != 0;
+            if (wr && !prev_wr) {
+                unsigned a = RS(ram_a) & 0xFFFF;
+                if (a >= 0x0900 && a <= 0x09FF) {
+                    unsigned off = a & 0xFF;
+                    if (getenv("VWR_ALL") || off < 0x10 || off >= 0xF0)
+                        printf("vwr %08llu f=%ld v=%3d addr=%04X data=%02X pc=%04X\n",
+                               (unsigned long long)main_time, fg.frame,
+                               (int)PIX(vcount), a, (int)RS(ram_d), CPU(R)[CPU(P)]);
+                }
+            }
+            prev_wr = wr;
         }
 
         // Per-scanline R0 trace: one line per HSync, while enabled.
