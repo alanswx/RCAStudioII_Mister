@@ -237,9 +237,7 @@ always @(posedge clk_sys) begin
 			// Space War
 			16'h45B5, 16'h977C: begin map_profile <= MAP_SPACEWAR; start_key <= 4'd1; end
 
-			// Tennis/Squash
-			16'h88FB: begin map_profile <= MAP_CROSS; start_key <= 4'd2; end
-
+			// MPT-02 Joystick cross layout
 			// Pinball / Speedway / Star Wars / other CROSS-compatible retail images
 			16'h03E6, 16'h8404, 16'h92BA, 16'hD0DA, 16'hD13E, 16'hD3E2, 16'hE153: begin map_profile <= MAP_CROSS; start_key <= 4'd1; end
 
@@ -261,8 +259,8 @@ always @(posedge clk_sys) begin
 			16'h4ADA, 16'h188E, 16'hD87F, 16'h54C7, 16'h4AA2, 16'hABBA, 16'h4009: begin map_profile <= MAP_HB2P; start_key <= 4'd1; end // Combat
 			16'h114A, 16'h4F55, 16'hD5DE, 16'h554B, 16'h1154, 16'hDE71, 16'hD753: begin map_profile <= MAP_HB2P; start_key <= 4'd1; end // Hockey
 
-			// Paddle
-			16'hFB76: begin map_profile <= MAP_PADDLE; start_key <= 4'd1; end
+			// Paddle (Tennis/Squash)
+			16'h88FB, 16'hFB76: begin map_profile <= MAP_PADDLE; start_key <= 4'd1; end
 
 			// Explicit no-controller mappings from the existing table.
 			16'h1634, 16'hB76F: begin map_profile <= MAP_CLEAR_ONLY; start_key <= 4'd1; end
