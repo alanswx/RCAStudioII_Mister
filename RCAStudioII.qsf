@@ -76,7 +76,6 @@ set_global_assignment -name VERILOG_MACRO "MISTER_DIRECT_VIDEO=1"
 source sys/sys.tcl
 source sys/sys_analog.tcl
 source files.qip
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/numstick.sv
 set_global_assignment -name PRE_FLOW_SCRIPT_FILE "quartus_sh:sys/build_id.tcl"
 set_location_assignment PIN_U9 -to ADC_CONVST
 set_location_assignment PIN_V10 -to ADC_SCK
