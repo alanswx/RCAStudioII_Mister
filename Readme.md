@@ -111,6 +111,16 @@ so the game can be started using the Start button.
 
 #### Which cartridges are mapped
 
+Built-in BIOS games are detected by the first key pressed after reset:
+
+| Game | Start | Profile |
+|------|-------|---------|
+| Doodles | `A1` | `DOODLES` |
+| Patterns | `A2` | `DOODLES` |
+| Bowling | `A4` | `BOWLING` |
+| Freeway | `A3` | `FREEWAY` |
+| Addition | `A5` | `CLEAR_ONLY` |
+
 | Cartridge | Profile | Start key |
 |-----------|---------|-----------|
 | TV Arcade I – Space War | `SPACEWAR` | `A1` |
@@ -149,21 +159,10 @@ rather than directional input. Use the keyboard, numstick, or manual mapping.
 - TV School House II – Math Fun
 - Concentration Match
 
-Demonstration Cartridge just autoplays a short point-of-sale animation.
-
-Built-in BIOS games are detected by the first key pressed after reset:
-
-| Game | Start | Profile |
-|------|-------|---------|
-| Doodles | `A1` | `DOODLES` |
-| Patterns | `A2` | `DOODLES` |
-| Bowling | `A4` | `BOWLING` |
-| Freeway | `A3` | `FREEWAY` |
-| Addition | `A5` | `CLEAR_ONLY` |
+Demonstration Cartridge autoplays a short point-of-sale animation and doesn't
+accept input other than Clear.
 
 #### Mapping: Auto or Manual
-
-Two OSD rows control this, rather than one list with `Auto` buried in it:
 
 | Row | Meaning |
 |-----|---------|

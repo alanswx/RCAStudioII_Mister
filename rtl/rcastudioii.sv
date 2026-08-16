@@ -235,40 +235,41 @@ always @(posedge clk_sys) begin
 	if (dl_done) begin
 		case (cart_crc)
 			// Space War
-			16'h977C, 16'h45B5: begin map_profile <= MAP_SPACEWAR; start_key <= 4'd1; end
+			16'h45B5, 16'h977C: begin map_profile <= MAP_SPACEWAR; start_key <= 4'd1; end
 
 			// Tennis/Squash
 			16'h88FB: begin map_profile <= MAP_CROSS; start_key <= 4'd2; end
 
-			// Pinball / Speedway / Star Wars
-			16'hD3E2, 16'h92BA,
-			16'hE153, 16'hD0DA, 16'h8404,
-			16'hD13E, 16'h03E6: begin map_profile <= MAP_CROSS; start_key <= 4'd1; end
+			// Pinball / Speedway / Star Wars / other CROSS-compatible retail images
+			16'h03E6, 16'h8404, 16'h92BA, 16'hD0DA, 16'hD13E, 16'hD3E2, 16'hE153: begin map_profile <= MAP_CROSS; start_key <= 4'd1; end
 
 			// Baseball
-			16'hF837, 16'h2526: begin map_profile <= MAP_BASEBALL; start_key <= 4'd0; end
+			16'h2526, 16'hF837: begin map_profile <= MAP_BASEBALL; start_key <= 4'd0; end
 
 			// Gunfighter
-			16'h3CDC, 16'h043E: begin map_profile <= MAP_GUNFIGHTER; start_key <= 4'd1; end
+			16'h043E, 16'h3CDC: begin map_profile <= MAP_GUNFIGHTER; start_key <= 4'd1; end
 
 			// Homebrew
-			16'h1943, 16'hFBEF, 16'h2B4D: begin map_profile <= MAP_HOMEBREW; start_key <= 4'd5; end // Asteroids
-			16'h4F61, 16'hAEC7, 16'hE080: begin map_profile <= MAP_HOMEBREW; start_key <= 4'd5; end // Berzerk
-			16'h69AA, 16'h5AC5, 16'h2D86: begin map_profile <= MAP_HOMEBREW; start_key <= 4'd0; end // Invaders
+			16'h1943, 16'hFBEF, 16'h2B4D, 16'h1973: begin map_profile <= MAP_HOMEBREW; start_key <= 4'd5; end // Asteroids
+			16'h4F61, 16'hAEC7, 16'hE080, 16'h787D: begin map_profile <= MAP_HOMEBREW; start_key <= 4'd5; end // Berzerk
+			16'h69AA, 16'h5AC5, 16'h2D86, 16'h6F69, 16'hADAB, 16'h0D1D: begin map_profile <= MAP_HOMEBREW; start_key <= 4'd0; end // Invaders
 			16'h6793, 16'hDFCF, 16'h8551: begin map_profile <= MAP_HOMEBREW; start_key <= 4'd0; end // Kaboom
-			16'hC556, 16'h5359, 16'hE00A: begin map_profile <= MAP_HOMEBREW; start_key <= 4'd0; end // Pacman
-			16'hBA0B, 16'hE45F, 16'h1280: begin map_profile <= MAP_HOMEBREW; start_key <= 4'd6; end // Scramble
+			16'hC556, 16'h5359, 16'hE00A, 16'hF4A1: begin map_profile <= MAP_HOMEBREW; start_key <= 4'd0; end // Pacman
+			16'hBA0B, 16'hE45F, 16'h1280, 16'hFAA9: begin map_profile <= MAP_HOMEBREW; start_key <= 4'd6; end // Scramble
 
 			// 2P Homebrew
-			16'h4ADA, 16'h188E, 16'hD87F: begin map_profile <= MAP_HB2P; start_key <= 4'd1; end // Combat
-			16'h114A, 16'h4F55, 16'hD5DE: begin map_profile <= MAP_HB2P; start_key <= 4'd1; end // Hockey
+			16'h4ADA, 16'h188E, 16'hD87F, 16'h54C7, 16'h4AA2, 16'hABBA, 16'h4009: begin map_profile <= MAP_HB2P; start_key <= 4'd1; end // Combat
+			16'h114A, 16'h4F55, 16'hD5DE, 16'h554B, 16'h1154, 16'hDE71, 16'hD753: begin map_profile <= MAP_HB2P; start_key <= 4'd1; end // Hockey
 
-			// Other
-			16'hFB76: begin map_profile <= MAP_PADDLE;     start_key <= 4'd1; end
+			// Paddle
+			16'hFB76: begin map_profile <= MAP_PADDLE; start_key <= 4'd1; end
+
+			// Explicit no-controller mappings from the existing table.
 			16'h1634, 16'hB76F: begin map_profile <= MAP_CLEAR_ONLY; start_key <= 4'd1; end
-			16'hE4C4, 16'hD124, 16'h3EAF, 16'h0C03, 16'h92C7: begin
-				map_profile <= MAP_8WAY; start_key <= 4'd1;
-			end
+
+			// Explicitly recognized but not assigned a specialized profile in the existing table.
+			// These retain the existing 8-way fallback behavior.
+			16'h0856, 16'h0C03, 16'h0ECC, 16'h1139, 16'h127F, 16'h29B8, 16'h2DDB, 16'h31AE, 16'h3244, 16'h3731, 16'h3EAF, 16'h4447, 16'h47EA, 16'h4B55, 16'h51A6, 16'h5638, 16'h6D1D, 16'h74AB, 16'h79C5, 16'h7A43, 16'h7BB6, 16'h7D85, 16'h8CDE, 16'h92C7, 16'h9D0D, 16'hA83F, 16'hAD6A, 16'hAF65, 16'hB2FF, 16'hB334, 16'hB5BF, 16'hBBC8, 16'hBD53, 16'hBE58, 16'hC78E, 16'hC8B4, 16'hC903, 16'hCEC2, 16'hD124, 16'hD2F0, 16'hD8C2, 16'hDA69, 16'hE3CF, 16'hE4C4, 16'hEE76, 16'hFC72, 16'hFF76: begin map_profile <= MAP_8WAY; start_key <= 4'd1; end
 
 			default: begin map_profile <= MAP_8WAY; start_key <= 4'd1; end
 		endcase
