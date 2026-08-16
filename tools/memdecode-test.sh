@@ -84,9 +84,9 @@ check "program ran to completion"      08FF EE
 check "write via \$0CF0 mirror"         08F0 A5
 check "write via \$19F0 mirror"         09F0 5A
 check "read via \$0DF0 mirror"          08F1 5A
-check "read \$0A00 (A9=1, open bus)"    08F2 00
+check "read \$0A00 (A9=1, open bus)"    08F2 FF
 check "read \$0000 (system ROM)"        08F3 "$rom0"
 check "read \$1000 (RAM, not ROM)"      08F4 3C
-check "read \$1200 (A9=1, open bus)"    08F5 00
+check "read \$1200 (A9=1, open bus)"    08F5 FF
 
 exit $fail

@@ -79,6 +79,22 @@ localparam DISPLAY_END       = 208;                   // one past the last (128 
 localparam INT_START         = DISPLAY_START - 2;     // 78
 localparam EFX_TOP_START     = DISPLAY_START - 4;     // 76
 localparam EFX_BOT_START     = DISPLAY_END   - 4;     // 204
+// INT and EFx lead their nominal line boundaries by one machine cycle
+// (8 pixels), following the AVI1861 hardware replacement: its 74HC4040 line
+// counter is clocked by the active-low HCLOCK asserted in line states 14+0,
+// so it increments at the START of state 14 -- one machine cycle before the
+// line boundary -- and INTREQ / DISP_STATUS decode straight off it. That
+// cycle is margin the BIOS ISR needs (see the INT assignment below), and the
+// EF1 edges are what its spin loops synchronise against. DMA_ADAPT enables
+// the fetch/execute-parity resync on the DMA request (see the DMAO logic).
+// Swept empirically against Robson's Hockey and Combat, whose main loops
+// exercise every interrupt-entry phase: this combination is the clear optimum
+// (each lead in {0,16} or adapt off strobes hundreds of frames of a 700-frame
+// hockey rally instead of the residual handful). A lead of 0 would disable
+// that term entirely (hcount >= 112 is never true).
+localparam INT_LEAD          = 8;
+localparam EFX_LEAD          = 8;
+localparam DMA_ADAPT         = 1;
 
 // 8 DMA cycles = 64 pixel times at the head of the line, then 6 machine cycles
 // of CPU time. Byte k is fetched by pixel 8k+7 and shown from pixel 16+8k, so
@@ -165,7 +181,30 @@ wire line_displayed = (vcount >= DISPLAY_START) && (vcount < DISPLAY_END);
 // updates), which is what delivers the 8th byte. Holding it through the 8th
 // ack ran a 9th cycle -- R(0) then advanced by 9 a line and the ISR's
 // rewind-by-8 arithmetic unravelled.
-assign DMAO = display_enabled && line_displayed && (hcount >= DMA_START) && (dma_cnt < 4'd7);
+// Fetch/execute parity resync, the AVI1861's state-14 trick: the real 1861
+// watches the CPU's SC lines and slips its line timing by one machine cycle
+// when the CPU is fetching where it should be executing, so the DMA burst
+// always interleaves the ISR's cycle-counted display loop at the intended
+// instruction. With a rigid HDMI line we slip the *request* instead: when the
+// CPU's parity is odd at the head of a line, assert DMAO one machine cycle
+// early so the burst begins one instruction earlier in the stream -- the same
+// interleave the real part restores by sliding its line. Without this, frames
+// whose interrupt entry lands on odd parity ran the BIOS display loop one
+// instruction out of phase: R(0) was rewound every line, every line re-read
+// row 0, and Robson's Hockey rendered whole frames as the solid border row
+// (the reported "flashing strobes"). Line 80 is exempt: the ISR preamble is
+// still running there and an early request would preempt it before PLO R0
+// loads the display base -- the read window already tolerates line 80's two
+// possible locks.
+reg dma_early;
+always @(posedge clk) begin
+    if (reset) dma_early <= 1'b0;
+    else if (ce_pix && hcount == 4)
+        dma_early <= (DMA_ADAPT != 0) && (vcount > DISPLAY_START) && (vcount < DISPLAY_END) && (SC == 2'b00);
+end
+
+assign DMAO = display_enabled && line_displayed &&
+              (hcount >= (dma_early ? DMA_START - 8 : DMA_START)) && (dma_cnt < 4'd7);
 
 reg  [7:0] linebuf [0:7];   // filled by DMA during this line, shown 8 pixels behind
 reg  [3:0] dma_cnt;
@@ -236,10 +275,38 @@ always @(posedge clk) begin
         HBlank <= !((hcount >= DE_START) && (hcount < DE_END));
         VBlank <= !line_displayed;
 
-        INT <= display_enabled && (vcount >= INT_START) && (vcount < DISPLAY_START);
+        // INT leads the line-78 boundary by one machine cycle, per the AVI1861
+        // (hardware-verified 1861 replacement): its 74HC4040 line counter is
+        // clocked by the active-low HCLOCK asserted in line states 14+0, so it
+        // increments at the START of state 14 -- one machine cycle before the
+        // line boundary -- and INTREQ (= LC:'D'39) rises with it. That cycle
+        // is exactly the margin the BIOS ISR needs: its display preamble is 27
+        // cycles plus up to 4 cycles of interrupt-entry latency (a 3-cycle LBR
+        // in flight when INT rises), and the line-80 DMA burst can steal at 31
+        // cycles after line 78. Asserting INT at line 78 exactly meant the
+        // worst-case entry finished PLO R0 one instruction too late, the burst
+        // preempted the preamble with R(0) still stale, and the whole frame
+        // displayed from $09F8/$0A00 -- Robson's Hockey and Combat, whose main
+        // loops keep LBRs in flight at interrupt time, strobed 2 frames in 8.
+        INT <= display_enabled &&
+               (((vcount == INT_START - 1)     && (hcount >= 112 - INT_LEAD)) ||
+                ((vcount >= INT_START) && (vcount < DISPLAY_START) &&
+                 !((vcount == DISPLAY_START - 1) && (hcount >= 112 - INT_LEAD))));
+        // EFx leads its line boundaries by one machine cycle for the same
+        // reason as INT: the AVI1861's line counter increments one machine
+        // cycle before the line boundary and DISP_STATUS decodes straight off
+        // it. The BIOS ISR spins on the EF1 edge to align its display loop, so
+        // this edge's position sets which instruction the first DMA burst
+        // lands after -- one cycle late here left the loop misaligned for some
+        // interrupt-entry phases (rows never advanced; whole frames rendered
+        // as the border row).
         EFx <= display_enabled &&
-               (((vcount >= EFX_TOP_START) && (vcount < DISPLAY_START)) ||
-                ((vcount >= EFX_BOT_START) && (vcount < DISPLAY_END)));
+               ((((vcount == EFX_TOP_START - 1) && (hcount >= 112 - EFX_LEAD)) ||
+                 ((vcount >= EFX_TOP_START) && (vcount < DISPLAY_START) &&
+                  !((vcount == DISPLAY_START - 1) && (hcount >= 112 - EFX_LEAD)))) ||
+                (((vcount == EFX_BOT_START - 1) && (hcount >= 112 - EFX_LEAD)) ||
+                 ((vcount >= EFX_BOT_START) && (vcount < DISPLAY_END) &&
+                  !((vcount == DISPLAY_END - 1) && (hcount >= 112 - EFX_LEAD)))));
     end
 end
 

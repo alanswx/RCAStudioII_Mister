@@ -687,11 +687,17 @@ always @(posedge clk_sys) begin
 	rom_sel_q <= rom_sel | cart_sel;
 	ram_sel_q <= ram_sel;
 end
-// Open bus reads back as $00. The reference emulator's PC build returns the
-// zeroed byte of its flat 4 KB array for undecoded space, so this keeps the
-// frame comparison in §9 honest; it is also the quiet answer for a DMA that
-// wanders out of display RAM (blank scanline rather than a white one).
-assign ram_q = ram_sel_q ? sram_q : (rom_sel_q ? rom_q : 8'h00);
+// Open bus reads back as $FF, matching MAME's unmap_value_high and the likely
+// floating-bus behaviour of the real machine (nothing drives the lines, and
+// the last DMA-driven byte was usually high). This was $00 to match the C
+// reference emulator's flat array, but Robson's Hockey and Combat flash the
+// screen through the BIOS scroll register with a base that walks the display
+// DMA past $09FF into this window: with $00 those frames rendered as a black
+// screen with an 8-pixel bar (the reported "flashing strobes"); with $FF they
+// render as the full-screen white flash MAME shows. Nothing in the §9 corpus
+// reads undecoded space (tools/memdecode-test.sh covers it instead), so the
+// frame comparison is unaffected.
+assign ram_q = ram_sel_q ? sram_q : (rom_sel_q ? rom_q : 8'hFF);
 
 
 ////////////////// SOUND ////////////////////////////////////////////////////

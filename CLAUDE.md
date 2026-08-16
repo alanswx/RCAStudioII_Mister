@@ -434,6 +434,66 @@ cartridges including an RCA test cart.
 
 ## 10. What changed
 
+### 2026-08-16 — Hockey/Combat "flashing strobes": INT/EFx lead the line by one cycle (AVI1861), parity-adaptive DMA request, open bus = $FF
+
+Elle's "flashing strobes in Hockey and Combat" were frames where the BIOS
+ISR's cycle-counted display machinery broke down for particular
+interrupt-entry phases, rendering whole frames from the wrong addresses.
+Combat strobed 2 frames in every 8 during ordinary play. Three stacked causes,
+three fixes, each grounded in a reference:
+
+- **INT and EFx now lead their nominal lines by one machine cycle**, matching
+  the AVI1861 hardware replacement: its 74HC4040 line counter is clocked by
+  the active-low HCLOCK asserted in line states 14+0, so it increments one
+  machine cycle *before* the line boundary, and INTREQ/DISP_STATUS decode off
+  it. That cycle is exactly the entry margin the BIOS ISR preamble needs
+  (27 cycles + up to 4 cycles of entry latency vs a 31-cycle window when INT
+  rises at line 78 sharp): without it, worst-case entries had the line-80
+  burst preempt the preamble before `PLO R0` loaded the display base, and the
+  whole frame displayed from stale $09F8/$0A00.
+- **The DMA request is fetch/execute-parity adaptive** (lines 81+ only), the
+  request-side analogue of the AVI1861's state-14 resync: the real 1861 slips
+  its line phase one cycle when the CPU fetches where it should execute, so
+  the burst always interleaves the ISR's `SEX/DEC R0/PLO R0` display loop at
+  the intended instruction. We keep the HDMI line rigid and instead assert
+  DMAO one machine cycle early on odd-parity lines. Without this, odd-parity
+  frames ran the loop one instruction out of phase — R(0) was rewound every
+  line and Hockey rendered entire frames as the solid border row. Line 80 is
+  exempt so the request can never preempt the ISR preamble.
+- **Open bus reads $FF** (was $00), matching MAME's `unmap_value_high` and
+  plausible floating-bus behaviour. The remaining marginal frames read
+  display data from outside $0900-$09FF; with $00 they rendered as black
+  frames with an 8-pixel bar (very visibly broken), with $FF they render as
+  clean full-screen white flashes. `tools/memdecode-test.sh` expectations
+  updated.
+
+The three knobs were swept empirically (INT lead × EFx lead × adapt on/off,
+plus sub-cycle leads): 8/8/on is the clear optimum; every other combination
+strobes hundreds of frames of a 700-frame hockey rally.
+
+Verified: Combat gameplay strobe frames 54 → **0**, and its steady-state
+frames now match the reference emulator pixel-for-pixel (`compare-game.sh`,
+frames 250/350). Hockey retains ~6 marginal frames per 700 during fast
+rallies — the same count as the previous build — from entry phases whose
+misalignment is at whole-instruction (mod-3) granularity, which no
+SC-parity-visible mechanism (ours or real hardware's) can correct; the
+reference emulator confirms neither game ever sets the scroll register, so
+those frames are the games' own timing marginality (both are Robson's 2000
+builds, authored against his emulator's abstract ISR model). A/B against the
+previous build: 5 built-ins, 18 retail carts, and all homebrew byte-identical
+except Combat (the fix) — Race's custom ISR included; memdecode 8/8; lint
+clean. The reference §9 sweep (builtins + 18 retail, same recipe pre/post) is
+outcome-identical cart for cart.
+
+Also from this session: the reference emulator now builds on this box
+(`refs/rca-studio2/studio2-games/studio2 && make headless`), and its
+`--frame-log` prints the per-frame scroll register — that's how the "is the
+flash authored?" question was settled. Emma 02 turns out to force-sync
+(`setCycle0()` at interrupt and after each DMA line) so it cannot arbitrate
+cycle-level races; the AVI1861 PLDs (`refs/AVI1861/pld/{frame,line}.pld`) are
+the hardware ground truth for 1861 sync/DMA/INT timing and settled both the
+INT lead and the parity resync.
+
 ### 2026-08-15 — the Invaders wobble WAS a core bug: fixed-slot shifter vs ISR entry jitter
 
 **This entry supersedes (and reverses) the earlier "the wobble is the game's
