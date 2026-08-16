@@ -101,6 +101,7 @@ module cdp1802 (
   localparam DMA_OUT   = 4'd8;    // S2 DMA_OUT state
   localparam INTERRUPT = 4'd9;    // S3 Interrupt state
   localparam IDLE      = 4'd10;   //    IDL, waiting for DMA or interrupt
+  localparam LSKIP     = 4'd11;   //    long-skip family (C4-C7, CC-CF), 3rd cycle
 
 /*
   localparam RESET [3:0]     = 4'b0000;  // sc_execute
@@ -160,7 +161,12 @@ module cdp1802 (
   reg sense;
   always @*
     casez ({I, N})
-      {4'h3, 4'b?000}, {4'hc, 4'b??00}: sense = 1;
+      // The Cx ??00 row's base condition is IE when N3 is set (reference
+      // cosmac.vhdl cond_no_skip_p): that gives CC (LSIE) skip-if-IE, and C8
+      // the same silicon quirk the reference models (branch if IE=0, which
+      // with IE=1 -- the usual case -- degenerates to the documented LSKP).
+      {4'h3, 4'b?000}:                  sense = 1;
+      {4'hc, 4'b??00}:                  sense = N[3] ? IE : 1'b1;
       {4'h3, 4'b?001}, {4'hc, 4'b??01}: sense = Q;
       {4'h3, 4'b?010}, {4'hc, 4'b??10}: sense = (D == 8'h00);
       {4'h3, 4'b?011}, {4'hc, 4'b??11}: sense = DF;
@@ -195,11 +201,19 @@ module cdp1802 (
     EXECUTE:
       casez ({I, N})
       8'h00:    state_n = IDLE;                       // IDL: hold until DMA or interrupt
-      8'hc?:    state_n = take ? BRANCH3 : SKIP;      // long branch / long skip take 3 cycles
+      // Cx splits on N2 (reference cosmac.vhdl): N2=0 is the long-branch family
+      // (taken loads the 2-byte target, untaken steps over it), N2=1 is the
+      // long-skip family (C4 NOP, C5-C7, CC-CF): 3 cycles that move P by 0 or
+      // 2 in total and never read the bytes. Treating the whole row as long
+      // branch sent C4 NOP through a taken branch -- Race executes C4 in its
+      // custom ISR and sailed into open bus.
+      {4'hc, 4'b?1??}: state_n = LSKIP;               // long skip, second cycle next
+      8'hc?:    state_n = take ? BRANCH3 : SKIP;      // long branch takes 3 cycles
       default:  state_n = next_cycle;                 // everything else is 2
       endcase
     BRANCH3:    state_n = next_cycle;
     SKIP:       state_n = next_cycle;
+    LSKIP:      state_n = next_cycle;
     IDLE:       state_n = (next_cycle == FETCH) ? IDLE : next_cycle;
     DMA_IN,
     DMA_OUT:    state_n = next_cycle;
@@ -270,6 +284,12 @@ module cdp1802 (
       /* OUT  */ {4'h6, 4'b0???}:   {action, Rwd} = {X, MEM_RD, R[X] + 16'd1};
       /* INP  */ {4'h6, 4'b1???}:   {action, Rwd} = {X, MEM_WR, R[X]};
 
+      /* long-skip family (C4-C7, CC-CF): no operand bytes; P moves by 0 or 1
+         this cycle and again in LSKIP -- skip means step over two bytes,
+         no-skip (C4 NOP included) means P stays put for all 3 cycles. `take`
+         here is the reference's cond_no_skip: 1 = do not skip. */
+      {4'hc, 4'b?1??}:              {action, Rwd} = {P, MEM___, take ? R[P] : (R[P] + 16'd1)};
+
       /* immediate and branch instructions must fetch from R[P] */
       /* short branch resolves in this cycle: take it, or step over the address byte */
       8'h3?:                        {action, Rwd} = {P, MEM_RD, take ? {R[P][15:8], ram_q}
@@ -280,6 +300,7 @@ module cdp1802 (
       default:                      {action, Rwd} = {X, MEM_RD, R[X]};
       endcase
     BRANCH3:                        {action, Rwd} = {P, MEM___, B, ram_q};
+    LSKIP:                          {action, Rwd} = {P, MEM___, take ? R[P] : (R[P] + 16'd1)};
     // A DMA cycle always goes through R(0) and post-increments it -- that is what makes the 1861's
     // 8 bytes per scanline walk through display memory without the CPU touching an address.
     DMA_OUT:                        {action, Rwd} = {4'd0, MEM_RD, R[0] + 16'd1};

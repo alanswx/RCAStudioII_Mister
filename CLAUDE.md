@@ -434,6 +434,32 @@ cartridges including an RCA test cart.
 
 ## 10. What changed
 
+### 2026-08-15 — the Cx row decoded as all-long-branch (Race), and Elle's list
+
+Elle's problem list was Combat, Hockey, Scramble, Race. Triage against MAME:
+
+- **Race (Andy Modla)** was a real CPU bug. The Cx decode treated the whole row
+  as long branch, but N2=1 is the long-skip family (reference cosmac.vhdl):
+  C4 NOP, C5-C7/CC-CF conditional long skips -- 3 cycles, P moves by 0 or 2,
+  the operand bytes are never read. Race's custom ISR at $0F00 executes C4, so
+  the "NOP" jumped to whatever two bytes followed and the machine ended up
+  executing open bus. Fixed with a LSKIP state; the ??00 condition base is IE
+  when N3 is set, per the reference, giving CC (LSIE) skip-if-IE. Race now
+  shows its title and starts on B0-pad key 2, matching MAME. No retail or
+  Robson title uses the skip family, which is why 18/21 never saw it.
+- **Hockey works and always did** -- its start is two-step: game select (1-4 on
+  pad A) *then* an option key (8 or 9). hockey.txt only documents the first
+  step; every single-key probe misses it. Traced the scan loops to find the
+  8/9 wait at $0434.
+- **Combat and Scramble** respond correctly in sim (Combat: code then B0;
+  Scramble: 6 starts each level) and are frame-identical to the verified
+  corpus copies. The reported flicker/stalling is consistent with the
+  pre-DMA-fix builds they were observed on; retest on current.
+- The library's five other titles (Climber, computer, outbreak, rocket,
+  tv-arcade-2012) are blank here and show uniform garbage in MAME's studio2
+  too -- likely Studio III / different-hardware or key-dependent; unresolved,
+  but not obviously a core defect.
+
 ### 2026-08-15 — DMA honoured at instruction boundaries only (the real flicker)
 
 There are two builds of Paul Robson's Invaders in circulation; the one in
