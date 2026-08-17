@@ -198,8 +198,12 @@ assign BUTTONS = 0;
 
 `include "build_id.v"
 localparam CONF_STR = {
-	"RCA-StudioII;v3;",
+	"RCA-StudioII;v4;",
 	"-;",
+	// Which machine. One core with a selector, rather than an .rbf per machine.
+	// The BIOS differs per machine and is not embedded, so a Studio III image has
+	// to be loaded through Load Firmware to match this row.
+	"O[13],Machine,Studio II,MPT-02/III;",
 	"F1,ST2BINROM,Load Cartridge;",
 	"F0,BINROM,Load Firmware;",
 	"-;",
@@ -368,6 +372,7 @@ rcastudioii rcastudio
 	.joystick_0(joystick_0),
 	.joystick_1(joystick_1),
 	.joy_override(status[5:2]),
+	.machine_mpt02(status[13]),
 	.joy_manual(status[6]),
 	.auto_profile(auto_profile),
 	.players(status[8:7]),

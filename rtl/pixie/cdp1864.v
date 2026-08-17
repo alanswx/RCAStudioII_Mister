@@ -60,6 +60,7 @@ module cdp1864
     input       [1:0] SC,           // 1802 state code: 2'b10 == DMA cycle
     input       [7:0] data_in,      // luminance byte the CPU put on the bus this DMA cycle
     input       [2:0] colour_in,    // {R,G,B} from colour RAM for that same byte
+    input             con,          // Color On: colour RAM has been written (see below)
     input             disp_on,      // INP 1
     input             disp_off,     // INP 4 on this machine, not OUT 1
     input             bg_step,      // OUT 1: step the background colour
@@ -111,8 +112,7 @@ localparam HSYNC_START       = 105;
 localparam HSYNC_END         = 112;
 // PAL vertical sync, from MAME's cdp1864: VBLANK starts 4 lines before the end
 // of the frame and VSync occupies lines 0..3.
-localparam VSYNC_START       = 0;
-localparam VSYNC_END         = 4;
+localparam VSYNC_END         = 4;                     // VSync is lines 0..3, so there is no START to name
 
 // ---------------------------------------------------------------------------
 // Counters
@@ -189,6 +189,10 @@ assign DMAO = display_enabled && line_displayed &&
 
 reg  [7:0] linebuf [0:7];
 reg  [2:0] colbuf  [0:7];
+// CON, "Color On" -- the datasheet has the pin "connected to the gated MWR signal
+// of the color memory", so the part is monochrome until software writes colour
+// RAM. Latched per byte with everything else so a mid-frame enable cannot tear.
+reg  [0:7] conbuf;
 reg  [3:0] dma_cnt;
 
 always @(posedge clk) begin
@@ -202,6 +206,7 @@ always @(posedge clk) begin
         if (cpu_ce && (SC == 2'b10) && (dma_cnt < 4'd8)) begin
             linebuf[dma_cnt[2:0]] <= data_in;
             colbuf [dma_cnt[2:0]] <= colour_in;
+            conbuf [dma_cnt[2:0]] <= con;
             dma_cnt <= dma_cnt + 4'd1;
         end
     end
@@ -214,18 +219,21 @@ end
 // ---------------------------------------------------------------------------
 reg [7:0] shift_reg;
 reg [2:0] shift_col;
+reg       shift_con;
 wire in_active = line_displayed && (hcount >= ACTIVE_START) && (hcount < ACTIVE_END);
 
 always @(posedge clk) begin
     if (reset) begin
         shift_reg <= 8'd0;
         shift_col <= 3'd0;
+        shift_con <= 1'b0;
     end
     else if (ce_pix) begin
         if (in_active) begin
             if (hcount[2:0] == 3'd0) begin
                 shift_reg <= linebuf[hcount[5:3] - 3'd5];   // ACTIVE_START/8 == 5
                 shift_col <= colbuf [hcount[5:3] - 3'd5];
+                shift_con <= conbuf [hcount[5:3] - 3'd5];
             end
             else shift_reg <= {shift_reg[6:0], 1'b0};
         end
@@ -241,8 +249,12 @@ end
 
 // Outside the display window the screen is black, not the background colour:
 // the background only applies within the displayed picture.
-assign video = (display_enabled && in_active_d) ? (shift_reg[7] ? shift_col : bg_colour)
-                                                : 3'b000;
+// Before CON the part is monochrome: white dots on black, exactly as an 1861.
+// After it, a lit pixel takes its dot colour and an unlit one the background.
+assign video = (display_enabled && in_active_d)
+                 ? (shift_con ? (shift_reg[7] ? shift_col : bg_colour)
+                              : (shift_reg[7] ? 3'b111    : 3'b000))
+                 : 3'b000;
 
 // ---------------------------------------------------------------------------
 // Sync, blanking and the CPU-visible status flags. The EF shape is the same as

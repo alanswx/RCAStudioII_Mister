@@ -418,6 +418,11 @@ static void usage(const char* argv0) {
 "    --vram               include $0800-$09FF hexdumps in state dumps\n"
 "    --dump-file FILE     write dumps here instead of stdout\n"
 "\n"
+"  Machine\n"
+"    --machine NAME       studio2 (default) or mpt02/studio3 -- the CDP1864\n"
+"                         colour machine: PAL 312-line frame, 192 display lines,\n"
+"                         colour RAM at $B00. Needs its own --bios.\n"
+"\n"
 "  Input\n"
 "    --joy-map N          OSD \"Joystick\" profile, and switch \"Mapping\" to Manual:\n"
 "                         0 none/keypad-only, 1 cross, 2 spacewar, 3 freeway,\n"
@@ -482,6 +487,7 @@ int main(int argc, char** argv) {
     std::string swap_file; long swap_frame = -1; bool swap_done = false;
     uint8_t  joy_override = 0;   // applied once top exists
     bool     joy_manual   = false;
+    bool     machine_mpt02 = false;
     uint8_t  players_mode = 0;
     // Q gates the Studio II's beeper; track its edges so the core can be compared
     // against the reference emulator's Q even though AUDIO_L/R are still tied off.
@@ -549,6 +555,12 @@ int main(int argc, char** argv) {
             swap_file = t.substr(0, at);
             swap_frame = atol(t.c_str() + at + 1);
         }
+        else if (a == "--machine") {
+            std::string m = next("--machine");
+            if      (m == "studio2") machine_mpt02 = false;
+            else if (m == "mpt02" || m == "studio3") machine_mpt02 = true;
+            else { fprintf(stderr, "error: --machine must be studio2 or mpt02\n"); return 1; }
+        }
         else if (a == "--joy-map") { joy_override = (uint8_t)atoi(next("--joy-map")); joy_manual = true; }
         else if (a == "--trace-q")    trace_q = true;
         else if (a == "--frame-log")  frame_log = true;
@@ -605,6 +617,7 @@ int main(int argc, char** argv) {
     top = new Vtop();
     top->joy_override = joy_override;
     top->joy_manual   = joy_manual;
+    top->machine_mpt02 = machine_mpt02;
     top->players = players_mode;
 
     IoctlDriver io;
