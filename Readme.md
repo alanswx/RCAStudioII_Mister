@@ -45,8 +45,8 @@ The Studio II has two 10-key keypads. Keypad A is on the left (read through
 `EF3`), the right is keypad B (`EF4`); software scans them by writing the key
 number to `OUT 2` and testing the flags — see `docs/keyboard.txt`.
 
-Each keypad is laid out on the host keyboard the way it sits on the console —
-a 3x4 block — so the shapes match rather than the digits:
+Each keypad is laid out to correspond with the existing jzIntv "[keyhack](https://forums.atariage.com/applications/core/interface/file/attachment.php?id=484005)" 
+keypad-to-keyboard mapping. Seemed better to use this than invent a new one.
 
 ```
    Keypad A (left)        Keypad B (right)
@@ -56,16 +56,18 @@ a 3x4 block — so the shapes match rather than the digits:
        X                      ,
 ```
 
+The original jzIntv keyhack layout this is based on can be seen ![here](https://media.invisioncic.com/r322239/monthly_01_2017/post-46336-0-51390500-1483262333_thumb.png).
+
+In table form:
+
 | Key | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 0 |
 |---|---|---|---|---|---|---|---|---|---|---|
 | **Keypad A** | `1` | `2` | `3` | `Q` | `W` | `E` | `A` | `S` | `D` | `X` |
 | **Keypad B** | `7` | `8` | `9` | `U` | `I` | `O` | `J` | `K` | `L` | `,` |
 
 **CLEAR** — the console reset button every manual asks for — is **F3**, or
-**Clear** in the OSD. Select on the joystick is always Clear.
-
-With no cartridge, the five BIOS built-in games are selected with keys **1**–**5** on keypad 
-A — see below.
+**Clear** in the OSD. Select on the joystick is always Clear. The core attempts to
+maintain sync during Clear to avoid television signal dropouts.
 
 ### Joystick
 
@@ -93,24 +95,13 @@ takes a **CRC16 of the cartridge as it loads** and selects a profile from a tabl
 
 `CROSS` is the standard 2/4/6/8 cross with fire on `5` and extra on `0`. It matches the official MPT-02 joystick layout and applies to both keypads.
 
-`SPACEWAR`, `FREEWAY`, and `BOWLING` are asymmetric one-player layouts, with the relevant inputs split across keypad A/B as shown above. `BASEBALL` uses a bat on A and pitch/curve on B. `HOMEBREW` is Paul Robson’s 8-way layout; fire is on `B0`, and diagonals use `1/3/7/9` to match the corner keys. `HB2P` is the two-player homebrew variant with fire on `0` on each player’s own pad.
+`SPACEWAR`, `FREEWAY`, and `BOWLING` are asymmetric one-player layouts, with the relevant inputs split across keypad A/B as shown above. `BASEBALL` uses a bat on A and pitch/curve on B. 
+
+`HOMEBREW` is Paul Robson’s 8-way layout; fire is on `B0`, and diagonals use `1/3/7/9` to match the corner keys. `HB2P` is the two-player homebrew variant with fire on `0` on each player’s own pad.
 
 `GUNFIGHTER` is a full cross with fire on `5`; in one-player mode it collapses onto keypad B, while two-player mode splits across A and B. `8WAY` is `CROSS` plus diagonals (`1/3/7/9`). `DOODLES` uses the same idea but sends everything to keypad B only.
 
-`PADDLE` is single-player and keypad-B-only, written for the homebrew
-`tennis.st2`. It maps racquet movement to `B2`/`B8`, and the left, Fire, and
-right buttons to the setup choices `B4`, `B5`, and `B6`, respectively.
-
-> **\* Retail Tennis/Squash is under review.** The core currently maps the
-> retail TV Arcade III cartridge (CRC `88FB`) to `PADDLE` with Start on `A1`,
-> the same entry as the homebrew `tennis.st2` (CRC `FB76`). They are different
-> cartridges, and two things look wrong for the retail one: `PADDLE` puts
-> nothing on keypad A and is a one-player profile, so in **two-player** Tennis
-> both sticks collapse onto keypad B and player A loses the pad entirely; and
-> the RCA manual starts two-player Tennis on **`A2`**, not `A1` (`A1` is
-> one-player Squash). The previous mapping was `CROSS` with Start `A2`.
-> Left as-is pending Elle's reasoning — if you play the retail cartridge with a
-> gamepad, say which behaves correctly.
+`PADDLE` is single-player and keypad-B-only. It maps racquet movement to `B2`/`B8`, and the left, Fire, and right buttons to the setup choices `B4`, `B5`, and `B6`, respectively.
 
 `CLEAR_ONLY` leaves the gamepad's Select button available for **CLEAR**, but
 disables all controller-driven keypad presses; keyboard, on-screen numstick, and
@@ -134,7 +125,7 @@ Built-in BIOS games are detected by the first key pressed after reset:
 | Cartridge | Profile | Start key |
 |-----------|---------|-----------|
 | TV Arcade I – Space War | `SPACEWAR` | `A1` |
-| TV Arcade III – Tennis / Squash | `PADDLE` * | `A1` * |
+| TV Arcade III – Tennis / Squash | `PADDLE` | `A1` |
 | TV Arcade IV – Baseball | `BASEBALL` | `A0` |
 | TV Arcade Series – Gunfighter / Moonship Battle | `GUNFIGHTER` | `A1` |
 | TV Arcade Series – Speedway / Tag | `CROSS` | `A1` |
@@ -150,13 +141,11 @@ Paul Robson’s homebrew games are mapped too:
 | Scramble | `HOMEBREW` | `A6` |
 | Hockey, Combat | `HB2P` | `A1` |
 
-Some other entries:
+Other entries may be populated here as they are confirmed mapped correctly:
 
 | Homebrew | Profile | Start key |
 |----------|---------|-----------|
-| tennis.st2 | `PADDLE` | `A1` |
-| flappy.st2 | `8WAY` | `A1` |
-| Space Explorer.bin / space_explorer.st2 | `8WAY` | `A1` |
+| Flappy Pixel | `8WAY` | `A1` |
 
 The following titles use `CLEAR_ONLY` because they require numerical input
 rather than directional input. Use the keyboard, numstick, or manual mapping.
@@ -174,21 +163,10 @@ accept input other than Clear.
 
 #### Mapping: Auto or Manual
 
-| Row | Meaning |
-|-----|---------|
-| **Mapping** | `Auto` — use the table above. `Manual` — use whatever **Joystick** says. |
-| **Joystick** | The profile itself. |
-
-On `Auto` the **Joystick** row is a *readout*: the core writes the profile it
-detected back into the menu, so after loading Gunfighter the row reads
-`Gunfighter` rather than `Auto`, and you can see at a glance what you are
-playing with. Switch **Mapping** to `Manual` and that same row becomes editable,
-starting from the detected profile instead of a stale selection — so overriding
-a profile means changing one row, from a sensible starting point.
-
-`None` leaves the pad with only Start; `Clear-only` leaves only Select for
-**CLEAR**. Both
-still allow the keyboard, the on-screen numstick, and direct key bindings.
+On `Auto` the core automatically loads the mapping associated with the game, then
+writes back the loaded profile it detected into the OSD menu. The profile option
+will be grayed out but still updates to reflect your current profile.
+On `Manual` you can select any mapping from the profile field.
 
 #### Start, Select, and the Players setting
 
@@ -222,26 +200,28 @@ The keyboard, on-screen numstick, and direct per-key bindings still work alongsi
 The button list also carries **A0–A9** and **B0–B9** — all twenty keypad keys as
 individual buttons, plus Select for CLEAR (21 inputs). None of them has a
 default binding, so they are inert until you map one in *Define buttons*; after
-that they work on top of whatever profile is active. This is the escape hatch
-when a profile does not fit: bind exactly the keys the game wants to whatever
-buttons you like, no keyboard needed.
+that they work on top of whatever profile is active. 
+
+It isn't recommended to map both the automap buttons and the keys manually as it 
+seems to cause potential issues, but it hasn't been exhaustively tested, so YMMV.
 
 #### On-screen keypad (analog sticks)
 
 The OSD's **Stick Keypad** setting (`Off` · `Pad A` · `Pad B`) overlays the
 Jaguar core's numstick, via the Coleco Adam: nudge the **right stick** for a
 1–9 grid, the **left stick** for `0`, hold ~half a second and the key is
-pressed. Presses land on the keypad the OSD names. The sticks belong to
-gamepad 0, except that Pad B in a two-player game belongs to gamepad 1. It is
-the slowest input, but reaches every key with no keyboard and no setup —
-number-entry games included.
+pressed. Nudge the right stick and release for `5`. 
+
+When using the 2 players option, each player's numstick affects their respective 
+keypad.
 
 #### Adding a cartridge
 
+Use
 ```sh
 tools/cart-crc.sh "software/carts/Some Game.bin"
 ```
-then add one line to the `cart_crc` case in `rtl/rcastudioii.sv`.
+to generate the hash to be used in the `cart_crc` case in `rtl/rcastudioii.sv`.
 
 ### Per-cartridge
 
@@ -291,12 +271,9 @@ Five games live in the BIOS. From `docs/RCA_Studio_II_Service_Manual.pdf` (pages
 |------|--------|----------|
 | **Doodles** | **A1** | Keyboard B moves the dot per the arrows on the panel. **B5** leaves a trail as you "write"; **B0** leaves none. Retrace to erase. |
 | **Patterns** | **A2** | Screen stays dark; keyboard B "writes" per the panel arrows. Memory holds 130 moves — after 130 the pattern auto-repeats, and for fewer, **B0** starts the repeat cycle. |
-| **Freeway** | **A3** | **B4**/**B6** steer left/right, **A2** throttle, **A8** brake. Avoid the computer car for two minutes; distance travelled shows at the end. |
-| **Bowling** | **A4** | **A5** rolls straight, **A2** hooks left (up), **A8** hooks right (down). Strike scores 20 (`ST-20`), spare 15 (`SP-15`). Player 2 then uses keyboard B. |
+| **Bowling** | **A3** | **A5** rolls straight, **A2** hooks left (up), **A8** hooks right (down). Strike scores 20 (`ST-20`), spare 15 (`SP-15`). Player 2 then uses keyboard B. |
+| **Freeway** | **A4** | **B4**/**B6** steer left/right, **A2** throttle, **A8** brake. Avoid the computer car for two minutes; distance travelled shows at the end. |
 | **Addition** | **A5** | Add the three digits shown and press the total on either keyboard within five seconds. Faster answers score more, max 11 a set; a wrong answer locks you out of that set. 20 sets. |
-
-These match what the core does: A2 correctly shows a dark screen, A1 puts a
-single dot at the lower left, and A4/A5 draw the bowling and score displays.
 
 #### TV Arcade III — Tennis / Squash
 
@@ -312,14 +289,6 @@ Setup, in order: each player picks racquet size on their own keyboard —
 In play: **2** moves your racquet up, **8** down. **0** pauses and resumes.
 First to 21, winning by two; if tied at 21 play continues until someone leads
 by two or reaches 200. Squash ends at 200.
-
-#### tennis.st2 (homebrew)
-
-Not the retail cartridge above — a different, single-player homebrew Tennis.
-**CLEAR**, then **A1** to start. All play is on keyboard B: **B4**/**B5**/**B6**
-pick racquet size once at the start, then **B2**/**B8** move the racquet up and
-down. The `PADDLE` joystick profile maps those same controls: up/down to
-**B2**/**B8**, and left/Fire/right to **B4**/**B5**/**B6**.
 
 #### Speedway / Tag
 
@@ -443,20 +412,12 @@ Checked against captures of real hardware in `refvideo/`:
   whose component values do not give a sane frequency.
 - Frames are pixel-identical to a reference emulator on 18 of 21 test cases.
 
-## Known issues and work in progress
+## Known issues
 
-- No PAL mode, and there should not be one: the Studio II was NTSC-only.
-  The CDP1861 has no PAL mode in any reference (MAME hard-codes 262
-  scanlines, Emma 02 ships no PAL Studio II config, the AVI1861 hardware
-  replacement has none), and since games time off the 60 Hz interrupt a
-  50 Hz mode would slow all of them by 17%. PAL belongs to the colour
-  successors (Studio III, MPT-02), whose CDP1864 is a PAL part by design.
-- Analog and direct video are (hypothetically) enabled now, but untested.
-- Certain homebrew titles (Paul Robson titles: Combat, Hockey, Scramble) don't 
-work properly. Combat and Hockey have flickering or jittering graphical issues, and Scramble doesn't seem to get
-going as far as I can tell. Invaders has some minor flicker, but this might be
-accurate to hardware; would be good to get a reference video from ubersaurus.
-- BIOS is currently loaded externally. Consider possibility of embedding.
+- Analog and direct video don't work.
+
+Note: Studio II was not released in PAL territories. PAL implementation is tied to
+Studio III (color) implementation (this work is ongoing).
 
 ## Building
 
@@ -514,10 +475,9 @@ CPU instruction tracing and VRAM dumps — see `--help`.
   interrupts, DMA and machine-cycle timing; the DMA-driven CDP1861; the
   reference-emulator comparison harness; and the 2026 timing/video work that
   brought the core to its current playable state (August 2026).
-- **Elle Ball** ([@meauxdal](https://github.com/meauxdal)) — the 3x4 keypad
-  layout, the expanded modern joystick profile system, and the 2026 OSD/profile
-  work for Gunfighter, 8-way, Doodles/Patterns, default profile tuning, and
-  config compatibility checks (August 2026).
+- **Elle Ball** ([@meauxdal](https://github.com/meauxdal)) — profile automapping 
+  work, hash table refactor, logical 3x4 keypad layout, OSD layout and logic 
+  tuning, extensive software testing (August 2026).
 
 ### Emulators and hardware references
 
@@ -543,6 +503,7 @@ This core would not be correct without other people's work. In particular:
 - **kanpapa** — `cosmac_mbc`, a COSMAC MicroBoard with Pixie video.
 - The **classicgaming Studio 2 technical pages** (via the Internet Archive), the
   source of everything in `docs/`.
+- **ubersaurus** — invaluable insights, documentation, rare archives and more.
 
 ## Licence
 
