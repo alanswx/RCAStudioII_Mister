@@ -46,12 +46,46 @@ once and six entries light up.
 
 ## 2. Order of work, cheapest useful first
 
-### 2.0 PAL (prerequisite, already on the roadmap)
+### 2.0 PAL is *not* a prerequisite — it belongs to the CDP1864
 
-Not a new machine, but it gates two of them: Studio III shipped in PAL, and the
-MPT-02 badges were European and Australian. We already hold `studio3_pal.bin`
-and PAL builds of Studio IV and Studio 2020. Doing PAL first means the successor
-work is not blocked on it later. This is `CLAUDE.md` §7.1 and stays first.
+An earlier draft of this plan (and `CLAUDE.md` §7.1 before it) had "add PAL"
+as step zero, gating everything else. **That was wrong, and checking the
+documentation is what caught it.**
+
+There was no PAL Studio II. The CDP1861 is an NTSC part with no PAL mode
+anywhere: MAME's `cdp1861.h` hard-codes `TOTAL_SCANLINES = 262` and mentions
+neither PAL nor 312 nor 50 Hz; Emma 02 ships four Studio II configs
+(`standard`, `multicart`, `chip8`, `test-cartridge`) and **not one of them is
+PAL**; the AVI1861 hardware replacement has no PAL either. Adding a "PAL Studio
+II" would be inventing a machine — and because Studio II games time themselves
+off the 60 Hz interrupt, a 50 Hz mode would also slow every one of them by 17%.
+MiSTer's scaler already handles PAL *displays* without touching core timing.
+
+PAL arrives **with the CDP1864**, where it is native rather than optional — the
+part is literally titled "COS/MOS PAL Compatible Color TV Interface" and MAME's
+`cdp1864.h` hard-codes `TOTAL_SCANLINES = 312`. So PAL is not a step; it is part
+of §2.1, and §2.1 is no longer blocked by anything.
+
+It is per machine, not a global toggle:
+
+| Machine | Field rate |
+|---|---|
+| Studio II | NTSC only |
+| Studio III | **both** — Emma has paired `*-ntsc.xml` / `*-pal.xml` for every variant, and separate `studio3_ntsc.bin` / `studio3_pal.bin` |
+| Soundic Victory MPT-02, Hanimex, Mustang 9016, Sheen M1200, Academy Apollo 80, Trevi M1200 | PAL |
+| **Conic M-1200** | **NTSC** — the one NTSC badge in an otherwise PAL family |
+
+Open questions to settle during §2.1 rather than guess at now:
+
+- MAME models the 1864 as PAL-only, but Emma models an NTSC Studio III and an
+  NTSC Conic M-1200. Different part, different crystal, or just a different
+  config? Nobody's notes here say.
+- The 1864 has **192 visible lines** against the 1861's 128, yet the MPT-02 runs
+  Studio II software that only ever fills 32 rows. What the extra window does in
+  practice is a bring-up question for the test cartridge.
+- MAME's `SCANLINE_DISPLAY_START = 60; // ???` is flagged uncertain *by MAME*.
+  Do not treat it as gospel; check it against the datasheet timing pages and the
+  RCA test cartridge.
 
 ### 2.1 MPT-02 / Victory family — the big unlock
 

@@ -31,7 +31,8 @@ Gunfighter/8-way/Doodles special cases, the Clear-only profile for digit-entry
 software, the memory decode, and config-versioning so old saved menu state does
 not silently map to the wrong fields.
 
-What is still missing: **PAL**, and an embedded BIOS. See §6.
+What is still missing: an embedded BIOS. (PAL is not missing — the Studio II
+never had it; see §7.1.) See §6.
 
 Licence: GPL-2.0-or-later (file headers). Note `rtl/reference/cosmac.vhdl` and
 its translation `rtl/cosmac.v` are Eric Smith's GPL-3.0 code — compatible with
@@ -432,9 +433,16 @@ with `start_key <= 4'd2`.
 ## 7. Roadmap
 
 ### 7.1 Polish
-PAL option, embedded BIOS, and any final top-level cleanup around default OSD
-behaviour and naming consistency. **PAL comes first** — it gates the successor
-machines in §7.4, which were European and Australian.
+Embedded BIOS, and any final top-level cleanup around default OSD behaviour and
+naming consistency.
+
+**"PAL option" used to be listed here and has been removed as a mistake.** There
+was no PAL Studio II: the CDP1861 is NTSC-only (MAME hard-codes 262 scanlines
+and has no PAL path), Emma 02 ships four Studio II configs and none is PAL, and
+the AVI1861 replacement has none either. A 50 Hz Studio II would also slow every
+game by 17%, since they time off the 60 Hz interrupt, and MiSTer's scaler
+already handles PAL displays without touching core timing. PAL is native to the
+**CDP1864** instead — see §7.4 and `docs/succession-plan.md` §2.0.
 
 ### 7.4 The next machines — see `docs/succession-plan.md`
 
@@ -442,7 +450,7 @@ Which machines follow the Studio II, in what order, and what software we hold
 for each. Headline: the CPU-side contract does not change (MAME drives the
 CDP1864 with the same `INT`/`DMA_OUT`/`EFx` our 1861 already produces), so the
 1802, DMA video model, cartridge loader, keypad and profile system all carry
-over. The MPT-02/Victory family is one implementation for six machines, and
+over. PAL comes with the 1864 rather than being a step of its own. The MPT-02/Victory family is one implementation for six machines, and
 `refs/emma_02/data/StudioIII/RCA_TEST_CARTRIDGE_TESTER1.st2` is a real test
 cartridge to bring it up against. Read that document before starting any of it —
 particularly §4, which lists the decisions to settle first (one core or many,

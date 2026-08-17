@@ -19,7 +19,7 @@ seed diverges, not rendering faults.
 The address bus is decoded properly: ROM, cartridge and the 512 bytes of RAM are
 separate, and the RAM mirrors appear where the hardware puts them.
 
-Still missing: **PAL**, and an embedded BIOS.
+Still missing: an embedded BIOS. (Not PAL — the Studio II was NTSC-only.)
 
 ## Installing
 
@@ -445,7 +445,12 @@ Checked against captures of real hardware in `refvideo/`:
 
 ## Known issues and work in progress
 
-- No PAL mode (yet). All games run at NTSC speeds.
+- No PAL mode, and there should not be one: the Studio II was NTSC-only.
+  The CDP1861 has no PAL mode in any reference (MAME hard-codes 262
+  scanlines, Emma 02 ships no PAL Studio II config, the AVI1861 hardware
+  replacement has none), and since games time off the 60 Hz interrupt a
+  50 Hz mode would slow all of them by 17%. PAL belongs to the colour
+  successors (Studio III, MPT-02), whose CDP1864 is a PAL part by design.
 - Analog and direct video are (hypothetically) enabled now, but untested.
 - Certain homebrew titles (Paul Robson titles: Combat, Hockey, Scramble) don't 
 work properly. Combat and Hockey have flickering or jittering graphical issues, and Scramble doesn't seem to get
