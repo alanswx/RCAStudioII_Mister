@@ -52,10 +52,13 @@ wire audio;   // 1-bit beeper, gated by the 1802's Q line
    assign VGA_DE = video_de;
 
    // Convert 1bpp output to 8bpp
-   wire video;
-   assign VGA_R = video ? 'hFF : 'h00;
-   assign VGA_G = video ? 'hFF : 'h00;
-   assign VGA_B = video ? 'hFF : 'h00;
+   // {R,G,B} from the core, one bit per channel -- see rtl/rcastudioii.sv.
+   // The Studio II's 1861 is mono and drives all three together, so this is
+   // still white on black.
+   wire [2:0] video/*verilator public_flat*/;
+   assign VGA_R = {8{video[2]}};
+   assign VGA_G = {8{video[1]}};
+   assign VGA_B = {8{video[0]}};
     
    // MAP OUTPUTS
    assign AUDIO_L = audio ? 16'sd6000 : -16'sd6000;

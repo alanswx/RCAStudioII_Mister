@@ -50,7 +50,19 @@ module rcastudioii
 	output reg         VBlank,
 	output reg         VSync,
 	output reg         video_de,
-	output             video,
+	// {R,G,B}, one bit per channel -- this mirrors the hardware rather than
+	// inventing a format. The CDP1864 in the successor machines has exactly one
+	// RDATA, GDATA and BDATA pin, fed from colour RAM, which is what gives it
+	// "1-of-8 dot colours" (datasheet, docs/succession-plan.md §6). The CDP1861
+	// here is a mono part, so the Studio II drives all three together and the
+	// picture is unchanged; the width exists so the 1864 has somewhere to put
+	// colour without touching every module above.
+	//
+	// Not modelled yet: the 1864's BCKGND output, which lowers the luminance of
+	// background colours so the same colour can be used for background and data.
+	// That needs a fourth bit, and it belongs with the 1864 itself rather than
+	// being guessed at here.
+	output       [2:0] video,
 	output             audio
 );
 
@@ -94,14 +106,20 @@ pixie_video pixie_video (
     // back end, video clock domain
     .video_clk  (clk_sys),    // I
     .csync      (),           // O
-    .video      (video),      // O
+    .video      (video_dot),  // O  one bit: the 1861 is a monochrome part
 
     .VSync      (VSync),      // O
     .HSync      (HSync),      // O
     .VBlank     (VBlank),     // O
     .HBlank     (HBlank),     // O
-    .video_de   (video_de)    // O    
+    .video_de   (video_de)    // O
 );
+
+// White on black: the Studio II's 1861 has no colour, so every channel follows
+// the single dot bit. A machine with a CDP1864 will drive these three from
+// colour RAM instead (see docs/succession-plan.md §6).
+wire       video_dot;
+assign     video = {3{video_dot}};
 
 ////////////////// KEYPAD //////////////////////////////////////////////////////////////////
 

@@ -116,6 +116,23 @@ static bool write_ppm(const std::string& path, int w, int h, const std::vector<u
 static const int MAX_W = 2048;
 static const int MAX_H = 1024;
 
+// {R,G,B} -> one character. Black is a space and white is '#', exactly as the
+// pre-colour harness printed them, so every Studio II capture and the whole §9
+// comparison in CLAUDE.md is byte-identical. The six chromatic values only ever
+// appear on a CDP1864 machine, and get their initials.
+static inline char ascii_for(uint8_t rgb) {
+    switch (rgb & 7) {
+        case 0: return ' ';   // black
+        case 1: return 'B';   // blue
+        case 2: return 'G';   // green
+        case 3: return 'C';   // cyan
+        case 4: return 'R';   // red
+        case 5: return 'M';   // magenta
+        case 6: return 'Y';   // yellow
+        default: return '#';  // white
+    }
+}
+
 struct FrameGrabber {
     std::vector<uint8_t> pix;   // MAX_W * MAX_H, 0 or 1
     int col = 0, line = 0;
@@ -128,7 +145,10 @@ struct FrameGrabber {
     FrameGrabber() : pix((size_t)MAX_W * MAX_H, 0) {}
 
     // Returns true on the clock where a frame boundary was crossed.
-    bool clock(bool vs, bool hs, bool de, bool video) {
+    // `rgb` is {R,G,B}, one bit per channel, matching the core's video output.
+    // The Studio II is monochrome so only 0 and 7 ever occur, which is what
+    // keeps the ASCII output byte-identical to the pre-colour harness.
+    bool clock(bool vs, bool hs, bool de, uint8_t rgb) {
         bool boundary = false;
 
         if (vs && !prev_vs) {
@@ -146,7 +166,7 @@ struct FrameGrabber {
         if (boundary) { line = 0; col = 0; width = 0; height = 0; }
 
         if (de && line < MAX_H && col < MAX_W) {
-            pix[(size_t)line * MAX_W + col] = video ? 1 : 0;
+            pix[(size_t)line * MAX_W + col] = rgb & 7;
             col++;
             if (col > width) width = col;
             if (line + 1 > height) height = line + 1;
@@ -163,11 +183,14 @@ struct FrameGrabber {
         out.assign((size_t)w * h * 3, 0);
         for (int y = 0; y < last_height; y++) {
             for (int x = 0; x < last_width; x++) {
-                uint8_t v = pix[(size_t)y * MAX_W + x] ? 0xFF : 0x00;
+                uint8_t c = pix[(size_t)y * MAX_W + x];
+                uint8_t r = (c & 4) ? 0xFF : 0x00;
+                uint8_t g = (c & 2) ? 0xFF : 0x00;
+                uint8_t b = (c & 1) ? 0xFF : 0x00;
                 for (int sy = 0; sy < scale; sy++) {
                     for (int sx = 0; sx < scale; sx++) {
                         size_t o = (((size_t)y * scale + sy) * w + ((size_t)x * scale + sx)) * 3;
-                        out[o] = out[o + 1] = out[o + 2] = v;
+                        out[o] = r; out[o + 1] = g; out[o + 2] = b;
                     }
                 }
             }
@@ -181,7 +204,7 @@ struct FrameGrabber {
         for (int y = 0; y < last_height; y++) {
             fprintf(f, "%3d |", y);
             for (int x = 0; x < last_width; x++)
-                fputc(pix[(size_t)y * MAX_W + x] ? '#' : ' ', f);
+                fputc(ascii_for(pix[(size_t)y * MAX_W + x]), f);
             fprintf(f, "|\n");
         }
         fprintf(f, "    +");
@@ -696,7 +719,9 @@ int main(int argc, char** argv) {
 
         // Sample video on the rising edge (ce_pix is tied high in sim.v)
         bool boundary = fg.clock(top->VGA_VS, top->VGA_HS, top->VGA_DE,
-                                 top->VGA_R != 0);
+                                 (uint8_t)((top->VGA_R ? 4 : 0) |
+                                           (top->VGA_G ? 2 : 0) |
+                                           (top->VGA_B ? 1 : 0)));
 
         {
             bool a_now = top->rootp->top__DOT__audio != 0;

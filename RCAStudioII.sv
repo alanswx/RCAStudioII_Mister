@@ -342,7 +342,7 @@ wire HBlank;
 wire HSync;
 wire VBlank;
 wire VSync;
-wire video;
+wire [2:0] video;   // {R,G,B} from the core
 
 rcastudioii rcastudio
 (
@@ -439,7 +439,13 @@ assign status_menumask = (!status[6]) ? 16'h0004 : 16'h0000;
 
 assign CLK_VIDEO = clk_sys;
 
-wire [7:0] mono = video ? 8'hFF : 8'h00;
+// The core hands up {R,G,B}, one bit per channel, mirroring the CDP1864's three
+// colour pins. The Studio II's 1861 is monochrome and drives all three together,
+// so this is still white on black -- expanding each bit to full 8-bit scale
+// gives byte-identical output to the old `video ? 8'hFF : 8'h00`.
+wire [7:0] vid_r = {8{video[2]}};
+wire [7:0] vid_g = {8{video[1]}};
+wire [7:0] vid_b = {8{video[0]}};
 
 ////////////////// On-screen keypad (Jaguar core's numstick, via ColecoAdam) //
 //
@@ -478,9 +484,9 @@ numstick #(
 	.enable   (osk_mode != 2'd0),
 	.hblank   (HBlank),
 	.vblank   (VBlank),
-	.in_r     (mono),
-	.in_g     (mono),
-	.in_b     (mono),
+	.in_r     (vid_r),
+	.in_g     (vid_g),
+	.in_b     (vid_b),
 	.stick_l_x($signed(osk_l[7:0])),
 	.stick_l_y($signed(osk_l[15:8])),
 	.stick_r_x($signed(osk_r[7:0])),
