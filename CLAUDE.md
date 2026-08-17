@@ -562,10 +562,24 @@ the old truncate-to-12-bits version scored exactly the same 18/21. That is what
 cartridge that pokes each case and checks the result out of the simulated RAM.
 It fails 4 of its 8 checks against the pre-decode core.
 
-**The reference is authoritative for instruction *order*, not for cycle
-timing.** Its model gives the CPU zero cycles during all 128 display lines
-rather than 6 of every 14, so it runs ~952 instructions/frame where real
-hardware (and the RTL) does **1321**. Do not "fix" the RTL to match 952.
+**The reference's cycle model was corrected on 2026-08-17 and now matches
+hardware's instruction rate, but it is still not cycle-accurate.** It used to give
+the CPU no cycles at all during the 128 display lines, so it ran ~952
+instructions/frame against hardware's 1321 -- a 28% shortfall, and the reason the
+old warning here said "do not fix the RTL to match 952". It now also gets the 6
+of every 14 cycles that the CPU keeps while DMA takes the other 8, and measures
+**1322/frame** against hardware's 1321.
+
+That fixed the *total* and not the *distribution*. The model has no scanline
+counter, so those display-window cycles all arrive in one lump before the next
+interrupt rather than interleaved between DMA bursts, and `CPU_ReadEFlag(1)`
+still returns a constant 1 -- so software that spins on EF1 or counts cycles
+across the display window still cannot be modelled. Measured effect: the §9 score
+did not move (27 -> 26 of 48 frames, three cases shifting by one frame each,
+which is animation-phase noise), while on the CDP1864 colour demo the reference
+went from 4 distinct colour states to 7 against the RTL's 9 -- closer, but still
+with none in common. So it is a fidelity improvement rather than an accuracy one.
+`tools/score-21.sh` measures the score; there was no script for it before.
 
 For CPU debugging both sims emit the same trace layout; strip the differing
 first and last columns to diff them:
