@@ -1194,8 +1194,12 @@ wire  [7:0] st2_pg    = st2_page[st2_blk];
 // system ROM ($00-$03), not RAM ($08-$09), and below $10. $0C/$0D ARE legal --
 // race.st2 pages ROM over the default RAM mirror there, which is why the memory
 // map calls $C00-$DFF "RAM/ROM". $00 is also the format's "unused block" marker.
+// Page $0B is the CDP1864's colour RAM, not cartridge space, so a cartridge must
+// not be able to page ROM over it on that machine. (On the Studio II $0B is an
+// ordinary cartridge window and stays loadable, which is why this is gated.)
 wire        st2_pg_ok = (st2_pg[7:4] == 4'h0) && (st2_pg[3:0] > 4'h3)
-                        && (st2_pg[3:0] != 4'h8) && (st2_pg[3:0] != 4'h9);
+                        && (st2_pg[3:0] != 4'h8) && (st2_pg[3:0] != 4'h9)
+                        && !(machine_mpt02 && (st2_pg[3:0] == 4'hB));
 
 wire        st2_data  = ioctl_addr >= 16'd256;          // past the header
 wire [11:0] cart_a    = st2_mode ? {st2_pg[3:0], ioctl_addr[7:0]}

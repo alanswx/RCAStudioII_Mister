@@ -389,33 +389,45 @@ do not assume the R(0) story above.
 ### 6.2 Memory decode -- done (2026-08-15)
 Implemented; see §10. `tools/memdecode-test.sh` covers it.
 
-### 6.2b Retail Tennis/Squash is mapped to PADDLE -- open question (2026-08-17)
+### 6.2b Tennis/Squash is mapped to PADDLE -- a design choice, not a bug (2026-08-17)
 
-`6b5b999` (Elle's, merged 2026-08-17) folded the retail TV Arcade III hash onto
-the homebrew tennis line:
+An earlier version of this entry called Elle's `6b5b999` a regression on the
+grounds that it folded "two different cartridges" onto one line. **That was
+wrong, and this records the correction**, because the wrong version was published
+and could otherwise get acted on.
+
+The line in question:
 
 ```
--16'h88FB: begin map_profile <= MAP_CROSS;  start_key <= 4'd2; end   # retail
--16'hFB76: begin map_profile <= MAP_PADDLE; start_key <= 4'd1; end   # homebrew
+-16'h88FB: begin map_profile <= MAP_CROSS;  start_key <= 4'd2; end
+-16'hFB76: begin map_profile <= MAP_PADDLE; start_key <= 4'd1; end
 +16'h88FB, 16'hFB76: begin map_profile <= MAP_PADDLE; start_key <= 4'd1; end
 ```
 
-Those are **different cartridges**, not two dumps of one: `88FB` is retail TV
-Arcade III (two-player Tennis, and per the RCA manual it starts on `A2`; `A1` is
-one-player Squash), `FB76` is Paul Robson's single-player homebrew `tennis.st2`.
+`88FB` and `FB76` are **the same cartridge in two containers**, not two
+cartridges. Measured: `88FB` is TV Arcade III Tennis + Squash as a 512-byte
+`.bin`; `FB76` is the same title as a 768-byte `.st2`, whose payload is
+byte-identical to that `.bin` and whose header title field reads
+"TV ARCADE III TENNIS". They hash apart only because the CRC covers the file as
+downloaded, header and all -- which is exactly why the table already pairs
+`.st2` with `.bin` elsewhere (`16'hFBEF, 16'h2B4D` for Asteroids, and so on).
+So grouping them is *consistent with the table's own convention*, and there is
+no "homebrew tennis": nothing by Paul Robson of that name exists in any corpus
+here.
 
-Two things look wrong for the retail cartridge. `map_padA(MAP_PADDLE)` is empty
-(the case arm is literally `MAP_PADDLE: ;`) and `MAP_PADDLE` is in
-`profile_1p`, so in two-player Tennis both sticks collapse onto keypad B and
-player A has no pad at all. And Start now presses `A1`, which starts the wrong
-game.
+What is left is one design question about one game, not a conflation. The
+cartridge holds two games: **Tennis** is two-player and starts on `A2`,
+**Squash** is one-player and starts on `A1` (Readme, from the RCA manual).
+`MAP_PADDLE` is keypad-B-only and sits in `profile_1p`, and the new start key is
+`A1`. That is a coherent package: it gives a gamepad user **Squash**, which one
+stick can actually play, instead of Tennis, which needs two keypads. The previous
+`MAP_CROSS` + `A2` gave Tennis, which a single pad plays only half of.
 
-**Deliberately left as-is** pending Elle's reasoning — she may have hardware
-findings the code does not show. Do not "fix" it without asking her first. Note
-the frame comparison cannot demonstrate this: retail Tennis does not visibly
-respond to held stick input in the harness, so the evidence is the code path,
-not a screenshot. If it is to be reverted, the previous mapping was `MAP_CROSS`
-with `start_key <= 4'd2`.
+So both mappings are defensible and the choice is Elle's to make. Left as-is.
+If it is ever revisited, the trade is "Squash with a pad" against "Tennis with
+two pads", not correct against incorrect. Note the frame harness cannot
+distinguish them: retail Tennis does not visibly respond to held stick input in
+these scenarios.
 
 ### 6.3 Top level — `RCAStudioII.sv`
 - No PAL support, and the BIOS is not embedded (the core is held in reset until

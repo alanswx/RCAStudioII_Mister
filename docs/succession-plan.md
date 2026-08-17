@@ -372,3 +372,62 @@ go to `refs/rca-studio2/Documents/`, `docs/rca-technical/` and the datasheets
 before choosing. Every conflict hit so far — open bus `$00` vs `$FF`, the keypad
 strobe, the built-in game order, and this one — was settled by paper, and in two
 cases the paper contradicted what the RTL already did.
+
+---
+
+## 7. MPT-02 bring-up: where it stands (2026-08-17)
+
+The machine runs. `--machine mpt02` in both the RTL sim and `tools/refemu`, and
+`tools/compare-game.sh --machine mpt02 --bios <studio3_pal.bin>` diffs them.
+
+**Use the PAL BIOS.** `studio3_pal.bin` or `victory.rom`. The NTSC images do not
+run under PAL timing — an NTSC colour machine needs its own frame timing, not
+just a different ROM (see `tools/refemu/README.md`).
+
+Score against the reference, 2 frames per cartridge:
+
+| Set | Cartridges | Frames matching |
+|---|---|---|
+| Conic/Studio III cartridges | 14 | 18 / 28 |
+| Sarnoff Collection (`.st2` only) | 4 | 4 / 8 |
+| Conic homebrew (`invsn.st2`) | 1 | 2 / 2 |
+
+Frame rate comes out at **50.373 Hz** from the existing PLL (112 × 312 pixel
+times at clk_sys/4), against the datasheet's 50.08 Hz — 0.6% fast, which is not
+worth a second PLL output.
+
+### The one diagnostic worth doing next: `color-demo.st2`
+
+The Sarnoff `color-demo` cartridge is purpose-built to exercise colour, and the
+two sides disagree on it in a specific way: **identical structure, same 8-pixel
+colour blocks in the same places, but different colours in the cells.** Nothing
+else about the picture differs.
+
+Colour index and channel permutation are provably the same on both sides — same
+`{off[7:5], off[2:0]}`, same R/B/G→RGB swap — so the disagreement is about *which
+display byte a colour belongs to*, and the likely culprit is the **reference**,
+not the RTL:
+
+- The RTL latches colour during the DMA cycle, indexed off the real DMA address
+  (R(0)), exactly as the hardware latches RDATA/GDATA/BDATA with the luminance.
+- `tools/refemu` reconstructs it at render time from `(y*8 + x + scroll) & 0xFF`,
+  because its frame model has no per-byte DMA. That is only equivalent while R(0)
+  advances linearly across the page. These machines show each logical row **6**
+  times by rewinding R(0), so a cartridge whose colour varies down the screen can
+  expose the difference.
+
+This is exactly the circularity caveat in §5 made concrete, and it is why the
+score above should not be read as "the RTL is 24/38 correct". **Resolve it with a
+third opinion**: Emma 02 ships this very cartridge (it is where these Sarnoff
+files came from), so run it there and see which side matches. If the reference is
+wrong, fix its lookup to follow the DMA address rather than screen position.
+
+### Also outstanding
+
+- Tone generator (256 tones, 107Hz–13672Hz on `OUT 4`) in neither side.
+- `BCKGND`, which lowers background luminance so one colour can serve as both
+  background and data. Needs a fourth video bit.
+- NTSC colour machines (Studio III NTSC, Conic M-1200) need their own timing.
+- `grand-pack.st2` (CRC `1594`) has no joystick profile entry and falls to the
+  default; the other 13 Conic CRCs were already in the table, paired with their
+  Studio II equivalents.
