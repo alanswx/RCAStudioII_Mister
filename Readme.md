@@ -97,10 +97,20 @@ takes a **CRC16 of the cartridge as it loads** and selects a profile from a tabl
 
 `GUNFIGHTER` is a full cross with fire on `5`; in one-player mode it collapses onto keypad B, while two-player mode splits across A and B. `8WAY` is `CROSS` plus diagonals (`1/3/7/9`). `DOODLES` uses the same idea but sends everything to keypad B only.
 
-`PADDLE` is single-player and keypad-B-only, for the homebrew `tennis.st2` (a
-different cartridge from the retail TV Arcade III Tennis/Squash, which uses
-`CROSS`). It maps racquet movement to `B2`/`B8`, and the left, Fire, and right
-buttons to the setup choices `B4`, `B5`, and `B6`, respectively.
+`PADDLE` is single-player and keypad-B-only, written for the homebrew
+`tennis.st2`. It maps racquet movement to `B2`/`B8`, and the left, Fire, and
+right buttons to the setup choices `B4`, `B5`, and `B6`, respectively.
+
+> **\* Retail Tennis/Squash is under review.** The core currently maps the
+> retail TV Arcade III cartridge (CRC `88FB`) to `PADDLE` with Start on `A1`,
+> the same entry as the homebrew `tennis.st2` (CRC `FB76`). They are different
+> cartridges, and two things look wrong for the retail one: `PADDLE` puts
+> nothing on keypad A and is a one-player profile, so in **two-player** Tennis
+> both sticks collapse onto keypad B and player A loses the pad entirely; and
+> the RCA manual starts two-player Tennis on **`A2`**, not `A1` (`A1` is
+> one-player Squash). The previous mapping was `CROSS` with Start `A2`.
+> Left as-is pending Elle's reasoning — if you play the retail cartridge with a
+> gamepad, say which behaves correctly.
 
 `CLEAR_ONLY` leaves the gamepad's Select button available for **CLEAR**, but
 disables all controller-driven keypad presses; keyboard, on-screen numstick, and
@@ -124,7 +134,7 @@ Built-in BIOS games are detected by the first key pressed after reset:
 | Cartridge | Profile | Start key |
 |-----------|---------|-----------|
 | TV Arcade I – Space War | `SPACEWAR` | `A1` |
-| TV Arcade III – Tennis / Squash | `CROSS` | `A2` |
+| TV Arcade III – Tennis / Squash | `PADDLE` * | `A1` * |
 | TV Arcade IV – Baseball | `BASEBALL` | `A0` |
 | TV Arcade Series – Gunfighter / Moonship Battle | `GUNFIGHTER` | `A1` |
 | TV Arcade Series – Speedway / Tag | `CROSS` | `A1` |

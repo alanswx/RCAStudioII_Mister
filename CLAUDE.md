@@ -309,6 +309,34 @@ do not assume the R(0) story above.
 ### 6.2 Memory decode -- done (2026-08-15)
 Implemented; see §10. `tools/memdecode-test.sh` covers it.
 
+### 6.2b Retail Tennis/Squash is mapped to PADDLE -- open question (2026-08-17)
+
+`6b5b999` (Elle's, merged 2026-08-17) folded the retail TV Arcade III hash onto
+the homebrew tennis line:
+
+```
+-16'h88FB: begin map_profile <= MAP_CROSS;  start_key <= 4'd2; end   # retail
+-16'hFB76: begin map_profile <= MAP_PADDLE; start_key <= 4'd1; end   # homebrew
++16'h88FB, 16'hFB76: begin map_profile <= MAP_PADDLE; start_key <= 4'd1; end
+```
+
+Those are **different cartridges**, not two dumps of one: `88FB` is retail TV
+Arcade III (two-player Tennis, and per the RCA manual it starts on `A2`; `A1` is
+one-player Squash), `FB76` is Paul Robson's single-player homebrew `tennis.st2`.
+
+Two things look wrong for the retail cartridge. `map_padA(MAP_PADDLE)` is empty
+(the case arm is literally `MAP_PADDLE: ;`) and `MAP_PADDLE` is in
+`profile_1p`, so in two-player Tennis both sticks collapse onto keypad B and
+player A has no pad at all. And Start now presses `A1`, which starts the wrong
+game.
+
+**Deliberately left as-is** pending Elle's reasoning — she may have hardware
+findings the code does not show. Do not "fix" it without asking her first. Note
+the frame comparison cannot demonstrate this: retail Tennis does not visibly
+respond to held stick input in the harness, so the evidence is the code path,
+not a screenshot. If it is to be reverted, the previous mapping was `MAP_CROSS`
+with `start_key <= 4'd2`.
+
 ### 6.3 Top level — `RCAStudioII.sv`
 - No PAL support, and the BIOS is not embedded (the core is held in reset until
   one is loaded). The rest of the old list — aspect ratio, `CE_PIXEL`, the dead
