@@ -19,11 +19,15 @@
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-REF="$ROOT/refs/rca-studio2/studio2-games/studio2/studio2_headless"
+# The reference emulator is vendored at tools/refemu (MIT, see its README). The
+# old location under the git-ignored refs/ is still accepted so an existing
+# checkout keeps working, but tools/refemu is the copy that ships with the repo.
+REF="$ROOT/tools/refemu/studio2_headless"
+[[ -x "$REF" ]] || REF="$ROOT/refs/rca-studio2/studio2-games/studio2/studio2_headless"
 RTL="$ROOT/verilator/obj_dir_headless/Vtop"
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 
-[[ -x "$REF" ]] || { echo "error: build the reference: (cd refs/rca-studio2/studio2-games/studio2 && make headless)" >&2; exit 1; }
+[[ -x "$REF" ]] || { echo "error: build the reference: (cd tools/refemu && make headless)" >&2; exit 1; }
 [[ -x "$RTL" ]] || { echo "error: build the RTL sim: (cd verilator && make headless)" >&2; exit 1; }
 
 CART="$1"; FRAMES="$2"; SHOTS="$3"; shift 3

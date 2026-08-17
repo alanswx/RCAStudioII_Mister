@@ -73,3 +73,10 @@ docs/rca-technical/
 RCAStudioII.dse
 dse_local_job_24632.log
 out/
+
+# tools/refemu is the vendored reference emulator (MIT) -- tracked on purpose,
+# see its README. Only its build products are ignored.
+tools/refemu/studio2_headless
+tools/refemu/studio2
+tools/refemu/*.o
+tools/refemu/out/

@@ -486,16 +486,24 @@ the corpus can substitute for (§9).
 
 ## 9. Verifying against the reference emulator
 
-The core is checked frame-by-frame against Paul Robson's C emulator at
-`refs/rca-studio2/studio2-games/studio2`, which was extended for this purpose:
-an ST2 loader, a headless front end (`headless.c`, no SDL), PNG capture, an
-instruction trace and scripted keypresses.
+The core is checked frame-by-frame against Paul Robson's C emulator, **vendored
+into this repo at `tools/refemu/`** (MIT; see its README for provenance and for
+why it is vendored rather than left in `refs/`). It was extended for this
+purpose: an ST2 loader, a headless front end (`headless.c`, no SDL), PNG capture,
+an instruction trace and scripted keypresses — all of which are part of this
+project, not upstream's.
 
 ```sh
-cd refs/rca-studio2/studio2-games/studio2
+cd tools/refemu
 make headless          # -> ./studio2_headless   (links libc only)
 ./studio2_headless --help
 ```
+
+It used to live only under the git-ignored `refs/`, *untracked*, in a checkout
+whose remote is upstream's — so the harness behind every accuracy figure below
+was one `git clean` away from being lost. `tools/compare-game.sh` prefers
+`tools/refemu` and still falls back to the old `refs/` path if a stale build is
+there.
 
 Both it and the RTL sim take the same `--frames`, `--press KEY@F[:H]`, `--shot`
 and `--ascii` options, so a comparison is a plain `diff`. The C emulator renders
@@ -607,7 +615,7 @@ clean. The reference §9 sweep (builtins + 18 retail, same recipe pre/post) is
 outcome-identical cart for cart.
 
 Also from this session: the reference emulator now builds on this box
-(`refs/rca-studio2/studio2-games/studio2 && make headless`), and its
+(`cd tools/refemu && make headless`; it lived under `refs/` at the time), and its
 `--frame-log` prints the per-frame scroll register — that's how the "is the
 flash authored?" question was settled. Emma 02 turns out to force-sync
 (`setCycle0()` at interrupt and after each DMA line) so it cannot arbitrate
