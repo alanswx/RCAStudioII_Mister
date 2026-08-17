@@ -181,7 +181,62 @@ only set committed to the repo.
   and the sim's frame grabber and ASCII output, which currently assume one bit
   per pixel. The §9 comparison harness needs a colour-aware mode or the whole
   regression stops working for the new machines.
-- **Whether the C reference emulator covers these.** Our §9 harness diffs
-  against Paul Robson's Studio II emulator, which will not help for the 1864
-  machines. Emma 02 covers all of them and would have to become the reference —
-  a different, less scriptable comparison.
+- **What the reference emulator becomes.** Settled — see §5.
+
+---
+
+## 5. The reference emulator: extend Robson, don't adopt Emma 02
+
+The §9 comparison diffs against Paul Robson's C Studio II emulator, which knows
+nothing about the CDP1864 — so the harness goes dark exactly when the colour
+machines arrive. Two obvious ideas, both investigated 2026-08-17, both rejected:
+
+### Making Emma 02 the harness — no
+
+Not an effort question. Emma's emulation is structurally welded to wxWidgets:
+
+```
+class Video : public wxFrame        // the video emulation IS a GUI window
+class Pixie : public Video
+void Video::drawPoint(wxCoord x, wxCoord y) { gc->DrawRectangle(x,y,0,0); }
+```
+
+Every pixel is painted straight into a wx device context. **There is no
+framebuffer array to read back** — nothing to capture, hash or diff without
+replacing the drawing substrate across 183 files and 135k lines. The entry point
+is `IMPLEMENT_APP(Emu1802)` on `wxApp`; the `wxCmdLineParser` in there is
+argument parsing inside the GUI, not a batch mode. And `Cdp1802 : public
+IoDevice, public Memory, public Sound` means the CPU inherits memory and sound,
+so a single machine does not lift out cleanly either.
+
+### Porting Emma's code into Robson — blocked, and the wrong donor
+
+Emma's file headers, on both Marcel van Tongeren's code and Michael H Riley's
+1802:
+
+> *This software may not be used in commercial applications without express
+> written permission from the author.*
+
+A non-commercial clause is an **additional restriction, which the GPL forbids**,
+so it cannot be combined into this GPL-2-or-later project. The repo also ships
+`agpl-3.0.txt`, which contradicts the headers — a real ambiguity that would need
+Marcel's clarification. Do not assume the AGPL file governs.
+
+### What to do instead: MAME's 1864 into Robson
+
+| | Licence | Size | Fit |
+|---|---|---|---|
+| MAME `cdp1864.cpp`/`.h` | **BSD-3-Clause** (Curt Coder) | 638 lines | The same authority we already matched the 1861 against |
+| Robson `studio2/` | **MIT** | 2,524 lines, no deps | Already extended with our `headless.c`; video is `CPU_GetScreenMemoryAddress()` into emulated RAM — the same DMA-reads-RAM model as the RTL |
+
+Both permissive, both compatible, and the donor is the source our 1861 timing
+already came from. Task #11.
+
+**State this caveat with any accuracy claim.** If both the RTL and the reference
+emulator derive from MAME's 1864, the comparison verifies *"the RTL matches our
+C port of MAME"*, not that the model is independently right. It still catches
+RTL timing, DMA and state-machine bugs — which is most of what the harness has
+ever actually caught — but it is a weaker claim than the Studio II 18/21, where
+Robson's emulator was written independently of MAME. Emma 02 stays as the
+independent second opinion for eyeball checks; `tools/emma02.sh` already unpacks
+it for that.
