@@ -36,8 +36,27 @@
 // State 1 : 1876 cycles till interrupt N1 = 0
 // State 2 : 29 cycles with N1 = 1
 
-#define STATE_1_CYCLES          (EXEC_CYCLES_PER_FRAME)
+#define STATE_1_CYCLES          (state1Cycles)
 #define STATE_2_CYCLES          (29)
+
+//  The CDP1864 colour machines are PAL and run a different frame: 1.75MHz clock,
+//  50Hz, 312 lines a frame, and 192 display lines (32 logical rows shown 6x --
+//  Emma 02's MPT-02 config gives display lines 76..267 inclusive, which is
+//  exactly 192, and the datasheet advertises "max 192 vertical x 64 horizontal").
+//  So the CPU gets (312-192)*14 = 1680 cycles between interrupts where the
+//  Studio II gets 1876.
+//
+//      1750000/8 = 218750 cycles/sec, /50 = 4375 a frame, /312 = 14 a line.
+//
+//  Held in a variable rather than a #define so one binary can be either machine.
+#define MPT02_CYCLES_PER_LINE   (14)
+#define MPT02_LINES_PER_FRAME   (312)
+#define MPT02_VISIBLE_LINES     (192)
+#define MPT02_EXEC_CYCLES       ((MPT02_LINES_PER_FRAME-MPT02_VISIBLE_LINES)*MPT02_CYCLES_PER_LINE)
+
+static INT16 state1Cycles = EXEC_CYCLES_PER_FRAME;                                  // set by CPU_SetMachine()
+static BYTE8 machineType  = MACHINE_STUDIO2;
+static BYTE8 rowScale     = ROW_SCALE_STUDIO2;
 
 static BYTE8 D,X,P,T;                                                               // 1802 8 bit registers
 static BYTE8 DF,IE,Q;                                                               // 1802 1 bit registers
@@ -49,6 +68,78 @@ static BYTE8 *screenMemory = NULL;                                              
 static BYTE8 scrollOffset;                                                          // Vertical scroll offset e.g. R0 = $nnXX at 29 cycles
 static BYTE8 screenEnabled;                                                         // Screen on (IN 1 on, OUT 1 off)
 static BYTE8 keyboardLatch;                                                         // Value stored in Keyboard Select Latch (Studio 2)
+
+//*******************************************************************************************************
+//                          CDP1864 colour state (MPT-02 / Studio III only)
+//*******************************************************************************************************
+//
+//  64 colour cells, not 256. The board decodes six address lines, so $B00-$BFF is
+//  the same 64 bytes mirrored four times -- which is why MAME maps $0B00-$0B3F
+//  (the storage) and Emma 02 declares $0B00-$0BFF (the decoded window) without
+//  the two actually disagreeing.  See docs/succession-plan.md §6.
+//
+//  The cell for a display byte is {off[7:5], off[2:0]}: the low three bits are
+//  the column (8 bytes across a 64 pixel row) and off[7:5] the row group, so one
+//  cell covers 8 pixels across by 4 logical rows down. That indexing is MAME's,
+//  from mpt02_state::dma_w(), where the offset it is handed is the DMA address
+//  (cosmac_device::dma_output passes R[0]).
+//
+//  Colours are 3-bit {R,G,B}. Bit 0 red, bit 1 blue, bit 2 green in the 1864's
+//  own pin order (RDATA/BDATA/GDATA); this keeps them in that order internally
+//  and converts to {R,G,B} on the way out so the value matches the RTL's video
+//  bus.
+
+#define COLOUR_CELLS            (64)
+
+static BYTE8 colourRAM[COLOUR_CELLS];                                               // 1-of-8 dot colour per cell
+static BYTE8 backgroundIndex;                                                       // 0-3, steps on OUT 1
+static BYTE8 colourEnabled;                                                         // CON: set by the first colour RAM write
+
+//  The four background colours, as {R,G,B}. Order and values follow Emma 02's
+//  soundic_victory_mpt-02.xml, which lists back_blue, back_black, back_green and
+//  back_red -- the 1864 steps through them in that order.
+static const BYTE8 backgroundColours[4] = { 1, 0, 2, 4 };                           // blue, black, green, red
+
+//  1864 colour RAM holds R/B/G in bits 0/1/2 (the pin order). Convert to the
+//  {R,G,B} = bit2/bit1/bit0 form the rest of this program and the RTL use.
+static BYTE8 CPU_ColourToRGB(BYTE8 c)
+{
+    return (BYTE8)(((c & 1) ? 4 : 0) | ((c & 4) ? 2 : 0) | ((c & 2) ? 1 : 0));
+}
+
+BYTE8 CPU_GetColour(BYTE8 pageOffset)
+{
+    BYTE8 cell = (BYTE8)(((pageOffset & 0xE0) >> 2) | (pageOffset & 0x07));
+    return CPU_ColourToRGB(colourRAM[cell & (COLOUR_CELLS-1)]);
+}
+
+BYTE8 CPU_GetBackgroundColour()
+{
+    return backgroundColours[backgroundIndex & 3];
+}
+
+BYTE8 CPU_GetColourEnabled()
+{
+    return colourEnabled;
+}
+
+BYTE8 CPU_GetMachine()  { return machineType; }
+BYTE8 CPU_GetRowScale() { return rowScale; }
+
+void CPU_SetMachine(BYTE8 machine)
+{
+    machineType  = machine;
+    if (machine == MACHINE_MPT02)
+    {
+        state1Cycles = MPT02_EXEC_CYCLES;
+        rowScale     = ROW_SCALE_MPT02;
+    }
+    else
+    {
+        state1Cycles = EXEC_CYCLES_PER_FRAME;
+        rowScale     = ROW_SCALE_STUDIO2;
+    }
+}
 
 #ifdef ARDUINO_VERSION
 static BYTE8 studio2RAM[512] __attribute__ ((section (".noinit")));                 // Studio 2's internal RAM (ONLY)
@@ -82,6 +173,7 @@ static BOOL CPU_IsLoadablePage(BYTE8 page)
     if (page >= 0x10) return FALSE;                                                 // Outside the single 4k bank we model.
     if (page <= 0x03) return FALSE;                                                 // System ROM.
     if (page == 0x08 || page == 0x09) return FALSE;                                 // Studio 2 RAM / display memory.
+    if (machineType == MACHINE_MPT02 && page == 0x0B) return FALSE;                 // 1864 colour RAM, not cartridge space.
     return TRUE;
 }
 
@@ -118,6 +210,32 @@ static BOOL CPU_LoadST2Image(FILE *f)
     }
     fflush(stdout);                                                                 // Loader output must survive a killed/headless run.
     return TRUE;
+}
+
+//  Load a system ROM flat at $0000, replacing the Studio II BIOS this program
+//  carries embedded. Needed for the colour machines: the Studio III / MPT-02
+//  BIOS is a different image (refs/emma_02/data/StudioIII/studio3_{ntsc,pal}.bin,
+//  data/Victory/victory.rom), and without it a Studio III cartridge just shows a
+//  blank frame. Call after CPU_Reset(), which is what copies the embedded BIOS in.
+
+void CPU_LoadBios(char *fileName)
+{
+    FILE *f = fopen(fileName,"rb");
+    int address = 0x0000;
+    int c;
+    if (f == NULL)
+        exit(printf("Unable to open BIOS: %s\n",fileName));
+    //  The Studio II BIOS is 2K and sits at $0000-$07FF. The Studio III / MPT-02
+    //  image is 4K, spanning both of that machine's ROM regions -- MAME's
+    //  mpt02_map has .rom() at $0000-$07FF *and* $0C00-$0FFF -- so load the whole
+    //  4K but step over the RAM at $0800-$09FF and the colour RAM at $0B00-$0BFF
+    //  rather than letting ROM bytes land on top of them.
+    while ((c = fgetc(f)) != EOF && address < 0x1000)
+    {
+        if (address < 0x800 || address >= 0xC00) studio24k[address] = (BYTE8)c;
+        address++;
+    }
+    fclose(f);
 }
 
 void CPU_LoadBinaryImage(char *fileName)
@@ -185,6 +303,18 @@ static BYTE8 CPU_ReadEFlag(BYTE8 flag)
     return retVal;
 }
 
+//  The colour machines move the display-off control. On the Studio II the 1861 is
+//  turned on by INP 1 and off by OUT 1. On the CDP1864, per the datasheet, N0
+//  with TPB enables interrupt and DMA ("a 61 or 69 instruction") while N2 with
+//  MRD and TPB disables them ("a 6C instruction"), and OUT 1 is taken over by the
+//  background colour step. MAME's mpt02_io_map and Emma 02's
+//  soundic_victory_mpt-02.xml (<in type="on">1</in>, <out type="back">1</out>,
+//  <out type="tone">4</out>) both agree.
+//
+//      Studio II:  INP 1 = on    OUT 1 = off
+//      MPT-02:     INP 1 = on    INP 4 = off    OUT 1 = step background
+//                                               OUT 4 = tone latch
+
 static BYTE8 CPU_InputHandler(BYTE8 portID)
 {
     BYTE8 retVal = 0;
@@ -192,6 +322,9 @@ static BYTE8 CPU_InputHandler(BYTE8 portID)
     {
         case 1:                                                                     // IN 1 turns the display on.
             screenEnabled = TRUE;
+            break;
+        case 4:                                                                     // IN 4 turns it off on the 1864 machines.
+            if (machineType == MACHINE_MPT02) screenEnabled = FALSE;
             break;
     }
     return retVal;
@@ -204,11 +337,20 @@ static void CPU_OutputHandler(BYTE8 portID,BYTE8 data)
         case 0:                                                                     // Called with 0 to set Q
             SYSTEM_Command(HWC_UPDATEQ,data);                                       // Update Q Flag via HW Handler
             break;
-        case 1:                                                                     // OUT 1 turns the display off
-            screenEnabled = FALSE;
+        case 1:                                                                     // OUT 1: display off on the Studio II,
+            if (machineType == MACHINE_MPT02)                                       // background colour step on the 1864.
+                backgroundIndex = (BYTE8)((backgroundIndex + 1) & 3);
+            else
+                screenEnabled = FALSE;
             break;
         case 2:                                                                     // OUT 2 sets the keyboard latch (both S2 & VIP)
             keyboardLatch = data & 0x0F;                                            // Lower 4 bits only :)
+            break;
+        case 4:                                                                     // OUT 4 loads the 1864 tone divider latch.
+            //  Not generating audio here: the comparison harness only ever diffs
+            //  frames, and the RTL's audio is checked separately by measuring Q
+            //  edges (CLAUDE.md §10, 2026-08-12). Swallowed so it does not fall
+            //  through to anything else.
             break;
     }
 }
@@ -237,6 +379,10 @@ void CPU_Reset()
     State = 1;                                                                      // State 1
     Cycles = STATE_1_CYCLES;                                                        // Run this many cycles.
     screenEnabled = FALSE;
+
+    memset(colourRAM,0,sizeof(colourRAM));                                          // 1864 colour state: cleared, colour off
+    backgroundIndex = 0;                                                            // until the first colour RAM write (CON).
+    colourEnabled = FALSE;
 
     #ifndef ARDUINO
     int i;                                                                          // PC Version copy code into 4k space.
@@ -279,6 +425,17 @@ void CPU_WriteMemory(WORD16 address,BYTE8 data)
         #else
         studio24k[address] = data;
         #endif
+        return;
+    }
+    //  Colour RAM on the CDP1864 machines. 64 cells behind a one page window, so
+    //  the index is the low six bits (see the colour section above). Writing here
+    //  is also what asserts CON on real hardware -- the datasheet has CON tied to
+    //  "the gated MWR signal of the color memory" -- so colour switches on with
+    //  the first write rather than needing a separate enable.
+    if (machineType == MACHINE_MPT02 && address >= 0xB00 && address < 0xC00)
+    {
+        colourRAM[address & (COLOUR_CELLS-1)] = data;
+        colourEnabled = TRUE;
     }
 }
 

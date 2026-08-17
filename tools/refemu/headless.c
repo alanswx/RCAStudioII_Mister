@@ -69,9 +69,12 @@ static void PNG_Chunk(FILE *f,const char *type,const unsigned char *data,unsigne
     PNG_Put32(f,crc ^ 0xFFFFFFFFUL);
 }
 
-//  Write a greyscale image.  "grey" is w*h bytes, one per pixel.
+//  Write a truecolour image.  "rgb" is w*h*3 bytes.  This used to be greyscale
+//  (colour type 0, one byte a pixel); it became RGB when the CDP1864 machines
+//  arrived. Nothing diffs these files byte-for-byte -- tools/compare-game.sh
+//  compares the --ascii output, not the PNGs -- so widening them is safe.
 
-static BOOL PNG_Write(const char *path,const unsigned char *grey,int w,int h)
+static BOOL PNG_Write(const char *path,const unsigned char *rgb,int w,int h)
 {
     static const unsigned char sig[8] = { 137,'P','N','G','\r','\n',26,'\n' };
     unsigned char ihdr[13],*raw,*z;
@@ -79,13 +82,14 @@ static BOOL PNG_Write(const char *path,const unsigned char *grey,int w,int h)
     int y;
     FILE *f;
 
-    rawLen = (unsigned long)h * (unsigned long)(w + 1);                             // Each scanline gets a leading filter byte.
+    rawLen = (unsigned long)h * (unsigned long)(w * 3 + 1);                         // Each scanline gets a leading filter byte.
     raw = (unsigned char *)malloc(rawLen);
     if (raw == NULL) return FALSE;
     for (y = 0;y < h;y++)
     {
-        raw[(unsigned long)y * (w + 1)] = 0;                                        // Filter type 0 (none).
-        memcpy(raw + (unsigned long)y * (w + 1) + 1,grey + (unsigned long)y * w,w);
+        raw[(unsigned long)y * (w * 3 + 1)] = 0;                                    // Filter type 0 (none).
+        memcpy(raw + (unsigned long)y * (w * 3 + 1) + 1,
+               rgb + (unsigned long)y * w * 3,(size_t)w * 3);
     }
 
     for (i = 0;i < rawLen;i++)                                                      // Adler-32 over the raw stream.
@@ -123,7 +127,7 @@ static BOOL PNG_Write(const char *path,const unsigned char *grey,int w,int h)
     ihdr[4] = (unsigned char)((h >> 24) & 0xFF); ihdr[5] = (unsigned char)((h >> 16) & 0xFF);
     ihdr[6] = (unsigned char)((h >>  8) & 0xFF); ihdr[7] = (unsigned char)( h        & 0xFF);
     ihdr[8] = 8;                                                                    // 8 bits per sample
-    ihdr[9] = 0;                                                                    // colour type 0 = greyscale
+    ihdr[9] = 2;                                                                    // colour type 2 = truecolour RGB
     ihdr[10] = 0; ihdr[11] = 0; ihdr[12] = 0;                                       // deflate / no filter / no interlace
     PNG_Chunk(f,"IHDR",ihdr,13);
     PNG_Chunk(f,"IDAT",z,pos);
@@ -141,10 +145,24 @@ static BOOL PNG_Write(const char *path,const unsigned char *grey,int w,int h)
 //  hardware.c does.  Note the index is masked per byte: hardware.c wraps the *line* start with & 0xFF but
 //  then reads 8 bytes straight on, which runs past the window when scrollOffset is not a multiple of 8.
 
+//  Each pixel comes out as a 3-bit {R,G,B} colour, 0-7, matching the RTL's video
+//  bus. A monochrome Studio II only ever produces 0 (black) and 7 (white), which
+//  is what keeps every existing capture and the whole §9 comparison identical.
+//
+//  On a CDP1864 machine the dot colour comes from colour RAM, indexed by the
+//  display byte's page offset, and lit pixels take that colour while unlit ones
+//  take the background. The datasheet has the colour latched "concurrent with the
+//  latching of the luminance information ... during the display interval", so
+//  colour is a pure function of where the byte is -- which is why it can be
+//  resolved here at render time even though this emulator models the frame as a
+//  screen pointer rather than per-byte DMA.
+
 static void HL_ReadScreen(unsigned char *pix)
 {
     BYTE8 *screen = CPU_GetScreenMemoryAddress();                                   // NULL when the display is off.
     BYTE8 scroll = CPU_GetScreenScrollOffset();
+    BOOL colour = (CPU_GetMachine() == MACHINE_MPT02) && CPU_GetColourEnabled();
+    BYTE8 background = colour ? CPU_GetBackgroundColour() : 0;
     int x,y,bit;
 
     memset(pix,0,SCREEN_W * SCREEN_H);
@@ -153,9 +171,12 @@ static void HL_ReadScreen(unsigned char *pix)
     {
         for (x = 0;x < SCREEN_W / 8;x++)
         {
-            BYTE8 byte = screen[(y * 8 + x + scroll) & 0xFF];
+            BYTE8 offset = (BYTE8)((y * 8 + x + scroll) & 0xFF);
+            BYTE8 byte = screen[offset];
+            BYTE8 on = colour ? CPU_GetColour(offset) : 7;                          // dot colour, white if monochrome
             for (bit = 0;bit < 8;bit++)                                             // Bit 7 is the leftmost pixel.
-                pix[y * SCREEN_W + x * 8 + bit] = (byte & (0x80 >> bit)) ? 255 : 0;
+                pix[y * SCREEN_W + x * 8 + bit] =
+                    (byte & (0x80 >> bit)) ? on : background;
         }
     }
 }
@@ -176,16 +197,26 @@ static BOOL HL_Shot(const char *dir,const char *prefix,int frame,const unsigned 
 {
     char path[512];
     unsigned char *big;
-    int x,y,w,h;
+    int x,y,w,h,rowScale;
     BOOL ok;
 
     if (scale < 1) scale = 1;
-    w = SCREEN_W * scale; h = SCREEN_H * scale;
-    big = (unsigned char *)malloc((size_t)w * h);
+    //  Each logical row covers several scanlines on a real set -- 4 on the NTSC
+    //  Studio II, 6 on the PAL colour machines -- so the saved image uses that as
+    //  its vertical scale to come out the shape the TV showed.
+    rowScale = CPU_GetRowScale();
+    w = SCREEN_W * scale; h = SCREEN_H * scale * rowScale;
+    big = (unsigned char *)malloc((size_t)w * h * 3);
     if (big == NULL) return FALSE;
     for (y = 0;y < h;y++)                                                           // Nearest neighbour, so pixels stay square.
         for (x = 0;x < w;x++)
-            big[y * w + x] = pix[(y / scale) * SCREEN_W + (x / scale)];
+        {
+            unsigned char c = pix[(y / (scale * rowScale)) * SCREEN_W + (x / scale)];
+            size_t o = ((size_t)y * w + x) * 3;
+            big[o + 0] = (c & 4) ? 0xFF : 0x00;                                     // R
+            big[o + 1] = (c & 2) ? 0xFF : 0x00;                                     // G
+            big[o + 2] = (c & 1) ? 0xFF : 0x00;                                     // B
+        }
     snprintf(path,sizeof(path),"%s/%s_%05d.png",dir,prefix,frame);
     ok = PNG_Write(path,big,w,h);
     free(big);
@@ -229,13 +260,31 @@ static void HL_TraceLine(unsigned long count)
            st.IE,st.Q,st.T);
 }
 
+//  Black stays '.' and white stays '#', exactly as before, so a monochrome frame
+//  prints byte-identically and tools/compare-game.sh keeps working unchanged. The
+//  six chromatic colours get their initials and can only appear on a 1864 machine.
+static char HL_AsciiFor(unsigned char rgb)
+{
+    switch (rgb & 7)
+    {
+        case 0: return '.';                                                         // black
+        case 1: return 'B';                                                         // blue
+        case 2: return 'G';                                                         // green
+        case 3: return 'C';                                                         // cyan
+        case 4: return 'R';                                                         // red
+        case 5: return 'M';                                                         // magenta
+        case 6: return 'Y';                                                         // yellow
+        default: return '#';                                                        // white
+    }
+}
+
 static void HL_Ascii(const unsigned char *pix)
 {
     int x,y;
     for (y = 0;y < SCREEN_H;y++)
     {
         putchar(' ');putchar(' ');
-        for (x = 0;x < SCREEN_W;x++) putchar(pix[y * SCREEN_W + x] ? '#' : '.');
+        for (x = 0;x < SCREEN_W;x++) putchar(HL_AsciiFor(pix[y * SCREEN_W + x]));
         putchar('\n');
     }
 }
@@ -391,6 +440,12 @@ static void HL_Usage(const char *argv0)
 "\n"
 "Runs the Studio II headless and captures frames as PNGs.\n"
 "\n"
+"  --machine NAME    studio2 (default) or mpt02 -- mpt02/studio3 selects the\n"
+"                    CDP1864 colour machine: PAL 312-line frame, 192 display\n"
+"                    lines (rows shown 6x), colour RAM at $B00, background on\n"
+"                    OUT 1, display off on INP 4\n"
+"  --bios FILE       system ROM at $0000, replacing the embedded Studio II BIOS\n"
+"                    (needed for mpt02: studio3_ntsc.bin / victory.rom)\n"
 "  --frames N        stop after N frames (default 300)\n"
 "  --shot N[,N...]   capture at these frame numbers (repeatable)\n"
 "  --shot-every N    capture every N frames\n"
@@ -428,6 +483,8 @@ int main(int argc,char *argv[])
     const char *image = NULL,*outdir = "out";
     char prefix[256] = "frame";
     int frames = 300,every = 0,scale = 4;
+    BYTE8 machine = MACHINE_STUDIO2;
+    const char *bios = NULL;
     BOOL last = FALSE,ascii = FALSE,frameLog = FALSE,quiet = FALSE,vram = FALSE;
     int i,frame = 0,captured = 0,traceFrom = 0;
     long traceCpu = 0;
@@ -455,6 +512,14 @@ int main(int argc,char *argv[])
         {
             if (!HL_AddPress(argv[++i])) return 1;
         }
+        else if (strcmp(argv[i],"--bios") == 0 && i+1 < argc)   bios = argv[++i];
+        else if (strcmp(argv[i],"--machine") == 0 && i+1 < argc)
+        {
+            const char *m = argv[++i];
+            if      (strcmp(m,"studio2") == 0) machine = MACHINE_STUDIO2;
+            else if (strcmp(m,"mpt02") == 0 || strcmp(m,"studio3") == 0) machine = MACHINE_MPT02;
+            else { printf("error: --machine must be studio2 or mpt02\n"); return 1; }
+        }
         else if (strcmp(argv[i],"--trace-cpu") == 0 && i+1 < argc)  traceCpu = atol(argv[++i]);
         else if (strcmp(argv[i],"--trace-from") == 0 && i+1 < argc) traceFrom = atoi(argv[++i]);
         else if (strcmp(argv[i],"--help") == 0 || strcmp(argv[i],"-h") == 0)
@@ -471,7 +536,9 @@ int main(int argc,char *argv[])
     if (frames <= 0) { printf("error: --frames must be positive\n"); return 1; }
 
     IF_Initialise();
+    CPU_SetMachine(machine);                                                        // Must precede CPU_Reset: it sets the frame timing.
     CPU_Reset();                                                                    // Also copies the BIOS into the 4k space.
+    if (bios != NULL) CPU_LoadBios((char *)bios);                                   // ...which --bios then overrides.
     if (image != NULL)
     {
         const char *base,*dot;

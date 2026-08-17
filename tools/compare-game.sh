@@ -30,6 +30,27 @@ TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 [[ -x "$REF" ]] || { echo "error: build the reference: (cd tools/refemu && make headless)" >&2; exit 1; }
 [[ -x "$RTL" ]] || { echo "error: build the RTL sim: (cd verilator && make headless)" >&2; exit 1; }
 
+# Optional leading --machine/--bios, consumed before the positionals. They are
+# not just forwarded to both sims: the two take them differently, and the row
+# expansion below depends on which machine it is.
+MACHINE=studio2
+BIOS="$ROOT/rom/studio2.rom"
+ROWS=4                                  # scanlines per logical row: 4 NTSC, 6 PAL
+while [[ ${1:-} == --machine || ${1:-} == --bios ]]; do
+    case "$1" in
+      --machine) MACHINE="$2"; shift 2 ;;
+      --bios)    BIOS="$2";    shift 2 ;;
+    esac
+done
+if [[ "$MACHINE" != studio2 ]]; then
+    ROWS=6                              # the CDP1864 machines show 32 rows over 192 lines
+    if [[ "$BIOS" == "$ROOT/rom/studio2.rom" ]]; then
+        echo "error: --machine $MACHINE needs its own --bios (e.g. refs/emma_02/data/StudioIII/studio3_pal.bin)" >&2
+        exit 1
+    fi
+fi
+[[ -f "$ROOT/$BIOS" ]] && BIOS="$ROOT/$BIOS"
+
 CART="$1"; FRAMES="$2"; SHOTS="$3"; shift 3
 PRESS=( "$@" )
 
@@ -43,6 +64,7 @@ fi
 shot_args=(); IFS=',' read -ra SL <<< "$SHOTS"
 for f in "${SL[@]}"; do shot_args+=( --shot "$f" ); done
 
+echo "machine: $MACHINE   (rows shown ${ROWS}x)"
 echo "cart   : $([[ "$CART" == "-" ]] && echo '<built-in games>' || basename "$CART")"
 echo "input  : ${PRESS[*]:-<none>}"
 echo "frames : $FRAMES   compared at: $SHOTS"
@@ -52,24 +74,28 @@ echo
 # ${arr[@]+"${arr[@]}"} rather than "${arr[@]}": macOS ships bash 3.2, where an
 # empty array expansion under `set -u` is an unbound-variable error, which is
 # exactly the "-" (no cartridge, built-in games) case.
-"$REF" --frames "$FRAMES" ${PRESS[@]+"${PRESS[@]}"} "${shot_args[@]}" --ascii --quiet --outdir "$TMP" ${cart_ref[@]+"${cart_ref[@]}"} 2>/dev/null \
-  | grep -E "^  [.#]+$" | sed 's/^  //' | tr '.' ' ' | awk '{for(i=0;i<4;i++) print}' > "$TMP/ref.txt"
+ref_opts=( --machine "$MACHINE" )
+[[ "$MACHINE" != studio2 ]] && ref_opts+=( --bios "$BIOS" )
+"$REF" "${ref_opts[@]}" --frames "$FRAMES" ${PRESS[@]+"${PRESS[@]}"} "${shot_args[@]}" --ascii --quiet --outdir "$TMP" ${cart_ref[@]+"${cart_ref[@]}"} 2>/dev/null \
+  | grep -E "^  [.#BGCRMY]+$" | sed 's/^  //' | tr '.' ' ' | awk -v n="$ROWS" '{for(i=0;i<n;i++) print}' > "$TMP/ref.txt"
 # the RTL sim defaults to ../rom/studio2.rom, which is relative to verilator/
-"$RTL" --bios "$ROOT/rom/studio2.rom" --frames "$FRAMES" ${PRESS[@]+"${PRESS[@]}"} "${shot_args[@]}" --ascii --outdir "$TMP" --prefix r ${cart_rtl[@]+"${cart_rtl[@]}"} 2>/dev/null \
+"$RTL" --bios "$BIOS" --frames "$FRAMES" ${PRESS[@]+"${PRESS[@]}"} "${shot_args[@]}" --ascii --outdir "$TMP" --prefix r ${cart_rtl[@]+"${cart_rtl[@]}"} 2>/dev/null \
   | grep -E "^ *[0-9]+ \|" | sed 's/^ *[0-9]* |//; s/|$//' > "$TMP/rtl.txt"
 
 nref=$(wc -l < "$TMP/ref.txt"); nrtl=$(wc -l < "$TMP/rtl.txt")
 nshots=${#SL[@]}
-if [[ $nref -ne $((128*nshots)) || $nrtl -ne $((128*nshots)) ]]; then
-    echo "warning: expected $((128*nshots)) lines each, got ref=$nref rtl=$nrtl" >&2
+lines=$((32*ROWS))
+if [[ $nref -ne $((lines*nshots)) || $nrtl -ne $((lines*nshots)) ]]; then
+    echo "warning: expected $((lines*nshots)) lines each, got ref=$nref rtl=$nrtl" >&2
 fi
 
 fail=0
 for i in "${!SL[@]}"; do
-    s=$(( i*128 + 1 )); e=$(( (i+1)*128 ))
+    s=$(( i*lines + 1 )); e=$(( (i+1)*lines ))
     sed -n "${s},${e}p" "$TMP/ref.txt" > "$TMP/a"
     sed -n "${s},${e}p" "$TMP/rtl.txt" > "$TMP/b"
-    lit_a=$(grep -c '#' "$TMP/a"); lit_b=$(grep -c '#' "$TMP/b")
+    # Any non-blank glyph, not just '#': a CDP1864 frame draws in colour letters.
+    lit_a=$(grep -c '[^ ]' "$TMP/a"); lit_b=$(grep -c '[^ ]' "$TMP/b")
     if diff -q "$TMP/a" "$TMP/b" >/dev/null 2>&1; then
         printf "  frame %-6s MATCH      (%s content lines)\n" "${SL[$i]}" "$lit_a"
     else

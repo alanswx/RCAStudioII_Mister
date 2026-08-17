@@ -63,5 +63,62 @@ The vendored copy was verified byte-identical to the `refs/` original across all
 upstream, do that check again — `tools/compare-game.sh` is only meaningful if
 this binary behaves the way the recorded scores were measured with.
 
-Planned next: a CDP1864 port from MAME (BSD-3-Clause) so the colour machines
-have a reference too — see `docs/succession-plan.md` §5 and task #11.
+The CDP1864 colour support described below arrived that way — see
+`docs/succession-plan.md` §5 and §6.
+
+## CDP1864 colour machines (`--machine mpt02`)
+
+Added here so the §9 comparison does not go dark when the RTL gains a CDP1864.
+Ported from MAME's `cdp1864` (BSD-3-Clause) and Emma 02's machine XML, both
+cross-checked against the datasheet — see `docs/succession-plan.md` §6.
+
+```sh
+./studio2_headless --machine mpt02 \
+  --bios ../../refs/emma_02/data/StudioIII/studio3_pal.bin \
+  --frames 260 --press a1@40:20 --shot 250 --ascii \
+  ../../refs/emma_02/data/St2/Conic_StudioIII-Cartridges/pinball.st2
+```
+
+What `--machine mpt02` changes:
+
+| | Studio II | MPT-02 / Studio III |
+|---|---|---|
+| Frame | 262 lines, 60 Hz, 128 display | **312 lines, 50 Hz, 192 display** |
+| CPU cycles between interrupts | 1876 | **1680** |
+| Rows shown | 4× | **6×** (32 × 6 = 192) |
+| Display off | `OUT 1` | **`INP 4`** — `OUT 1` steps the background |
+| Tone | 555 beeper, gated by Q | `OUT 4` tone latch (not synthesised here) |
+| Colour RAM | — | 64 cells behind `$0B00-$0BFF` |
+
+`--bios` is new and is **required** for `mpt02`: this program carries the Studio II
+BIOS embedded, and a Studio III cartridge on it draws nothing. The Studio III
+image is 4 KB and covers both of that machine's ROM regions (`$0000-$07FF` and
+`$0C00-$0FFF`), so the loader steps over the RAM and colour RAM in between.
+
+### Three things measurement settled
+
+- **Use the PAL BIOS.** `studio3_pal.bin` and `victory.rom` run properly;
+  `studio3_ntsc.bin` and `studio3.rom` do not — with PAL timing they get as far
+  as 175 writes and stall, against 5017 for the PAL image. That is real evidence
+  that the NTSC Studio III is a different timing configuration and not merely a
+  different ROM, which was an open question in the plan. NTSC support here needs
+  its own frame timing, not just `--bios`.
+- **64 colour cells is right.** The PAL BIOS writes `$0B00-$0BFF` exactly **64**
+  times during init — the number the MAME-derived `{off[7:5], off[2:0]}` index
+  implies, arrived at independently.
+- **Rows are shown 6×.** Emma's MPT-02 config gives display lines 76 to 267
+  inclusive, which is exactly 192, and 192 / 32 logical rows = 6. So the logical
+  framebuffer stays 64×32 and only the vertical scale changes.
+
+### State
+
+Working: 12 of the 14 Conic/Studio III cartridges draw, 6 of them in colour
+(`pinball` renders a recognisable table — blue field, yellow border and digits,
+green and red bumpers, magenta targets, cyan lanes). `baseball` and `biorhythm`
+come up blank, almost certainly because they start on a different key rather
+than anything to do with the port — the Studio II table has Baseball on `A0`.
+
+Not done: the tone generator is swallowed rather than synthesised, since the
+harness only ever diffs frames; NTSC colour machines need their own timing as
+above; and none of this is validated against a second emulator yet, which is
+what Emma 02 is for.
