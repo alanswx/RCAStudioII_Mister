@@ -123,6 +123,11 @@ BYTE8 CPU_GetColourEnabled()
     return colourEnabled;
 }
 
+BYTE8 CPU_GetColourCell(BYTE8 cell)
+{
+    return colourRAM[cell & (COLOUR_CELLS-1)];
+}
+
 BYTE8 CPU_GetMachine()  { return machineType; }
 BYTE8 CPU_GetRowScale() { return rowScale; }
 

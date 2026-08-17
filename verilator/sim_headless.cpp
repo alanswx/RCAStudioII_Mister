@@ -36,6 +36,7 @@
 #define PIX(sig)  (top->rootp->top__DOT__rcastudio__DOT__pixie_video__DOT__cdp1861__DOT__##sig)
 #define DPRAM     (top->rootp->top__DOT__rcastudio__DOT__dpram__DOT__mem)   // ROM/cart image, $0000-$0FFF
 #define SRAM      (top->rootp->top__DOT__rcastudio__DOT__sram__DOT__mem)    // the 512 bytes of RAM, $0800-$09FF
+#define COLRAM    (top->rootp->top__DOT__rcastudio__DOT__colour_ram)         // 64 CDP1864 colour cells
 
 static Vtop* top = nullptr;
 static vluint64_t main_time = 0;
@@ -370,6 +371,18 @@ static void dump_state(FILE* f, long frame, const FrameGrabber& fg, bool with_vr
     fprintf(f, "  keylatch %X  playerA %03X  playerB %03X\n",
             RS(keylatch), RS(playerA), RS(playerB));
 
+    // The 64 CDP1864 colour cells, laid out as they appear on screen: 8 columns
+    // across by 8 row-groups down. Printed in the 1864's own pin order, matching
+    // tools/refemu's --colour, so the two can be diffed without a permutation in
+    // the way.
+    if (with_vram && RS(machine_mpt02)) {
+        fprintf(f, "-- CDP1864 colour RAM (row group x column), 1864 pin order --\n");
+        for (int g = 0; g < 8; g++) {
+            fprintf(f, "  g%d:", g);
+            for (int c = 0; c < 8; c++) fprintf(f, " %d", (int)COLRAM[g * 8 + c]);
+            fprintf(f, "\n");
+        }
+    }
     if (with_vram) {
         fprintf(f, "-- Display RAM $0900-$09FF --\n");
         for (int r = 0; r < 256; r += 16) {
