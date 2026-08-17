@@ -82,6 +82,59 @@ handlers over `$0000-$07FF` alone, which is the same statement. Implemented in
 | `EF4`   | Selected key pressed on **right** keypad (player B). |
 | `Q`     | Beeper on/off. NE555 astable, ~625 Hz nominal, pitch decays ~50% over 0.4 s (the "warpy" power-up sound). |
 
+### 2.1 What the RCA block diagram says (primary source, 2026-08-17)
+
+`docs/rca-technical/` (git-ignored, see §5) holds photographs of RCA/Weisbecker
+documents. `Studio II III IV/IMG_0618.JPG` is **"Figure 1 — Studio II Block
+Diagram"**, which is the authority for most of the above. It confirms:
+
+- **Memory is exactly what §2 claims.** Four 512×8 ROMs — `IC11` `$0000-$01FF`
+  and `IC12` `$0200-$03FF` labelled INTERPRETER, `IC13` `$0400-$05FF` and
+  `IC14` `$0600-$07FF` labelled GAME ROM — and four 256×4 NMOS RAMs paired into
+  512 bytes at `$0800-$08FF` and `$0900-$09FF`. There is a discrete **"RAM
+  ADDRESS DECODE"** block fed by `TPA`, gated with `MRD`/`TPA2`, which is the
+  thing our decode models.
+- **The data bus has 22 kΩ pull-ups** ("The data bus uses pullup resistors,
+  22K ohms"). So an undecoded read floats **high**: open bus is `$FF`, not `$00`.
+  This vindicates the change in `0563df6`; the `$00` this core shipped
+  originally (chosen to match the C reference emulator's zeroed array) was wrong
+  on hardware grounds.
+- **The keypad strobe is `N1 AND TPB`**, not a decode of `N == 2`. The CD4515's
+  strobe comes from a gate driven by `N1` and `TPB`, and it takes 4 data-bus
+  bits. On real hardware `OUT 3`, `OUT 6` and `OUT 7` therefore latch the key
+  select as well as `OUT 2`. Our `rtl/rcastudioii.sv` tests `io_n == 3'd2`,
+  which is a deliberate-looking divergence introduced when an earlier bit test
+  was "fixed" — the bit test was closer to the hardware. **Measured neutral:**
+  patching it to `io_out && io_n[1]` gives byte-identical frames across 71
+  images (5 built-ins, 18 retail, 48 PD), so no real software executes those
+  ports. Fidelity nicety, not a bug — but do not "fix" it back without reading
+  this.
+- The **1861 is selected by `N0`**, and `CLEAR` goes to *both* the 1802 and the
+  1861 (which is why CLEAR resets the pixie here). `Q` drives the 555 sound
+  circuit into the speaker. `EF3`/`EF4` are keyboards A/B.
+- `IMG_0619.JPG` is **"Figure 2 — How the RAM is mapped on to the TV"**:
+  `$0900` at top-left, 8 bytes (64 bits) per row, 32 rows, `$09FF` at
+  bottom-right, **bit 7 leftmost**. Exactly the video path we implement.
+- `IMG_0620.JPG` is "Figure 3 — Plug-in PROM card Schematic": a Harris 7641
+  cartridge with `A8` latched from `TPA2` by a CD4042, enabled by `CE1` + `MRD`
+  off the 22-pin socket. Useful if the cartridge window is ever revisited.
+
+Also in there, and worth knowing about:
+
+- `IMG_0353.JPG` — Weisbecker's typed **"STUDIO IV INSTRUCTIONS"** (his
+  letterhead, 7-20-77): the Studio IV I/O map. `61`=tone, `62`=key select
+  (B3-B0), `63`=output port, `64`=TV control (RGB background, spot map,
+  TV on/off, 192-vs-128 lines), `65`=DMA-out, `6B`=input port, and
+  "**TV OFF AFTER RESET**". Relevant if PAL/Studio III/IV ever gets attempted.
+- `IMG_0354.JPG` — his handwritten Studio IV memory test, whose interrupt
+  routine starts `C4 22 78` — `C4` as a real NOP at ISR entry, independent
+  corroboration of the `Cx` long-skip decode fixed in `d1eb75b`.
+- `IMG_1535.JPG` — the "COLOR CHIP" sketch (JAW 1-77), 22 pins, **3.58 MHz
+  crystal generating the CPU clock**, "A8 not req'd for 32×64 format". Note this
+  is the colour machine; the Studio II's own clock is still the slug-tuned RC
+  oscillator of the service manual (§10, 2026-08-12), so it does not change the
+  1.76 MHz figure here.
+
 ### Video — this is the part that matters most
 The CDP1861 does **not** have its own frame buffer. It asserts `DMA_OUT` and the
 **1802** performs 8 DMA-OUT machine cycles per scanline, reading bytes through
@@ -269,6 +322,32 @@ ioctl_addr==100`, so the core is held in reset until a BIOS is loaded.
 | `software/carts/` | Same set, extracted `.bin` (512 / 1024 bytes, load at `$0400`) |
 | `software/tosec/RCA Studio 2 [TOSEC]/` | TOSEC 2012-04-23: BIOS + games as `.st2`, `.bin` and `.asm` |
 | `software/RCA - Chip-8.zip`, `RCA - Superchip.zip`, `RCA - COMSAC VIP.zip` | CHIP-8 / VIP software |
+
+### `docs/rca-technical/` — photographed RCA documents (git-ignored, ~220 MB)
+
+Photographs of primary RCA/Weisbecker paperwork, unpacked from
+`RCA Technical docs.zip`. **Git-ignored deliberately** — `/*.zip` and
+`docs/rca-technical/` are in `.gitignore` because the archive is ~220 MB, over
+GitHub's 100 MB hard limit, and none of it is ours to redistribute. It got swept
+into a commit once by a `git add -A`; that is what the ignore rules prevent.
+
+| Folder | Files | What |
+|--------|-------|------|
+| `Studio II III IV/` | 21 | **The useful one.** Studio II block diagram and RAM/TV map, Studio IV I/O spec, colour chip sketch — see §2.1 |
+| `Technical Reports/` | 57 | RCA technical reports (HEIC) |
+| `Coin Arcade and FRED III/` | 33 | Coin-op and FRED III, incl. `RCA_paper2.pdf` |
+| `Cosmac VIP stuff/` | 11 | VIP photos |
+| `FRED and FRED II/` | 2 | Weisbecker's *Microprocessor Manual System 00* and the July 1972 FRED manual, both searchable PDFs |
+
+Mostly `.HEIC`, so convert before viewing:
+`sips -s format jpeg -Z 1800 in.HEIC --out out.jpg`.
+
+The two FRED PDFs carry their own provenance: the System 00 manual is courtesy
+of the **Hagley Museum and Library** from the David Sarnoff Library Collection
+(Acc. 2464), published to cosmacelf.com with permission granted to Dave Ruske in
+2016; the FRED manual was scanned and cleaned by **Herb Johnson** from the
+Sarnoff Collection and Anthony "Toni" Robbi's papers. Cite them properly if any
+of it is quoted.
 
 `rom/studio2.rom` is md5 `b37205bf19b197682f00619d05da194b`, byte-identical to
 the TOSEC `RCA Studio II BIOS (1976)(RCA).bin`. Good. `rom/studio2.hex` is the
