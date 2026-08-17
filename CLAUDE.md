@@ -723,10 +723,10 @@ Main's menu draw pass skips `J` entries but its selection pass counts anything
 profiles. This is necessary rather than ornamental: the Studio II has no
 joystick, so each game chose its own keys -- Tennis moves the racquet on 2/8 but
 uses 4/5/6 for racquet size, and Space War fires on keypad A while steering on
-keypad B. Presses are OR'd with the keyboard. Unknown cartridges get `CROSS`.
+keypad B. Presses are OR'd with the keyboard. Unknown cartridges get `8WAY`.
 
 The five BIOS built-ins have no cartridge to CRC, so they are told apart by the
-key that starts them (A1 Doodles, A2 Patterns, A3 Freeway, A4 Bowling, A5
+key that starts them (A1 Doodles, A2 Patterns, A3 Bowling, A4 Freeway, A5
 Addition), latching on the first press after reset only -- those keys are reused
 during play. An OSD "Joystick" setting overrides the whole thing, since the table
 can only be as good as its entries.

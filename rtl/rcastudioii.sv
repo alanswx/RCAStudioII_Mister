@@ -234,43 +234,318 @@ reg [3:0] start_key = 4'd1;
 always @(posedge clk_sys) begin
 	if (dl_done) begin
 		case (cart_crc)
-			// Space War
-			16'h977C, 16'h45B5: begin map_profile <= MAP_SPACEWAR; start_key <= 4'd1; end
 
-			// Tennis/Squash
-			16'h88FB: begin map_profile <= MAP_CROSS; start_key <= 4'd2; end
+			// ----------------------------------------------------------------
+			// Retail / known controller mappings
+			// ----------------------------------------------------------------
 
-			// Pinball / Speedway / Star Wars
-			16'hD3E2, 16'h92BA,
-			16'hE153, 16'hD0DA, 16'h8404,
-			16'hD13E, 16'h03E6: begin map_profile <= MAP_CROSS; start_key <= 4'd1; end
-
-			// Baseball
-			16'hF837, 16'h2526: begin map_profile <= MAP_BASEBALL; start_key <= 4'd0; end
-
-			// Gunfighter
-			16'h3CDC, 16'h043E: begin map_profile <= MAP_GUNFIGHTER; start_key <= 4'd1; end
-
-			// Homebrew
-			16'h1943, 16'hFBEF, 16'h2B4D: begin map_profile <= MAP_HOMEBREW; start_key <= 4'd5; end // Asteroids
-			16'h4F61, 16'hAEC7, 16'hE080: begin map_profile <= MAP_HOMEBREW; start_key <= 4'd5; end // Berzerk
-			16'h69AA, 16'h5AC5, 16'h2D86: begin map_profile <= MAP_HOMEBREW; start_key <= 4'd0; end // Invaders
-			16'h6793, 16'hDFCF, 16'h8551: begin map_profile <= MAP_HOMEBREW; start_key <= 4'd0; end // Kaboom
-			16'hC556, 16'h5359, 16'hE00A: begin map_profile <= MAP_HOMEBREW; start_key <= 4'd0; end // Pacman
-			16'hBA0B, 16'hE45F, 16'h1280: begin map_profile <= MAP_HOMEBREW; start_key <= 4'd6; end // Scramble
-
-			// 2P Homebrew
-			16'h4ADA, 16'h188E, 16'hD87F: begin map_profile <= MAP_HB2P; start_key <= 4'd1; end // Combat
-			16'h114A, 16'h4F55, 16'hD5DE: begin map_profile <= MAP_HB2P; start_key <= 4'd1; end // Hockey
-
-			// Other
-			16'hFB76: begin map_profile <= MAP_PADDLE;     start_key <= 4'd1; end
-			16'h1634, 16'hB76F: begin map_profile <= MAP_CLEAR_ONLY; start_key <= 4'd1; end
-			16'hE4C4, 16'hD124, 16'h3EAF, 16'h0C03, 16'h92C7: begin
-				map_profile <= MAP_8WAY; start_key <= 4'd1;
+			// TV Arcade I - Space War
+			16'h45B5, 16'h977C: begin
+				map_profile <= MAP_SPACEWAR;
+				start_key   <= 4'd1;
 			end
 
-			default: begin map_profile <= MAP_8WAY; start_key <= 4'd1; end
+			// Pinball
+			// Speedway + Tag
+			// Star Wars
+			// These cartridges use the MPT-02 joystick cross layout.
+			16'h03E6, 16'h8404, 16'h92BA, 16'hD0DA, 16'hD13E, 16'hD3E2, 16'hE153: begin
+				map_profile <= MAP_CROSS;
+				start_key   <= 4'd1;
+			end
+
+			// TV Arcade IV - Baseball
+			16'h2526, 16'hF837: begin
+				map_profile <= MAP_BASEBALL;
+				start_key   <= 4'd0;
+			end
+
+			// TV Arcade Series - Gunfighter + Moonship Battle
+			16'h043E, 16'h3CDC: begin
+				map_profile <= MAP_GUNFIGHTER;
+				start_key   <= 4'd1;
+			end
+
+			// TV Arcade III - Tennis + Squash
+			16'h88FB, 16'hFB76: begin
+				map_profile <= MAP_PADDLE;
+				start_key   <= 4'd1;
+			end
+
+
+			// ----------------------------------------------------------------
+			// Homebrew: single-player (Paul Robson scheme)
+			// ----------------------------------------------------------------
+
+			// Asteroids
+			16'h1943, 16'hFBEF, 16'h1973, 16'h2B4D: begin
+				map_profile <= MAP_HOMEBREW;
+				start_key   <= 4'd5;
+			end
+
+			// Berzerk
+			16'h4F61, 16'hAEC7, 16'h787D, 16'hE080: begin
+				map_profile <= MAP_HOMEBREW;
+				start_key   <= 4'd5;
+			end
+
+			// Invaders v1/v2/v3
+			16'h6F69, 16'hADAB, 16'h0D1D, 16'h69AA, 16'h2D86, 16'h5AC5: begin
+				map_profile <= MAP_HOMEBREW;
+				start_key   <= 4'd0;
+			end
+
+			// Kaboom
+			16'h6793, 16'hDFCF, 16'h8551: begin
+				map_profile <= MAP_HOMEBREW;
+				start_key   <= 4'd0;
+			end
+
+			// Pacman
+			16'hC556, 16'h5359, 16'hF4A1, 16'hE00A: begin
+				map_profile <= MAP_HOMEBREW;
+				start_key   <= 4'd0;
+			end
+
+			// Scramble
+			16'hBA0B, 16'hE45F, 16'hFAA9, 16'h1280: begin
+				map_profile <= MAP_HOMEBREW;
+				start_key   <= 4'd6;
+			end
+
+
+			// ----------------------------------------------------------------
+			// Homebrew: two-player (Paul Robson scheme)
+			// ----------------------------------------------------------------
+
+			// Combat v1/v2/v3
+			16'h4ADA, 16'h188E, 16'hD87F,
+			16'h54C7, 16'h4AA2, 16'hABBA, 16'h4009: begin
+				map_profile <= MAP_HB2P;
+				start_key   <= 4'd1;
+			end
+
+			// Hockey v1/v2/v3
+			16'h114A, 16'h4F55, 16'hD5DE,
+			16'h554B, 16'h1154, 16'hDE71, 16'hD753: begin
+				map_profile <= MAP_HB2P;
+				start_key   <= 4'd1;
+			end
+
+
+			// ----------------------------------------------------------------
+			// No explicit profile set (8WAY) but known cartridge names
+			// ----------------------------------------------------------------
+
+			// 86677b (Europe) (unknown)
+			16'hFC72: begin
+				map_profile <= MAP_8WAY;
+				start_key   <= 4'd1;
+			end
+
+			// 87201 (Europe) (unknown)
+			16'h74AB: begin
+				map_profile <= MAP_8WAY;
+				start_key   <= 4'd1;
+			end
+
+			// RCA Studio II Resident Games
+			16'hB5BF: begin
+				map_profile <= MAP_8WAY;
+				start_key   <= 4'd1;
+			end
+
+			// A Cheap Graphics Computer
+			16'hBBC8, 16'hEE76: begin
+				map_profile <= MAP_8WAY;
+				start_key   <= 4'd1;
+			end
+
+			// Climber v1.00
+			16'hAD6A, 16'h1139: begin
+				map_profile <= MAP_8WAY;
+				start_key   <= 4'd1;
+			end
+
+			// Concentration + Match
+			16'h7A43, 16'h0ECC: begin
+				map_profile <= MAP_8WAY;
+				start_key   <= 4'd1;
+			end
+
+			// Fifteen Puzzle
+			16'h3244: begin
+				map_profile <= MAP_8WAY;
+				start_key   <= 4'd1;
+			end
+
+			// Flappy Pixel
+			16'h6D1D, 16'hD124: begin
+				map_profile <= MAP_8WAY;
+				start_key   <= 4'd1;
+			end
+
+			// Invasion, The v1.00
+			16'h2DDB: begin
+				map_profile <= MAP_8WAY;
+				start_key   <= 4'd1;
+			end
+
+			// Outbreak v1.00
+			16'hA83F, 16'hBE58: begin
+				map_profile <= MAP_8WAY;
+				start_key   <= 4'd1;
+			end
+
+			// Race
+			16'h5638, 16'h47EA: begin
+				map_profile <= MAP_8WAY;
+				start_key   <= 4'd1;
+			end
+
+			// Rocket v1.01
+			16'h127F, 16'hD2F0: begin
+				map_profile <= MAP_8WAY;
+				start_key   <= 4'd1;
+			end
+
+			// Space Explorer
+			16'h0C03, 16'h92C7: begin
+				map_profile <= MAP_8WAY;
+				start_key   <= 4'd1;
+			end
+
+			// Studio II Point of Sale Demonstration Cartridge
+			16'hB334, 16'h3EAF: begin
+				map_profile <= MAP_8WAY;
+				start_key   <= 4'd1;
+			end
+
+			// Studio II Programming Examples - Move 1
+			16'hD8C2: begin
+				map_profile <= MAP_8WAY;
+				start_key   <= 4'd1;
+			end
+
+			// Studio II Programming Examples - Move 2
+			16'hFF76: begin
+				map_profile <= MAP_8WAY;
+				start_key   <= 4'd1;
+			end
+
+			// Studio II Programming Examples - Move 3
+			16'h0856: begin
+				map_profile <= MAP_8WAY;
+				start_key   <= 4'd1;
+			end
+
+			// Studio II Programming Examples - Random 1
+			16'h51A6: begin
+				map_profile <= MAP_8WAY;
+				start_key   <= 4'd1;
+			end
+
+			// Studio II Programming Examples - Random 2
+			16'h4447: begin
+				map_profile <= MAP_8WAY;
+				start_key   <= 4'd1;
+			end
+
+			// Studio II Programming Examples - Show Key
+			16'hC78E: begin
+				map_profile <= MAP_8WAY;
+				start_key   <= 4'd1;
+			end
+
+			// Studio II Programming Examples - Tone
+			16'hC903: begin
+				map_profile <= MAP_8WAY;
+				start_key   <= 4'd1;
+			end
+
+			// Studio II Test Cartridge
+			16'h7BB6, 16'h79C5: begin
+				map_profile <= MAP_8WAY;
+				start_key   <= 4'd1;
+			end
+
+			// TV Arcade 2012
+			16'hE3CF, 16'h4B55: begin
+				map_profile <= MAP_8WAY;
+				start_key   <= 4'd1;
+			end
+
+			// TV Arcade II - Fun with Numbers
+			16'h29B8, 16'hCEC2: begin
+				map_profile <= MAP_8WAY;
+				start_key   <= 4'd1;
+			end
+
+			// TV Casino Series - Blackjack
+			16'hAF65, 16'hC8B4: begin
+				map_profile <= MAP_8WAY;
+				start_key   <= 4'd1;
+			end
+
+			// TV Casino Series - TV Bingo
+			16'h3731, 16'h31AE: begin
+				map_profile <= MAP_8WAY;
+				start_key   <= 4'd1;
+			end
+
+			// TV Mystic Series - Biorhythm
+			16'h8CDE, 16'hDA69: begin
+				map_profile <= MAP_8WAY;
+				start_key   <= 4'd1;
+			end
+
+			// TV School House I
+			16'h7D85, 16'h9D0D: begin
+				map_profile <= MAP_8WAY;
+				start_key   <= 4'd1;
+			end
+
+			// TV School House II - Math Fun
+			16'hBD53, 16'hB2FF: begin
+				map_profile <= MAP_8WAY;
+				start_key   <= 4'd1;
+			end
+
+
+			// ----------------------------------------------------------------
+			// Existing recognized no-controller entries
+			//
+			// These hashes were present in the previous mapping table but
+			// are not identified by name in the supplied CRC inventory.
+			// Preserve their existing behavior rather than guessing.
+			// ----------------------------------------------------------------
+
+			16'h1634, 16'hB76F: begin
+				map_profile <= MAP_CLEAR_ONLY;
+				start_key   <= 4'd1;
+			end
+
+
+			// ----------------------------------------------------------------
+			// Existing recognized hash with no supplied inventory identity
+			// ----------------------------------------------------------------
+
+			// Identity not present in supplied CRC inventory.
+			16'hE4C4: begin
+				map_profile <= MAP_8WAY;
+				start_key   <= 4'd1;
+			end
+
+
+			// ----------------------------------------------------------------
+			// Fallback
+			// ----------------------------------------------------------------
+
+			default: begin
+				map_profile <= MAP_8WAY;
+				start_key   <= 4'd1;
+			end
+
 		endcase
 	end
 end
@@ -278,7 +553,7 @@ end
 // ---- built-in games -------------------------------------------------------
 // With no cartridge there is nothing to CRC, so the five BIOS games are told
 // apart by the key that starts them (service manual pp.7-8): A1 Doodles,
-// A2 Patterns, A3 Freeway, A4 Bowling, A5 Addition. Only the *first* such press
+// A2 Patterns, A3 Bowling, A4 Freeway, A5 Addition. Only the *first* such press
 // after reset counts -- those keys are reused during play (A5 rolls the ball in
 // Bowling, for instance). 
 
@@ -300,12 +575,9 @@ always @(posedge clk_sys) begin
 	else if (no_cart && !builtin_sel) begin
 		if      (builtin_padA[1] || (builtin_start_press && (active_start_key == 4'd1))) begin builtin_profile <= MAP_DOODLES; builtin_sel <= 1'b1; end  // Doodles: B-side 8-way
 		else if (builtin_padA[2] || (builtin_start_press && (active_start_key == 4'd2))) begin builtin_profile <= MAP_DOODLES; builtin_sel <= 1'b1; end  // Patterns: B-side 8-way
-		// A3 is Freeway and A4 is Bowling: service manual pp.7-8, and the screens
-		// agree (A3 draws the bordered road with the car at the left, A4 the lane
-		// with the pin triangles). Verified by profile dump in sim; a swap here
-		// gives Freeway the Bowling mapping and the B4/B6 steering goes dead.
-		else if (builtin_padA[3]) begin builtin_profile <= MAP_FREEWAY; builtin_sel <= 1'b1; end  // Freeway
-		else if (builtin_padA[4]) begin builtin_profile <= MAP_BOWLING; builtin_sel <= 1'b1; end  // Bowling
+		// A3 = BOWLING; A4 = FREEWAY. If the service manual claims otherwise, it's wrong.
+		else if (builtin_padA[3]) begin builtin_profile <= MAP_BOWLING; builtin_sel <= 1'b1; end  // Bowling
+		else if (builtin_padA[4]) begin builtin_profile <= MAP_FREEWAY; builtin_sel <= 1'b1; end  // Freeway
 		else if (builtin_padA[5]) begin builtin_profile <= MAP_CLEAR_ONLY; builtin_sel <= 1'b1; end  // Addition: digits
 	end
 end

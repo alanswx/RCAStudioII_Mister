@@ -1,0 +1,195 @@
+RCA Studio II — CRC16-CCITT Hash Inventory
+Algorithm: CRC16-CCITT, polynomial 0x1021, initial value 0xFFFF, exact file bytes.
+Grouped by game/file identity; all known BIN/ST2 hashes are listed under the corresponding entry.
+by Elle Ball (meauxdal), August 16, 2026
+
+86677b (Europe) (unknown
+  FC72  86677b (Europe) (unknown.bin
+
+87201 (Europe) (unknown)
+  74AB  87201 (Europe) (unknown).bin
+
+[BIOS] RCA Studio II Resident Games (USA) (Joseph Weisbecker)
+  B5BF  [BIOS] RCA Studio II Resident Games (USA) (Joseph Weisbecker).bin
+
+A Cheap Graphics Computer (1978) (Joseph Weisbecker)
+  BBC8  A Cheap Graphics Computer (1978) (Joseph Weisbecker).bin
+  EE76  A Cheap Graphics Computer (1978) (Joseph Weisbecker).st2
+
+Asteroids (29.03.2013) (Paul Robson) (PD)
+  1973  Asteroids (29.03.2013) (Paul Robson) (PD).bin
+  2B4D  Asteroids (29.03.2013) (Paul Robson) (PD).st2
+
+Berzerk (15.04.2013) (Paul Robson) (PD)
+  787D  Berzerk (15.04.2013) (Paul Robson) (PD).bin
+  E080  Berzerk (15.04.2013) (Paul Robson) (PD).st2
+
+Climber v1.00 (15.05.2013) (Lee Romanow) (PD)
+  AD6A  Climber v1.00 (15.05.2013) (Lee Romanow) (PD).bin
+  1139  Climber v1.00 (15.05.2013) (Lee Romanow) (PD).st2
+
+Combat v1 (11.10.2000) (Paul Robson) (PD)
+  54C7  Combat v1 (11.10.2000) (Paul Robson) (PD).bin
+  4AA2  Combat v1 (11.10.2000) (Paul Robson) (PD).st2
+
+Combat v2 (unknown) (Paul Robson) (PD)
+  4ADA  Combat v2 (unknown) (Paul Robson) (PD).bin
+  D87F  Combat v2 (unknown) (Paul Robson) (PD).st2
+
+Combat v3 (15.09.2016) (Paul Robson) (PD)
+  ABBA  Combat v3 (15.09.2016) (Paul Robson) (PD).bin
+  4009  Combat v3 (15.09.2016) (Paul Robson) (PD).st2
+
+Concentration + Match (Europe) (Gooitzen van der Wal)
+  7A43  Concentration + Match (Europe) (Gooitzen van der Wal).bin
+  0ECC  Concentration + Match (Europe) (Gooitzen van der Wal).st2
+
+Fifteen Puzzle (12.12.2017) (Lee Romanow) (PD)
+  3244  Fifteen Puzzle (12.12.2017) (Lee Romanow) (PD).bin
+
+Flappy Pixel (13.02.2026) (flip) (PD)
+  6D1D  Flappy Pixel (13.02.2026) (flip) (PD).bin
+  D124  Flappy Pixel (13.02.2026) (flip) (PD).st2
+
+Hockey v1 (Four Sports) (16.09.2000) (Paul Robson) (PD)
+  554B  Hockey v1 (Four Sports) (16.09.2000) (Paul Robson) (PD).bin
+  1154  Hockey v1 (Four Sports) (16.09.2000) (Paul Robson) (PD).st2
+
+Hockey v2 (Four Sports) (unknown) (Paul Robson) (PD)
+  114A  Hockey v2 (Four Sports) (unknown) (Paul Robson) (PD).bin
+  D5DE  Hockey v2 (Four Sports) (unknown) (Paul Robson) (PD).st2
+
+Hockey v3 (Four Sports) (16.09.2016) (Paul Robson) (PD)
+  DE71  Hockey v3 (Four Sports) (16.09.2016) (Paul Robson) (PD).bin
+  D753  Hockey v3 (Four Sports) (16.09.2016) (Paul Robson) (PD).st2
+
+Invaders v1 (Space Invaders) (15.09.2000) (Paul Robson) (PD)
+  6F69  Invaders v1 (Space Invaders) (15.09.2000) (Paul Robson) (PD).st2
+
+Invaders v2 (Space Invaders) (unknown) (Paul Robson) (PD)
+  ADAB  Invaders v2 (Space Invaders) (unknown) (Paul Robson) (PD).bin
+  0D1D  Invaders v2 (Space Invaders) (unknown) (Paul Robson) (PD).st2
+
+Invaders v3 (Space Invaders) (17.09.2016) (Paul Robson) (PD)
+  69AA  Invaders v3 (Space Invaders) (17.09.2016) (Paul Robson) (PD).bin
+  2D86  Invaders v3 (Space Invaders) (17.09.2016) (Paul Robson) (PD).st2
+
+Invasion, The v1.00 (01.01.2019) (Lee Romanow) (PD)
+  2DDB  Invasion, The v1.00 (01.01.2019) (Lee Romanow) (PD).bin
+
+Kaboom (22.03.2013) (Paul Robson) (PD)
+  DFCF  Kaboom (22.03.2013) (Paul Robson) (PD).bin
+  8551  Kaboom (22.03.2013) (Paul Robson) (PD).st2
+
+Outbreak v1.00 (15.06.2013) (Lee Romanow) (PD)
+  A83F  Outbreak v1.00 (15.06.2013) (Lee Romanow) (PD).bin
+  BE58  Outbreak v1.00 (15.06.2013) (Lee Romanow) (PD).st2
+
+Pacman (26.03.2013) (Paul Robson) (PD)
+  F4A1  Pacman (26.03.2013) (Paul Robson) (PD).bin
+  E00A  Pacman (26.03.2013) (Paul Robson) (PD).st2
+
+Pinball (Europe) (Andrew Modla)
+  D3E2  Pinball (Europe) (Andrew Modla).bin
+  92BA  Pinball (Europe) (Andrew Modla).st2
+
+Race (07.08.2020) (azya52) (PD)
+  5638  Race (07.08.2020) (azya52) (PD).bin
+  47EA  Race (07.08.2020) (azya52) (PD).st2
+
+Rocket v1.01 (23.08.2010) (ET3400) (PD)
+  127F  Rocket v1.01 (23.08.2010) (ET3400) (PD).bin
+  D2F0  Rocket v1.01 (23.08.2010) (ET3400) (PD).st2
+
+Scramble (13.04.2013) (Paul Robson) (PD)
+  FAA9  Scramble (13.04.2013) (Paul Robson) (PD).bin
+  1280  Scramble (13.04.2013) (Paul Robson) (PD).st2
+
+Space Explorer (1978) (Mark Lenihan)
+  0C03  Space Explorer (1978) (Mark Lenihan).bin
+  92C7  Space Explorer (1978) (Mark Lenihan).st2
+
+Speedway + Tag (Europe) (Joyce Weisbecker)
+  E153  Speedway + Tag (Europe) (Joyce Weisbecker).bin
+
+Star Wars (Europe) (Gooitzen van der Wal)
+  D13E  Star Wars (Europe) (Gooitzen van der Wal).bin
+  03E6  Star Wars (Europe) (Gooitzen van der Wal).st2
+
+Studio II Point of Sale Demonstration Cartridge (USA) (Andrew Modla)
+  B334  Studio II Point of Sale Demonstration Cartridge (USA) (Andrew Modla).bin
+  3EAF  Studio II Point of Sale Demonstration Cartridge (USA) (Andrew Modla).st2
+
+Studio II Programming Examples by Joseph Weisbecker - Move 1 (PD)
+  D8C2  Studio II Programming Examples by Joseph Weisbecker - Move 1 (PD).bin
+
+Studio II Programming Examples by Joseph Weisbecker - Move 2 (PD)
+  FF76  Studio II Programming Examples by Joseph Weisbecker - Move 2 (PD).bin
+
+Studio II Programming Examples by Joseph Weisbecker - Move 3 (PD)
+  0856  Studio II Programming Examples by Joseph Weisbecker - Move 3 (PD).bin
+
+Studio II Programming Examples by Joseph Weisbecker - Random 1 (PD)
+  51A6  Studio II Programming Examples by Joseph Weisbecker - Random 1 (PD).bin
+
+Studio II Programming Examples by Joseph Weisbecker - Random 2 (PD)
+  4447  Studio II Programming Examples by Joseph Weisbecker - Random 2 (PD).bin
+
+Studio II Programming Examples by Joseph Weisbecker - Show Key (PD)
+  C78E  Studio II Programming Examples by Joseph Weisbecker - Show Key (PD).bin
+
+Studio II Programming Examples by Joseph Weisbecker - Tone (PD)
+  C903  Studio II Programming Examples by Joseph Weisbecker - Tone (PD).bin
+
+Studio II Test Cartridge (1976) (Jack Wright)
+  7BB6  Studio II Test Cartridge (1976) (Jack Wright).bin
+  7BB6  Studio II Test Cartridge (1976) (Jack Wright).bin
+  79C5  Studio II Test Cartridge (1976) (Jack Wright).st2
+
+TV Arcade 2012 v1.00 (12.12.2012) (Lee Romanow) (PD)
+  E3CF  TV Arcade 2012 v1.00 (12.12.2012) (Lee Romanow) (PD).bin
+  4B55  TV Arcade 2012 v1.00 (12.12.2012) (Lee Romanow) (PD).st2
+
+TV Arcade I - Space War (USA) (Jeff Winsor)
+  977C  TV Arcade I - Space War (USA) (Jeff Winsor).bin
+  45B5  TV Arcade I - Space War (USA) (Jeff Winsor).st2
+
+TV Arcade II - Fun with Numbers (USA) (Phil Baltzer)
+  29B8  TV Arcade II - Fun with Numbers (USA) (Phil Baltzer).bin
+  CEC2  TV Arcade II - Fun with Numbers (USA) (Phil Baltzer).st2
+
+TV Arcade III - Tennis + Squash (USA) (Andrew Modla)
+  88FB  TV Arcade III - Tennis + Squash (USA) (Andrew Modla).bin
+  FB76  TV Arcade III - Tennis + Squash (USA) (Andrew Modla).st2
+
+TV Arcade IV - Baseball (USA) (Andrew Modla)
+  F837  TV Arcade IV - Baseball (USA) (Andrew Modla).bin
+  2526  TV Arcade IV - Baseball (USA) (Andrew Modla).st2
+
+TV Arcade Series - Gunfighter + Moonship Battle (USA, Europe) (Andrew Modla)
+  3CDC  TV Arcade Series - Gunfighter + Moonship Battle (USA, Europe) (Andrew Modla).bin
+  043E  TV Arcade Series - Gunfighter + Moonship Battle (USA, Europe) (Andrew Modla).st2
+
+TV Arcade Series - Speedway + Tag (USA) (Joyce Weisbecker)
+  D0DA  TV Arcade Series - Speedway + Tag (USA) (Joyce Weisbecker).bin
+  8404  TV Arcade Series - Speedway + Tag (USA) (Joyce Weisbecker).st2
+
+TV Casino Series - Blackjack (USA) (Andrew Modla)
+  AF65  TV Casino Series - Blackjack (USA) (Andrew Modla).bin
+  C8B4  TV Casino Series - Blackjack (USA) (Andrew Modla).st2
+
+TV Casino Series - TV Bingo (USA, Europe)
+  3731  TV Casino Series - TV Bingo (USA, Europe).bin
+  31AE  TV Casino Series - TV Bingo (USA, Europe).st2
+
+TV Mystic Series - Biorhythm (USA, Europe) (Gooitzen van der Wal)
+  8CDE  TV Mystic Series - Biorhythm (USA, Europe) (Gooitzen van der Wal).bin
+  DA69  TV Mystic Series - Biorhythm (USA, Europe) (Gooitzen van der Wal).st2
+
+TV School House I (USA) (Joyce Weisbecker)
+  7D85  TV School House I (USA) (Joyce Weisbecker).bin
+  9D0D  TV School House I (USA) (Joyce Weisbecker).st2
+
+TV School House II - Math Fun (USA, Europe) (Andrew Modla)
+  BD53  TV School House II - Math Fun (USA, Europe) (Andrew Modla).bin
+  B2FF  TV School House II - Math Fun (USA, Europe) (Andrew Modla).st2

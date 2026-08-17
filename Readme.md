@@ -8,7 +8,8 @@ A MiSTer FPGA core for the **RCA Studio II** (1977) — the RCA CDP1802
 ## Status
 
 Playable. The CDP1802 has the full instruction set the BIOS needs, interrupts
-and DMA, and runs at machine-cycle timing. The video is a real CDP1861. No frame buffer, fed by DMA through `R(0)` exactly as the hardware does.
+and DMA, and runs at machine-cycle timing. The video is a real CDP1861. No frame buffer, 
+fed by DMA through `R(0)` exactly as the hardware does.
 
 The beeper and the RTL ST2 cartridge loader are both implemented and used in
 practice. Output is **pixel-identical to a reference emulator on 18 of 21 test
@@ -22,14 +23,18 @@ Still missing: **PAL**, and an embedded BIOS.
 
 ## Installing
 
-Copy a release from `releases/` to `/media/fat/_Console/` on your MiSTer.
+Copy a release from `releases/` to e.g. `/media/fat/_Console/` on your MiSTer.
 
-BIOS is **not** embedded. Name it `boot.rom` and place it in `/media/fat/games/`, or load it manually from the OSD.
+Firmware is not embedded. Place the RCA Studio BIOS (2 KB, md5 
+`b37205bf19b197682f00619d05da194b`) in `/media/fat/games/RCA-StudioII` (assuming SD 
+card). Name it `boot.rom` to have it load automatically, or load it manually from 
+the OSD. 
 
 | OSD slot | File | Loads at |
 |----------|------|----------|
-| `Load Cartridge` | `.st2`, `.bin`, `.rom` | `.bin`/`.rom` flat at `$0400`; `.st2` paged per its header |
-| `Load Firmware` | `.rom` (2 KB, md5 `b37205bf19b197682f00619d05da194b`) | `$0000` |
+| `Load Cartridge` | `.st2`, `.bin`, `.rom` | `.bin`/`.rom` flat at `$0400`; `.st2` 
+paged per its header |
+| `Load Firmware` | `.bin`, `.rom` | `$0000` |
 
 
 The core is held in reset until a BIOS is loaded.
@@ -106,6 +111,16 @@ so the game can be started using the Start button.
 
 #### Which cartridges are mapped
 
+Built-in BIOS games are detected by the first key pressed after reset:
+
+| Game | Start | Profile |
+|------|-------|---------|
+| Doodles | `A1` | `DOODLES` |
+| Patterns | `A2` | `DOODLES` |
+| Bowling | `A4` | `BOWLING` |
+| Freeway | `A3` | `FREEWAY` |
+| Addition | `A5` | `CLEAR_ONLY` |
+
 | Cartridge | Profile | Start key |
 |-----------|---------|-----------|
 | TV Arcade I – Space War | `SPACEWAR` | `A1` |
@@ -125,24 +140,16 @@ Paul Robson’s homebrew games are mapped too:
 | Scramble | `HOMEBREW` | `A6` |
 | Hockey, Combat | `HB2P` | `A1` |
 
-A handful of other homebrew titles are mapped individually, since none of the
-categories above fit them:
+Some other entries:
 
 | Homebrew | Profile | Start key |
 |----------|---------|-----------|
 | tennis.st2 | `PADDLE` | `A1` |
-| RCA_demo.st2 | `8WAY` | `A1` |
-| cas-190-bagua-blood-horoscope.st2 | `8WAY` (unverified) | `A1` |
-| flappy.st2 | `8WAY` (unverified) | `A1` |
-| Space Explorer.bin / space_explorer.st2 | `8WAY` (unverified) | `A1` |
+| flappy.st2 | `8WAY` | `A1` |
+| Space Explorer.bin / space_explorer.st2 | `8WAY` | `A1` |
 
-"Unverified" means the profile is a generic default, not a checked-against-the-
-manual mapping — nobody has run these through `tools/probe-keys.sh` or supplied
-the actual control scheme yet. If you know how one of these plays, open an
-issue or a PR with the details and it can get a proper profile the way
-`tennis.st2` did.
-
-The rest use `CLEAR_ONLY` because they require only digit input, which a joystick cannot express cleanly:
+The following titles use `CLEAR_ONLY` because they require numerical input
+rather than directional input. Use the keyboard, numstick, or manual mapping.
 
 - TV Arcade II – Fun with Numbers
 - TV Casino Series – Blackjack
@@ -151,21 +158,11 @@ The rest use `CLEAR_ONLY` because they require only digit input, which a joystic
 - TV School House I
 - TV School House II – Math Fun
 - Concentration Match
-- Demonstration Cartridge
 
-Built-in BIOS games are detected by the first key pressed after reset:
-
-| Game | Start | Profile |
-|------|-------|---------|
-| Doodles | `A1` | `DOODLES` |
-| Patterns | `A2` | `DOODLES` |
-| Freeway | `A3` | `FREEWAY` |
-| Bowling | `A4` | `BOWLING` |
-| Addition | `A5` | `CLEAR_ONLY` |
+Demonstration Cartridge autoplays a short point-of-sale animation and doesn't
+accept input other than Clear.
 
 #### Mapping: Auto or Manual
-
-Two OSD rows control this, rather than one list with `Auto` buried in it:
 
 | Row | Meaning |
 |-----|---------|
