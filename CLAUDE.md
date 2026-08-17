@@ -433,7 +433,21 @@ with `start_key <= 4'd2`.
 
 ### 7.1 Polish
 PAL option, embedded BIOS, and any final top-level cleanup around default OSD
-behaviour and naming consistency.
+behaviour and naming consistency. **PAL comes first** — it gates the successor
+machines in §7.4, which were European and Australian.
+
+### 7.4 The next machines — see `docs/succession-plan.md`
+
+Which machines follow the Studio II, in what order, and what software we hold
+for each. Headline: the CPU-side contract does not change (MAME drives the
+CDP1864 with the same `INT`/`DMA_OUT`/`EFx` our 1861 already produces), so the
+1802, DMA video model, cartridge loader, keypad and profile system all carry
+over. The MPT-02/Victory family is one implementation for six machines, and
+`refs/emma_02/data/StudioIII/RCA_TEST_CARTRIDGE_TESTER1.st2` is a real test
+cartridge to bring it up against. Read that document before starting any of it —
+particularly §4, which lists the decisions to settle first (one core or many,
+how colour widens the 1bpp video chain, and what replaces the §9 reference
+emulator for the colour machines).
 
 ### 7.2 Controller/profile parity
 The profile system is intentionally explicit and tested across the common
