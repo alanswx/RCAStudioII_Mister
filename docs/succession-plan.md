@@ -61,13 +61,13 @@ work is not blocked on it later. This is `CLAUDE.md` §7.1 and stays first.
 |---|---|---|
 | CDP1864 video | the bulk of it | Replaces the 1861. Same `INT`/`DMA_OUT`/`EFx` contract to the CPU, so our DMA and interrupt plumbing is unchanged |
 | Colour output | moderate | Our chain is 1bpp mono (`video` → white). The 1864 fetches R/G/B from colour RAM per DMA byte; the mixer path has to widen |
-| Memory map | small | ROM `$0000-$07FF`, RAM `$0800-$09FF`, **colour RAM `$0B00-$0B3F`**, **ROM `$0C00-$0FFF`**. Our decode already handles `$0C00-$0DFF` as cart-or-mirror, so this is an extension of work already done |
+| Memory map | small | ROM `$0000-$07FF`, RAM `$0800-$09FF`, **colour RAM 64 cells mirrored across `$0B00-$0BFF`** (§6), **ROM `$0C00-$0FFF`**. Our decode already handles `$0C00-$0DFF` as cart-or-mirror and 512 bytes mirrored across a wide window, so this is an extension of work already done |
 | CDP1864 tone | small | The 1864 has its own tone generator; the 555 beeper goes away |
 | PAL | see 2.0 | |
 
-References: `refs/rca-studio2/Documents/cdp1864.pdf` (datasheet) and MAME's
-`src/devices/sound/cdp1864.cpp`. Note MAME files it under *sound* — it is a
-combined video+sound part.
+References: `refs/rca-studio2/Documents/cdp1864.pdf` (datasheet — distilled into
+§6) and MAME's `src/devices/sound/cdp1864.cpp`. Note MAME files it under
+*sound* — it is a combined video+sound part.
 
 Pleasing continuity: our `CROSS` joystick profile is already the MPT-02
 joystick layout (cross on 2/4/6/8, fire 5, second button 0), taken from the
@@ -209,28 +209,47 @@ argument parsing inside the GUI, not a batch mode. And `Cdp1802 : public
 IoDevice, public Memory, public Sound` means the CPU inherits memory and sound,
 so a single machine does not lift out cleanly either.
 
-### Porting Emma's code into Robson — blocked, and the wrong donor
+### Porting Emma's 1864 into Robson — the wrong donor, technically
 
-Emma's file headers, on both Marcel van Tongeren's code and Michael H Riley's
-1802:
+**Licensing is not the blocker.** Emma's headers carry a non-commercial clause
+(and the repo ships a contradictory `agpl-3.0.txt`), but the harness is a local
+debugging artefact that is never distributed: GPL obligations attach to
+distribution, private modification is explicitly permitted, and a hobby core is
+not a "commercial application". `refs/` is git-ignored, so none of it can reach
+the repo by accident. If the harness ever *is* released, revisit this.
 
-> *This software may not be used in commercial applications without express
-> written permission from the author.*
+The real blocker is that **there is no CDP1864 in Emma to take.** It is not a
+module — there is no `cdp1864.cpp`, and no `Pixie1864` class. The 1864 is
+configuration state (`CDP1864Configuration`) threaded through the generic
+`Pixie` class alongside the 1861 and 1862, driven by XML, and `Pixie` is:
 
-A non-commercial clause is an **additional restriction, which the GPL forbids**,
-so it cannot be combined into this GPL-2-or-later project. The repo also ships
-`agpl-3.0.txt`, which contradicts the headers — a real ambiguity that would need
-Marcel's clarification. Do not assume the AGPL file governs.
+- 1,682 lines, inheriting `Video : public wxFrame`
+- 40 calls into the `p_Main` global and **81** into `p_Computer`
+
+So "port Emma's 1864" means lifting the generic Pixie, its XML configuration
+machinery, and two application-wide singletons. Compare MAME's `cdp1864.cpp`:
+638 self-contained lines with exactly the interface we need
+(`int_cb`, `dma_out_cb`, `efx_cb`, `rdata/bdata/gdata_cb`).
+
+**Emma is still useful here, as data rather than code.** Its XML machine configs
+are a port spec with no extraction problem at all —
+`refs/emma_02/data/Xml/Conic/soundic_victory_mpt-02.xml` gives the MPT-02's tone
+port (`OUT 4`, agreeing with MAME's `mpt02_io_map`), the full RGB palette
+including the four background colours, and the colour RAM range. Use it to
+cross-check the port.
+
+The apparent Emma-vs-MAME disagreement over the colour RAM range turned out not
+to be one — see §6.
 
 ### What to do instead: MAME's 1864 into Robson
 
 | | Licence | Size | Fit |
 |---|---|---|---|
-| MAME `cdp1864.cpp`/`.h` | **BSD-3-Clause** (Curt Coder) | 638 lines | The same authority we already matched the 1861 against |
-| Robson `studio2/` | **MIT** | 2,524 lines, no deps | Already extended with our `headless.c`; video is `CPU_GetScreenMemoryAddress()` into emulated RAM — the same DMA-reads-RAM model as the RTL |
+| MAME `cdp1864.cpp`/`.h` | BSD-3-Clause (Curt Coder) | **638 self-contained lines** | Clean device interface; the same authority we already matched the 1861 against |
+| Robson `studio2/` | MIT | 2,524 lines, no deps | Already extended with our `headless.c`; video is `CPU_GetScreenMemoryAddress()` into emulated RAM — the same DMA-reads-RAM model as the RTL |
 
-Both permissive, both compatible, and the donor is the source our 1861 timing
-already came from. Task #11.
+Chosen on extractability, not licence — though it happens that both are
+permissive, which keeps the option of releasing the harness open. Task #11.
 
 **State this caveat with any accuracy claim.** If both the RTL and the reference
 emulator derive from MAME's 1864, the comparison verifies *"the RTL matches our
@@ -240,3 +259,82 @@ ever actually caught — but it is a weaker claim than the Studio II 18/21, wher
 Robson's emulator was written independently of MAME. Emma 02 stays as the
 independent second opinion for eyeball checks; `tools/emma02.sh` already unpacks
 it for that.
+
+---
+
+## 6. CDP1864 spec, from the datasheet
+
+`refs/rca-studio2/Documents/cdp1864.pdf` is a scan with no text layer — render it
+before searching: `pdftoppm -r 150 -jpeg cdp1864.pdf out`. Page 5 (sheet 89) is
+the functional description of the terminals and answers most design questions.
+**Settle conflicts here first**, rather than picking between emulators.
+
+### Chip-level facts
+
+| | |
+|---|---|
+| Part | "COS/MOS **PAL Compatible** Color TV Interface" — PAL is native, not an afterthought |
+| Clock | **1.75 MHz** crystal (matches MAME's `1.75_MHz_XTAL` for both CPU and CTI) |
+| Colour | Programmable **1-of-8 dot colours** plus **1-of-4 background colours** |
+| Resolution | Bit-mapped, max **192 vertical × 64 horizontal** |
+| `INLACE` | high = 625 lines/frame interlaced; low = **312 lines/frame non-interlaced** |
+| Tone | 256 tones, **107 Hz – 13672 Hz**, from a programmable divider |
+| `BURST` | 4.57 µs pulse on each h-sync back porch (blanked for 24 lines during v-sync) |
+| `ALT` | toggles at each h-sync, driving PAL phase alternation |
+
+### The port map, straight from the datasheet
+
+- **`N0`** with `MRD`+`TPB` steps the background colour, and `N0·TPB` enables
+  INTERRUPT and DMA. The datasheet spells out the opcodes: "a **61** instruction
+  would step the background color, and a **61 or 69** instruction would enable
+  the INTERRUPT and DMA requests."
+- **`N2`** with `MRD`+`TPB` loads the tone-generator latch, and disables INT/DMA:
+  "a **64** instruction would result in data being loaded into the tone-divider
+  latch, while a **6C** instruction would disable the INTERRUPT and DMA requests."
+
+So `OUT 4` is the tone latch and `OUT 1` steps the background — which is what
+both MAME's `mpt02_io_map` and Emma's `soundic_victory_mpt-02.xml`
+(`<out type="tone">4</out>`) already say. Three sources agree.
+
+- **`EF`** emits two pulses per field, each four horizontal lines wide: one
+  starting four lines before the display, one four lines before it ends. That is
+  the same shape as the 1861's `EF1`, so **our existing EF model carries over**.
+- **`CON` (Color On)** is "connected to the gated `MWR` signal of the color
+  memory" — writing to colour RAM is what switches colour on. MAME fakes this
+  with `m_cti->con_w(0); // HACK` on every DMA; worth doing properly.
+- **`RDATA`/`GDATA`/`BDATA`** "carry color information from the color RAM…
+  latched concurrent with the latching of the luminance information from the
+  data bus during the display interval". Colour is fetched **in parallel with
+  each DMA luminance byte**, not on a separate pass.
+
+### The colour RAM range: not a conflict
+
+Emma declares `0xb00-0xbff`, MAME maps `0x0b00-0x0b3f`. The datasheet does not
+adjudicate, because colour RAM size is a *board* choice, not a chip one — the
+"typical color system" figure just shows a CDP1822 (256×4) as the colour map.
+
+MAME's DMA handler shows what the MPT-02 board actually does:
+
+```c
+uint8_t addr = ((offset & 0xe0) >> 2) | (offset & 0x07);   // = {offset[7:5], offset[2:0]}
+m_color = m_color_ram[addr];
+```
+
+A **6-bit index — 64 distinct cells.** With 8 bytes per 64-pixel row and 32
+rows, `offset[2:0]` is the column and `offset[7:3]` the row; MAME keeps only
+`offset[7:5]`, so colour is one cell per **8 columns × 4-row group**.
+
+That makes the two descriptions the same hardware: 64 bytes of storage inside a
+decoded window of one page, i.e. **mirrored four times across `$0B00-$0BFF`** —
+exactly the window-versus-storage distinction we just implemented for the Studio
+II's 512 bytes of RAM (CLAUDE.md §10, 2026-08-15). Emma names the window, MAME
+names the storage. Implement 64 cells, mirror them across the page, and both are
+satisfied.
+
+### Method note
+
+This is the general rule for the successor work: where two emulators disagree,
+go to `refs/rca-studio2/Documents/`, `docs/rca-technical/` and the datasheets
+before choosing. Every conflict hit so far — open bus `$00` vs `$FF`, the keypad
+strobe, the built-in game order, and this one — was settled by paper, and in two
+cases the paper contradicted what the RTL already did.
