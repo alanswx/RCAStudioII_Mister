@@ -44,7 +44,7 @@ module rcastudioii
 	input        [9:0] osk_b,          // and for keypad B
 	input  reg         ce_pix,
 	input              clear_key,      // CLEAR button input from top-level; keep video alive during CLEAR
-	//  Which machine. 0 = Studio II (CDP1861, NTSC, mono), 1 = MPT-02 / Studio III
+	//  Which machine. 0 = Studio II (CDP1861, NTSC, mono), 1 = Studio III 
 	//  (CDP1864, PAL, colour). Selected from the OSD; see docs/succession-plan.md.
 	input              machine_mpt02,
 
@@ -235,20 +235,15 @@ reg  [9:0] playerB = 10'h0;
 ////////////////// JOYSTICK -> KEYPAD ///////////////////////////////////////
 //
 // The Studio II has no joystick: every game is played on the 10-key pads, and
-// each one picks its own keys. So a gamepad can only work if the mapping follows
-// the cartridge. A CRC16 of the image is taken while it downloads and looked up
+// keys vary by game. A CRC16 of the image is taken while it downloads and looked up
 // in a table below; the result selects one of a few profiles.
 //
-// Key numbers come from the RCA manuals (see Readme "How to play"), not guesses.
 // MiSTer joystick bits, per the CONF_STR "J1,..." list in RCAStudioII.sv:
 //   [0]=right [1]=left [2]=down [3]=up   [4]=Fire   [5]=Extra   [6]=Start
 //   [7]=Select(CLEAR, folded into reset by the top level)
 //   [17:8]=A0..A9   [27:18]=B0..B9.
 // Fire/Extra mirror the MPT-02 joystick (the Soundic/Hanimex Studio III
 // machines' swappable keypad controller): fire on 5, a second button on 0.
-// Extra only presses 0 in the profiles where 0 is documented and safe --
-// CROSS, the MPT-02's own layout -- never in HOMEBREW, where A0 restarts
-// Invaders.
 // A0..B9 are direct per-key bindings with no default mapping: they are inert
 // until the user binds them in Define Buttons, and then they always work, on
 // top of whatever profile is active.
@@ -256,8 +251,7 @@ reg  [9:0] playerB = 10'h0;
 // The profile is 4 bits internally; the OSD override (joy_override) is 4, so
 // the menu can force any of the 16 encoded profiles, including Gunfighter.
 // Keep the numeric values aligned with the OSD list so a user selection selects
-// the correct profile. PADDLE is distinct from CROSS, which remains the default
-// for the retail Tennis/Squash cartridge.
+// the correct profile.
 localparam [3:0] MAP_NONE       = 4'd0;   // no controller mapping; keep keypad/OSK input only
 localparam [3:0] MAP_CROSS      = 4'd1;   // 2/8/4/6 + 5 fire, both pads
 localparam [3:0] MAP_SPACEWAR   = 4'd2;   // fire A2, steer B4/B6
@@ -275,7 +269,8 @@ localparam [3:0] MAP_HB2P       = 4'd10;  // 2P homebrew (Hockey, Combat): cross
                                           // list as "2P Homebrew" for manual override.
 localparam [3:0] MAP_CLEAR_ONLY = 4'd11;  // explicit no-controller mapping: only Clear/Select
                                           // from the pad; numstick/keyboard still work.
-localparam [3:0] MAP_PADDLE     = 4'd12;  // homebrew tennis.st2: single-player, keypad B
+localparam [3:0] MAP_PADDLE     = 4'd12;  // TODO: fix 2-player to work when selecting 
+										  // that mode. Single-player, keypad B
                                           // only. Up/down map to 2/8; left/fire/right map
                                           // to the one-time racket-size choices B4/B5/B6.
 
@@ -850,6 +845,9 @@ function automatic [9:0] map_padB(input [3:0] prof, input [31:0] j);
 	end
 endfunction
 
+// TODO: Make MAP_PADDLE 2-player-compatible: the right-hand stick should drive the 
+// B-side, and the left-hand stick should drive the A-side. The current implementation 
+// is single-player only. 
 wire profile_1p = (profile == MAP_SPACEWAR) || (profile == MAP_FREEWAY) ||
                   (profile == MAP_BOWLING)  || (profile == MAP_NONE) ||
                   (profile == MAP_HOMEBREW) || (profile == MAP_GUNFIGHTER) ||
@@ -874,10 +872,8 @@ wire [9:0] start_keys       = ((profile != MAP_CLEAR_ONLY) && start_press) ? (10
 
 // Gunfighter is the special case: in Auto/1P it is B-only (2/4/6/8 + 5 + 0 on
 // the right-hand pad), while in 2P it splits exactly like CROSS across both
-// pads. DOODLES and PADDLE are permanently B-only one-player profiles, so
-// gamepad 0 drives them regardless of Players. 8WAY follows the normal CROSS
-// path (A-side in 1P). The explicit Clear-only profile stays quiet unless the
-// user binds a direct A/B key manually.
+// pads. 8WAY follows the normal CROSS path (A-side in 1P). The explicit Clear-only profile 
+// stays quiet unless the user binds a direct A/B key manually.
 wire [9:0] joyA = ((profile == MAP_NONE) ? 10'd0
                 : ((profile == MAP_GUNFIGHTER) && one_player) ? 10'd0
                 : ((profile == MAP_DOODLES) ? 10'd0
@@ -904,8 +900,7 @@ wire  [9:0] padB = playerB | joyB_active | osk_b;
 assign EF = {key_valid & padB[keylatch], key_valid & padA[keylatch], 1'b1, EFx};
 
 // The Studio II has no input port that returns data -- the keypads are read through EF3/EF4,
-// and INP 1 only toggles the display, discarding the byte. Tie the CPU's input bus off
-// explicitly at 0 (what synthesis was silently defaulting to) rather than leave it undriven.
+// and INP 1 only toggles the display, discarding the byte. 
 wire [7:0] cpu_din = 8'h00;
 reg  [7:0] cpu_dout;
 wire       Q;
