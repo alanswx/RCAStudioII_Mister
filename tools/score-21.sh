@@ -29,7 +29,7 @@ score() {   # $1=label  $2=cart-or-"-"  $3=frames  $4=shots  rest=presses
 }
 
 echo "Built-in games (no cartridge):"
-score "Doodles  (A1)"   - 300 150,300 --press a1@40:20
+score "Doodle   (A1)"   - 300 150,300 --press a1@40:20
 score "Patterns (A2)"   - 300 150,300 --press a2@40:20
 score "Bowling  (A3)"   - 300 150,300 --press a3@40:20
 score "Freeway  (A4)"   - 300 150,300 --press a4@40:20

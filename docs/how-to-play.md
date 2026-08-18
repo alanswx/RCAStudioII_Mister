@@ -12,7 +12,7 @@ Five games are resident in the RCA Studio II BIOS ROM image.
 
 | Game | Select | Controls |
 |------|--------|----------|
-| **Doodles** | **A1** | Keyboard B moves the dot per the arrows on the panel. **B5** leaves a trail as you "write"; **B0** leaves none. Retrace to erase. |
+| **Doodle** | **A1** | Keyboard B moves the dot per the arrows on the panel. **B5** leaves a trail as you "write"; **B0** leaves none. Retrace to erase. |
 | **Patterns** | **A2** | Screen stays dark; keyboard B "writes" per the panel arrows. Memory holds 130 moves — after 130 the pattern auto-repeats, and for fewer, **B0** starts the repeat cycle. |
 | **Bowling** | **A3** | **A5** rolls straight, **A2** hooks left (up), **A8** hooks right (down). Strike scores 20 (`ST-20`), spare 15 (`SP-15`). Player 2 then uses keyboard B. |
 | **Freeway** | **A4** | **B4**/**B6** steer left/right, **A2** throttle, **A8** brake. Avoid the computer car for two minutes; distance travelled shows at the end. |

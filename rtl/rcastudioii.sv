@@ -262,7 +262,7 @@ localparam [3:0] MAP_HOMEBREW   = 4'd6;   // Paul Robson's 1P games: 8-way on pa
                                           // (diagonals are keys 1/3/7/9), fire B0
 localparam [3:0] MAP_GUNFIGHTER = 4'd7;   // vertical cross: 2/8 + fire 5, one-player
 localparam [3:0] MAP_8WAY       = 4'd8;   // CROSS plus diagonals: 1/3/7/9, fire 5 + extra 0
-localparam [3:0] MAP_DOODLES    = 4'd9;   // Doodles/Patterns: B-side 8-way, fire 5, extra 0
+localparam [3:0] MAP_DOODLE     = 4'd9;   // Doodle/Patterns: B-side 8-way, fire 5, extra 0
 localparam [3:0] MAP_HB2P       = 4'd10;  // 2P homebrew (Hockey, Combat): cross plus
                                           // fire-on-0, each player's own pad. Normally
                                           // chosen by CRC, but also exposed in the OSD
@@ -630,7 +630,7 @@ end
 
 // ---- built-in games -------------------------------------------------------
 // With no cartridge there is nothing to CRC, so the five BIOS games are told
-// apart by the key that starts them (service manual pp.7-8): A1 Doodles,
+// apart by the key that starts them (service manual pp.7-8): A1 Doodle,
 // A2 Patterns, A3 Bowling, A4 Freeway, A5 Addition. Only the *first* such press
 // after reset counts -- those keys are reused during play (A5 rolls the ball in
 // Bowling, for instance). 
@@ -651,8 +651,8 @@ always @(posedge clk_sys) begin
 		builtin_profile <= MAP_NONE;
 	end
 	else if (no_cart && !builtin_sel) begin
-		if      (builtin_padA[1] || (builtin_start_press && (active_start_key == 4'd1))) begin builtin_profile <= MAP_DOODLES; builtin_sel <= 1'b1; end  // Doodles: B-side 8-way
-		else if (builtin_padA[2] || (builtin_start_press && (active_start_key == 4'd2))) begin builtin_profile <= MAP_DOODLES; builtin_sel <= 1'b1; end  // Patterns: B-side 8-way
+		if      (builtin_padA[1] || (builtin_start_press && (active_start_key == 4'd1))) begin builtin_profile <= MAP_DOODLE; builtin_sel <= 1'b1; end  // Doodle: B-side 8-way
+		else if (builtin_padA[2] || (builtin_start_press && (active_start_key == 4'd2))) begin builtin_profile <= MAP_DOODLE; builtin_sel <= 1'b1; end  // Patterns: B-side 8-way
 		// A3 = BOWLING; A4 = FREEWAY. If the service manual claims otherwise, it's wrong.
 		else if (builtin_padA[3]) begin builtin_profile <= MAP_BOWLING; builtin_sel <= 1'b1; end  // Bowling
 		else if (builtin_padA[4]) begin builtin_profile <= MAP_FREEWAY; builtin_sel <= 1'b1; end  // Freeway
@@ -742,7 +742,7 @@ function automatic [9:0] map_padA(input [3:0] prof, input [31:0] j);
 			if (j[4]) k[5] = 1'b1;
 			if (j[5]) k[0] = 1'b1;
 		end
-		MAP_DOODLES: begin                   // Doodles/Patterns: B-side 8-way, single-player
+		MAP_DOODLE: begin                   // Doodle/Patterns: B-side 8-way, single-player
 			case (j[3:0])
 			4'b1010: k[1] = 1'b1;            // up+left
 			4'b1001: k[3] = 1'b1;            // up+right
@@ -820,7 +820,7 @@ function automatic [9:0] map_padB(input [3:0] prof, input [31:0] j);
 			if (j[4]) k[5] = 1'b1;
 			if (j[5]) k[0] = 1'b1;
 		end
-		MAP_DOODLES: begin                   // Doodles/Patterns: B-side 8-way, single-player
+		MAP_DOODLE: begin                   // Doodle/Patterns: B-side 8-way, single-player
 			case (j[3:0])
 			4'b1010: k[1] = 1'b1;            // up+left
 			4'b1001: k[3] = 1'b1;            // up+right
@@ -851,7 +851,7 @@ endfunction
 wire profile_1p = (profile == MAP_SPACEWAR) || (profile == MAP_FREEWAY) ||
                   (profile == MAP_BOWLING)  || (profile == MAP_NONE) ||
                   (profile == MAP_HOMEBREW) || (profile == MAP_GUNFIGHTER) ||
-                  (profile == MAP_8WAY)     || (profile == MAP_DOODLES) ||
+                  (profile == MAP_8WAY)     || (profile == MAP_DOODLE) ||
                   (profile == MAP_CLEAR_ONLY) || (profile == MAP_PADDLE);
 wire one_player = (players == 2'd1) || ((players == 2'd0) && profile_1p);
 
@@ -867,7 +867,7 @@ always @* begin
 	end
 end
 wire       start_press = joystick_0[6] | joystick_1[6];
-wire [3:0] active_start_key = ((profile == MAP_GUNFIGHTER) || (profile == MAP_DOODLES) || (profile == MAP_8WAY)) ? 4'd1 : start_key;
+wire [3:0] active_start_key = ((profile == MAP_GUNFIGHTER) || (profile == MAP_DOODLE) || (profile == MAP_8WAY)) ? 4'd1 : start_key;
 wire [9:0] start_keys       = ((profile != MAP_CLEAR_ONLY) && start_press) ? (10'd1 << active_start_key) : 10'd0;
 
 // Gunfighter is the special case: in Auto/1P it is B-only (2/4/6/8 + 5 + 0 on
@@ -876,13 +876,13 @@ wire [9:0] start_keys       = ((profile != MAP_CLEAR_ONLY) && start_press) ? (10
 // stays quiet unless the user binds a direct A/B key manually.
 wire [9:0] joyA = ((profile == MAP_NONE) ? 10'd0
                 : ((profile == MAP_GUNFIGHTER) && one_player) ? 10'd0
-                : ((profile == MAP_DOODLES) ? 10'd0
+                : ((profile == MAP_DOODLE) ? 10'd0
                                           : ((profile == MAP_GUNFIGHTER) ? map_padA(MAP_CROSS, joystick_0)
                                                                         : map_padA(profile, joystick_0))));
 
 wire [9:0] joyB = ((profile == MAP_NONE) ? 10'd0
                 : ((profile == MAP_GUNFIGHTER) && one_player) ? map_padB(MAP_CROSS, joystick_0)
-                : ((profile == MAP_DOODLES) ? map_padB(MAP_DOODLES, joystick_0)
+                : ((profile == MAP_DOODLE) ? map_padB(MAP_DOODLE, joystick_0)
                                           : ((profile == MAP_GUNFIGHTER) ? map_padB(MAP_CROSS, joystick_1)
                                                                         : (one_player ? map_padB(profile, joystick_0)
                                                                                        : map_padB(profile, joystick_1)))));

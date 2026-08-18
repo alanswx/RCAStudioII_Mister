@@ -109,7 +109,7 @@ By default, keypad controls are dynamically mapped to gamepads per game. The cor
 | `HB2P` | `2` | `8` | `4` | `6` | `0` | — | `A1` | `CLEAR` | `2P` | Hockey, Combat |
 | `GUNFIGHTER` | `B2` | `B8` | `B4` | `B6` | `B5` | `B0` | `A1` | `CLEAR` | `1P` | TV Arcade Series – Gunfighter / Moonship Battle |
 | `8WAY` | `2` | `8` | `4` | `6` | `5` | `0`; diagonals `1` / `3` / `7` / `9` | `A1` | `CLEAR` | `1P` | Flappy Pixel |
-| `DOODLES` | `B2` | `B8` | `B4` | `B6` | `B5` | `B0` | `A1` / `A2` | `CLEAR` | `1P` | BIOS Doodles / Patterns |
+| `DOODLE` | `B2` | `B8` | `B4` | `B6` | `B5` | `B0` | `A1` / `A2` | `CLEAR` | `1P` | BIOS Doodle / Patterns |
 | `PADDLE` | `B2` | `B8` | `B4` | `B6` | `B5` | — | `A1` | `CLEAR` | `1P` | TV Arcade III – Tennis / Squash |
 | `CLEAR_ONLY` | — | — | — | — | — | — | — | `CLEAR` | n/a | Numerical-input games; BIOS Addition |
 | `NONE` | — | — | — | — | — | — | `A1` | `CLEAR` | n/a | No automatic keypad mapping; useful with numstick |
@@ -120,7 +120,7 @@ By default, keypad controls are dynamically mapped to gamepads per game. The cor
 
 `HOMEBREW` is Paul Robson's 8-way layout, with Fire on `B0` and diagonal directions on `1`/`3`/`7`/`9`. `HB2P` is the two-player variant, with Fire on `0` on each player's keypad.
 
-`GUNFIGHTER` uses a full directional cross with Fire on `5`; in one-player mode its controls collapse onto keypad B. `8WAY` adds diagonal inputs to `CROSS`. `DOODLES` uses the corresponding full layout on keypad B.
+`GUNFIGHTER` uses a full directional cross with Fire on `5`; in one-player mode its controls collapse onto keypad B. `8WAY` adds diagonal inputs to `CROSS`. `DOODLE` uses the corresponding full layout on keypad B.
 
 `PADDLE` is single-player and keypad-B-only. For Squash, movement is `B2`/`B8`, with Left/Fire/Right on `B4`/`B5`/`B6`. For two-player Tennis, start with `A2` and use two pads with `Mapping: Manual` and `CROSS`, or use the keyboard.
 
@@ -132,24 +132,24 @@ By default, keypad controls are dynamically mapped to gamepads per game. The cor
 
 | Cartridge / Game | Profile | Start |
 |---|---|---|
-| BIOS – Doodles | `DOODLES` | `A1` |
-| BIOS – Patterns | `DOODLES` | `A2` |
+| BIOS – Doodle | `DOODLE` | `A1` |
+| BIOS – Patterns | `DOODLE` | `A2` |
 | BIOS – Bowling | `BOWLING` | `A3` |
 | BIOS – Freeway | `FREEWAY` | `A4` |
 | BIOS – Addition | `CLEAR_ONLY` | `A5` |
 | TV Arcade I – Space War | `SPACEWAR` | `A1` |
+| TV Arcade II – Fun with Numbers | `CLEAR_ONLY` | — |
 | TV Arcade III – Tennis / Squash | `PADDLE` | `A1` |
 | TV Arcade IV – Baseball | `BASEBALL` | `A0` |
 | TV Arcade Series – Gunfighter / Moonship Battle | `GUNFIGHTER` | `A1` |
 | TV Arcade Series – Speedway / Tag | `CROSS` | `A1` |
-| Star Wars | `CROSS` | `A1` |
-| Pinball | `CROSS` | `A1` |
-| TV Arcade II – Fun with Numbers | `CLEAR_ONLY` | — |
 | TV Casino Series – Blackjack | `CLEAR_ONLY` | — |
 | TV Casino Series – TV Bingo | `CLEAR_ONLY` | — |
 | TV Mystic Series – Biorhythm | `CLEAR_ONLY` | — |
 | TV School House I | `CLEAR_ONLY` | — |
 | TV School House II – Math Fun | `CLEAR_ONLY` | — |
+| Star Wars | `CROSS` | `A1` |
+| Pinball | `CROSS` | `A1` |
 | Concentration Match | `CLEAR_ONLY` | — |
 | Demonstration Cartridge | `CLEAR_ONLY` | — |
 | Asteroids | `HOMEBREW` | `A5` |

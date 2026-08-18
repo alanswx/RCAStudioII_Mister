@@ -27,7 +27,7 @@ Quartus with timing closed (§4).
 Recent additions that matter for day-to-day use include the OSD-managed joystick
 profile system with its Auto/Manual split (the menu shows the detected profile
 instead of the word "Auto"), the default 8-way profile,
-Gunfighter/8-way/Doodles special cases, the Clear-only profile for digit-entry
+Gunfighter/8-way/Doodle special cases, the Clear-only profile for digit-entry
 software, the memory decode, and config-versioning so old saved menu state does
 not silently map to the wrong fields.
 
@@ -747,7 +747,7 @@ cosmac does the same). Fixed in `rtl/cdp1802.v` (FETCH no longer yields to DMA;
 until its 8 cycles are actually serviced rather than for a positional window,
 dropping at the 7th acknowledge because the CPU commits one more cycle after
 the request falls — holding it a cycle longer ran 9 cycles/line and R(0)
-drifted +1 a line (Doodles lost its dot; that is the symptom to check).
+drifted +1 a line (Doodle lost its dot; that is the symptom to check).
 
 Verified: the whole corpus — 5 built-ins, 8 homebrews in both formats — is
 **pixel-identical to the pre-fix RTL** at the test frames, the memory-decode
@@ -889,7 +889,7 @@ uses 4/5/6 for racquet size, and Space War fires on keypad A while steering on
 keypad B. Presses are OR'd with the keyboard. Unknown cartridges get `8WAY`.
 
 The five BIOS built-ins have no cartridge to CRC, so they are told apart by the
-key that starts them (A1 Doodles, A2 Patterns, A3 Bowling, A4 Freeway, A5
+key that starts them (A1 Doodle, A2 Patterns, A3 Bowling, A4 Freeway, A5
 Addition), latching on the first press after reset only -- those keys are reused
 during play. An OSD "Joystick" setting overrides the whole thing, since the table
 can only be as good as its entries.

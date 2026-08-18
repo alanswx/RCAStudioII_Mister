@@ -352,7 +352,7 @@ static void dump_state(FILE* f, long frame, const FrameGrabber& fg, bool with_vr
 
     fprintf(f, "-- Cartridge mapping --\n");
     {
-        static const char* pn[] = {"NONE","CROSS","SPACEWAR","FREEWAY","BOWLING","BASEBALL","HOMEBREW","GUNFIGHTER","8WAY","DOODLES","HB2P","UNMAPPED","LEGACY-PADDLE"};
+        static const char* pn[] = {"NONE","CROSS","SPACEWAR","FREEWAY","BOWLING","BASEBALL","HOMEBREW","GUNFIGHTER","8WAY","DOODLE","HB2P","UNMAPPED","LEGACY-PADDLE"};
         int pr = top->rootp->top__DOT__rcastudio__DOT__profile;
         fprintf(f, "  cart CRC16 %04X  ->  profile %d (%s)\n",
                 top->rootp->top__DOT__rcastudio__DOT__cart_crc, pr,
@@ -440,7 +440,7 @@ static void usage(const char* argv0) {
 "    --joy-map N          OSD \"Joystick\" profile, and switch \"Mapping\" to Manual:\n"
 "                         0 none/keypad-only, 1 cross, 2 spacewar, 3 freeway,\n"
 "                         4 bowling, 5 baseball, 6 homebrew, 7 gunfighter,\n"
-"                         8 8-way, 9 doodles, 10 2P homebrew, 11 unmapped,\n"
+"                         8 8-way, 9 doodle, 10 2P homebrew, 11 unmapped,\n"
 "                         12 paddle (legacy). Omit for auto-detection.\n"
 "    --joy MASK@F[:H]     drive joystick 0 with MASK (bit0 right, 1 left, 2 down,\n"
 "                         3 up, 4 fire, 5 extra, 6 start, 17:8 A0..A9,\n"
