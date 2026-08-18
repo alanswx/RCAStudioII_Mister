@@ -207,24 +207,14 @@ assign BUTTONS = 0;
 `include "build_id.v"
 localparam CONF_STR = {
 	"RCA-StudioII;v4;",
-	"-;",
 	"F1,ST2BINROM,Load Cartridge;",
 	"-;",
 	// Must load valid firmware after switching to Studio III
 	"O[13],Machine,Studio II,Studio III;",
 	"F0,BINROM,Load Firmware;",
 	"-;",
-	// Mapping picks who owns the Joystick row below it. On Auto the core drives
-	// that row: it writes the profile it detected back into the menu through
-	// hps_io's status_set, so loading Gunfighter leaves the menu reading
-	// "Gunfighter" instead of "Auto". Switch to Manual and the row keeps
-	// whatever it is showing and becomes yours to change -- so Manual always
-	// starts from the detected profile rather than from a stale one.
 	"O[6],Mapping,Auto,Manual;",
-	// Value 0 is MAP_NONE, which still passes Start through; Clear-only (11) is the
-	// one that silences the pad completely. 
-	// Order must match the localparams in rtl/rcastudioii.sv -- the row's value
-	// IS the profile number.
+	// Order must match the localparams in rtl/rcastudioii.sv
 	"D2O[5:2],Joystick,None,Cross,Space War,Freeway,Bowling,Baseball,Homebrew,Gunfighter,8-way,Doodles,2P Homebrew,Clear-only,Paddle;",
 	"O[8:7],Players,Auto,1,2;",
 	"O[10:9],Stick Keypad,Off,Pad A,Pad B;",
@@ -232,17 +222,14 @@ localparam CONF_STR = {
 	"O[122:121],Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
 	"O[12:11],Scale,Normal,V-Integer,Narrower HV-Integer,Wider HV-Integer;",
 	"-;",
-//	"T[0],Reset;",
 	"T[1],Clear;",
 	"R[0],Reset and close OSD;",
-	// Non-OSD entries (J/jn/V) must sit below every menu row: the menu's selection
-	// pass counts any entry starting >= 'A' (Main menu.cpp), but its drawing pass
-	// skips J -- a J placed mid-string shifts every row after it off by one.
-	// A0..B9 are direct per-key bindings (see rtl/rcastudioii.sv); jn gives
-	// defaults to the first three only, so the direct keys stay unbound until
-	// the user maps them deliberately.
+	// Non-OSD entries (J/jn/V) must sit below every menu row; a J placed mid-string shifts 
+	// every row after it off by one.
 	// Fire/Extra mirror the MPT-02 joystick: fire on 5, a second button on 0.
-	"J1,Fire,Extra,Start,Select,A0,A1,A2,A3,A4,A5,A6,A7,A8,A9,B0,B1,B2,B3,B4,B5,B6,B7,B8,B9;",
+	"J1,Fire,Extra,Start,Clear,A0,A1,A2,A3,A4,A5,A6,A7,A8,A9,B0,B1,B2,B3,B4,B5,B6,B7,B8,B9;",
+	// A0..B9 are direct per-key bindings (see rtl/rcastudioii.sv); jn gives
+	// defaults to the first three only.
 	"jn,A,B,Start,Select;",
 	"V,v",`BUILD_DATE
 };
@@ -261,8 +248,9 @@ wire  [15:0] joystick_l_analog_1, joystick_r_analog_1;
 
 // CLEAR is the Studio II's console button. It resets the CPU and blanks/clears
 // the display, but the Pixie's timing generator is kept running in order to be
-// friendlier to display sync. Mapped to F3 (0x04), the OSD "Clear" button, and
-// gamepad Select.
+// friendlier to display sync. 
+// TODO: Ensure this "hack" does not compromise accuracy. ~elle
+// Mapped to F3 (0x04), the OSD "Clear" button, and the gamepad (as Clear).
 reg clear_key = 1'b0;
 always @(posedge clk_sys) begin
 	reg old_stb;
@@ -321,6 +309,8 @@ pll pll
 
 // The CDP1861 emits one pixel per CPU clock: 1.7897725 MHz nominal, 1.760229 MHz
 // here (clk_sys/4, and the real Studio II's RC oscillator was tuned by eye anyway).
+// TODO: We should still consider the feasibility of hitting true nominal. We are
+// further off than I'd like. ~elle
 reg [1:0] ce_cnt = 2'd0;
 always @(posedge clk_sys) ce_cnt <= ce_cnt + 2'd1;
 wire ce_pix = (ce_cnt == 2'd0);

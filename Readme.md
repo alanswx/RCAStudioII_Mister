@@ -7,28 +7,35 @@ A MiSTer FPGA core for the **RCA Studio II** (1977) — the RCA CDP1802
 
 ## Status
 
-Playable. The CDP1802 has the full instruction set the BIOS needs, interrupts
-and DMA, and runs at machine-cycle timing. The video is a real CDP1861. No frame buffer, 
-fed by DMA through `R(0)` exactly as the hardware does.
+* Studio II: 100% software compatibiity.
+* Studio III: PAL-only. NTSC and Visicom support are WIP; see **Current limitations**.
+* CPU: CDP1802 is complete for Studio II software (including interrupts
+and DMA) and runs at machine-cycle timing. 
+* Video: CDP1861 is complete for Studio II software; no visual issues observed. 
+* Sound: Beeper and Studio III CDP1863 are both implemented and tuned to reference
+recordings.
+* Memory: Proper address bus decoding: ROM, cartridge and the 512 bytes of RAM are
+separate, hardware-accurate RAM mirroring.
 
-The beeper and the RTL ST2 cartridge loader are both implemented and used in
-practice. Output is **pixel-identical to a reference emulator on 18 of 21 test
-frames**. The three that differ are memory/dice games whose BIOS-updated RNG
-seed diverges, not rendering faults.
+## Current limitations
 
-The address bus is decoded properly: ROM, cartridge and the 512 bytes of RAM are
-separate, and the RAM mirrors appear where the hardware puts them.
-
-Still missing: an embedded BIOS. (Not PAL — the Studio II was NTSC-only.)
+* OSD settings do not save.
+* Analog video does not work yet.
+* Direct video does not work yet.
+* Studio III: NTSC support is not implemented yet. 
+* Studio III: Visicom support is not implemented yet.
 
 ## Installing
 
 Copy a release from `releases/` to e.g. `/media/fat/_Console/` on your MiSTer.
 
-Firmware is not embedded. Place the RCA Studio BIOS (2 KB, md5 
-`b37205bf19b197682f00619d05da194b`) in `/media/fat/games/RCA-StudioII` (assuming SD 
-card). Name it `boot.rom` to have it load automatically, or load it manually from 
-the OSD. 
+Firmware is not embedded. Place the RCA Studio II BIOS in 
+`/media/fat/games/RCA-StudioII` (assuming SD  card). Name it `boot.rom` to have 
+it load automatically, or load it manually from the OSD. 
+
+Known Studio II BIOS images:  
+* **2KB, md5 `B37205BF19B197682F00619D05DA194B` (No-Intro): working, recommended**
+* 2KB, md5 `B0010F722FC930D4F7D2F20703C8C80D` (studio2.rom): untested
 
 | OSD slot | File | Loads at |
 |----------|------|----------|
@@ -36,7 +43,17 @@ the OSD.
 | `Load Firmware` | `.bin`, `.rom` | `$0000` |
 
 
-The core is held in reset until a BIOS is loaded.
+The core also accepts Studio III BIOS images. These must currently be explicitly loaded 
+via the `Load Firmware` option after switching to Studio III; they aren't automatically
+loaded at time of writing.
+
+Known Studio III BIOS images:  
+* Studio III 4KB, md5 `849A484AA4B2784ECE5C35C39D9D51A8`: untested
+* Studio III (PAL) 2KB, md5 `4CBC2F551D12709BB26D1500284C97C2`: working
+* Studio III (NTSC) 2KB, md5 `F2EBBF8FA4A2F8509C041B6F07E55C5A`: partial (no NTSC support)
+* **Victory (PAL) 4KB, md5 `5E261010D361A378EAB13F543A96D3C5`: working, recommended**
+* Victory (NTSC) 4KB, md5 `85514FD09950DD8C0CC25238A862C8DC`: not working
+* Visicom (NTSC) 2KB, md5 `AEEC6FE3934481E20EB7DB6D5FF56A54`: not working
 
 ## Controls
 
@@ -107,13 +124,8 @@ takes a CRC16 of the cartridge as it loads and selects a profile from a table in
 `PADDLE` is single-player and keypad-B-only. It maps racquet movement to `B2`/`B8`, and the left, Fire, and right buttons to the setup choices `B4`, `B5`, and `B6`, respectively.
 `PADDLE` is single-player and keypad-B-only, for **Squash** on the TV Arcade III
 cartridge. It maps racquet movement to `B2`/`B8`, and the left, Fire, and right
-buttons to the setup choices `B4`, `B5`, and `B6`, respectively.
-
-> **\* Tennis/Squash gives you Squash, not Tennis.** The cartridge holds both.
-> Tennis is two-player and starts on `A2`; Squash is one-player and starts on
-> `A1`. `PADDLE` is keypad-B-only and one-player, and Start presses `A1`, so a
-> single gamepad plays **Squash** properly rather than half of Tennis. Use the
-> keyboard (or two pads with `Mapping: Manual` and `Cross`) if you want Tennis.
+buttons to the setup choices `B4`, `B5`, and `B6`, respectively. For 2-player Tennis,
+start with `A2` and use two pads with `Mapping: Manual` and `Cross` or the keyboard.
 
 `CLEAR_ONLY` leaves the gamepad's Select button available for **CLEAR**, but
 disables all controller-driven keypad presses; keyboard, on-screen numstick, and
@@ -130,8 +142,8 @@ Built-in BIOS games are detected by the first key pressed after reset:
 |------|-------|---------|
 | Doodles | `A1` | `DOODLES` |
 | Patterns | `A2` | `DOODLES` |
-| Bowling | `A4` | `BOWLING` |
-| Freeway | `A3` | `FREEWAY` |
+| Bowling | `A3` | `BOWLING` |
+| Freeway | `A4` | `FREEWAY` |
 | Addition | `A5` | `CLEAR_ONLY` |
 
 | Cartridge | Profile | Start key |
@@ -226,41 +238,6 @@ pressed. Nudge the right stick and release for `5`.
 
 When using the 2 players option, each player's numstick affects their respective 
 keypad.
-
-#### Adding a cartridge
-
-Use
-```sh
-tools/cart-crc.sh "software/carts/Some Game.bin"
-```
-to generate the hash to be used in the `cart_crc` case in `rtl/rcastudioii.sv`.
-
-### Per-cartridge
-
-"Starts with" is the key that first puts something on screen; 
-"responds to" lists keys that demonstrably change the game state afterwards.
-
-Each cartridge was run in the simulator and every key tried; see 
-`tools/probe-keys.sh`. Further corrections have been made manually.
-
-| Cartridge | Starts with | Keypad A responds to | Keypad B responds to |
-|-----------|-------------|----------------------|----------------------|
-| Concentration Match (Europe) | `any` | `1 2 3 4 5 6 7 8 9` | `1 2 3 4 5 6 7 8` |
-| Demonstration Cartridge (USA) | — | — | — |
-| Pinball (Europe) | `1 2` | — | `1` |
-| Speedway + Tag (Europe) | `1 2` | `2 4 6 8` | `2 4 6 8` |
-| Star Wars (Europe) | `1 2 3` | `1 2 3` | `1 2 3` |
-| TV Arcade I - Space War (USA) | `1 3` | `2` | — |
-| TV Arcade II - Fun with Numbers (USA) | `1 2 3` | — | `1 2 3 4 5 6 7 8` |
-| TV Arcade III - Tennis + Squash (USA) | `1 2` | — | `4 5 6` |
-| TV Arcade IV - Baseball (USA) | `0` | `5` | `2 5 8` |
-| TV Arcade Series - Gunfighter + Moonship Battle (USA, Europe) | `1 2 3` | `2 4 5 6 8` | `2 4 5 6 8` |
-| TV Arcade Series - Speedway + Tag (USA) | `1 2` | `2 4 6 8` | `2 4 6 8` |
-| TV Casino Series - Blackjack (USA) | `1 2` | — | `0` |
-| TV Casino Series - TV Bingo (USA, Europe) | `1 2` | `1` | — |
-| TV Mystic Series - Biorhythm (USA, Europe) | `0` | — | `1 2 3 4 5 6 7 8 0` |
-| TV School House I (USA) | `any` | `1 2 3 4 5 6 7 8 9` | — |
-| TV School House II - Math Fun (USA, Europe) | `1 2` | `1 2 3 4 5` | — |
 
 ### How to play
 
@@ -407,24 +384,6 @@ cards), **2** doubles — double the bet, exactly one more card — and **0** st
 
 Dealer draws on 16 or less and stands on 17, except a soft 17. A natural
 blackjack pays 2 to 1, an ordinary win 1 to 1, a tie returns your bet.
-
-## Accuracy
-
-Checked against captures of real hardware in `refvideo/`:
-
-- **Speed** — beep length is a CPU-timed loop, so it measures CPU speed directly.
-  Real hardware's Star Wars beeps are 115–130 ms; this core's are 117 ms.
-- **Beeper pitch** — 547 Hz, measured from the spectrum of a direct capture
-  (545–549 Hz across every beep) rather than taken from the hardware notes,
-  whose component values do not give a sane frequency.
-- Frames are pixel-identical to a reference emulator on 18 of 21 test cases.
-
-## Known issues
-
-- Analog and direct video don't work.
-
-Note: Studio II was not released in PAL territories. PAL implementation is tied to
-Studio III (color) implementation (this work is ongoing).
 
 ## Building
 
