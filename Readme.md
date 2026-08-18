@@ -8,7 +8,8 @@ color-capable Studio III (a.k.a. MPT-02) clone support as a runtime toggle
 
 ## Status
 
-* Studio II: 100% software compatibiity across all known retail and homebrew titles.
+### Studio II
+* Studio II: 100% software compatibility across all known retail and homebrew titles.
 * CPU: CDP1802 is complete for Studio II software (including interrupts
 and DMA) and runs at machine-cycle timing. 
 * Video: CDP1861 is complete for Studio II software; no visual issues observed. 
@@ -16,6 +17,7 @@ and DMA) and runs at machine-cycle timing.
 * Memory: Proper address bus decoding: ROM, cartridge and the 512 bytes of RAM are
 separate, hardware-accurate RAM mirroring.
 
+### Studio III
 * Studio III: PAL-only. NTSC and Visicom support are WIP; see **Current limitations**.
 * Video: CDP1864 PAL video is working; no visual issues observed.
 * Audio: CDP1863 audio is implemented, but not substantively tested yet.
