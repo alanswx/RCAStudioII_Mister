@@ -372,3 +372,75 @@ go to `refs/rca-studio2/Documents/`, `docs/rca-technical/` and the datasheets
 before choosing. Every conflict hit so far — open bus `$00` vs `$FF`, the keypad
 strobe, the built-in game order, and this one — was settled by paper, and in two
 cases the paper contradicted what the RTL already did.
+
+---
+
+## 7. MPT-02 bring-up: where it stands (2026-08-17)
+
+The machine runs. `--machine mpt02` in both the RTL sim and `tools/refemu`, and
+`tools/compare-game.sh --machine mpt02 --bios <studio3_pal.bin>` diffs them.
+
+**Use the PAL BIOS.** `studio3_pal.bin` or `victory.rom`. The NTSC images do not
+run under PAL timing — an NTSC colour machine needs its own frame timing, not
+just a different ROM (see `tools/refemu/README.md`).
+
+Score against the reference, 2 frames per cartridge:
+
+| Set | Cartridges | Frames matching |
+|---|---|---|
+| Conic/Studio III cartridges | 14 | 18 / 28 |
+| Sarnoff Collection (`.st2` only) | 4 | 4 / 8 |
+| Conic homebrew (`invsn.st2`) | 1 | 2 / 2 |
+
+Frame rate comes out at **50.373 Hz** from the existing PLL (112 × 312 pixel
+times at clk_sys/4), against the datasheet's 50.08 Hz — 0.6% fast, which is not
+worth a second PLL output.
+
+### `color-demo.st2`: chased and explained — the reference cannot arbitrate this
+
+**Resolved 2026-08-17, and my first hypothesis was wrong.** I guessed the
+reference's render-time colour lookup was at fault. It is not. The real cause is
+the reference's *CPU budget*, and it disqualifies the reference for any
+timing-sensitive comparison on this machine.
+
+What was measured, in order:
+
+1. The colour **RAM contents** differ, not the indexing — so the fault is
+   upstream of display. (Colour index and the R/B/G→RGB permutation are provably
+   identical on both sides.)
+2. The demo **animates** its colour RAM, so phase was the obvious suspect.
+3. But over frames 120–220 the two sides share **zero** colour states: the RTL
+   cycles through 9 distinct ones, the reference only 4, mostly stuck on a single
+   value. Not phase.
+4. Cause: **the reference executes 854 instructions a frame where the RTL
+   executes 1485 — a measured 1.74×.** Its model gives the CPU only
+   `STATE_1 + STATE_2` = `(312-192)*14 + 29` cycles and **nothing at all during
+   the 192 display lines**, where the RTL runs the CPU all frame and loses only
+   the 8 machine cycles a line that DMA actually steals. A demo that paints colour
+   RAM across the frame simply never gets those writes in on the reference.
+
+This is the weakness `CLAUDE.md` §9 already documents for the Studio II
+(~952 against 1321, a 1.39× gap) — but it is **worse here**, because the display
+window is proportionally larger: 192 of 312 lines against 128 of 262.
+
+Consequences, which matter for how the harness gets used:
+
+- The RTL is very likely **right** here and the reference wrong. Not proven —
+  proving it needs Emma 02, which ships this cartridge.
+- The 24/38 score above measures agreement on **static** content and little else.
+  Do not read it as an accuracy figure. Anything that computes during the display
+  window will diverge for reasons that have nothing to do with the RTL.
+- To make the comparison trustworthy for these machines, `tools/refemu` needs a
+  real cycle model: execute during the display window too, minus the DMA steal.
+  That is a change to Robson's timing model rather than a bug fix, so it is filed
+  separately rather than done in passing.
+
+### Also outstanding
+
+- Tone generator (256 tones, 107Hz–13672Hz on `OUT 4`) in neither side.
+- `BCKGND`, which lowers background luminance so one colour can serve as both
+  background and data. Needs a fourth video bit.
+- NTSC colour machines (Studio III NTSC, Conic M-1200) need their own timing.
+- `grand-pack.st2` (CRC `1594`) has no joystick profile entry and falls to the
+  default; the other 13 Conic CRCs were already in the table, paired with their
+  Studio II equivalents.

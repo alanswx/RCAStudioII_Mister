@@ -44,6 +44,9 @@ module rcastudioii
 	input        [9:0] osk_b,          // and for keypad B
 	input  reg         ce_pix,
 	input              clear_key,      // CLEAR button input from top-level; keep video alive during CLEAR
+	//  Which machine. 0 = Studio II (CDP1861, NTSC, mono), 1 = MPT-02 / Studio III
+	//  (CDP1864, PAL, colour). Selected from the OSD; see docs/succession-plan.md.
+	input              machine_mpt02,
 
 	output reg         HBlank,
 	output reg         HSync,
@@ -77,7 +80,6 @@ wire [1:0]  SC;
 wire        INT;
 wire        DMAO;
 wire        EFx;
-wire        Locked;
 
 
 pixie_video pixie_video (
@@ -99,27 +101,82 @@ pixie_video pixie_video (
 
     .data_in    (ram_q),      // I [7:0]  byte the CPU delivers during a DMA-OUT cycle
 
-    .DMAO       (DMAO),       // O
-    .INT        (INT),        // O
-    .EFx        (EFx),        // O
+    .DMAO       (DMAO_61),    // O
+    .INT        (INT_61),     // O
+    .EFx        (EFx_61),     // O
 
     // back end, video clock domain
     .video_clk  (clk_sys),    // I
     .csync      (),           // O
     .video      (video_dot),  // O  one bit: the 1861 is a monochrome part
 
-    .VSync      (VSync),      // O
-    .HSync      (HSync),      // O
-    .VBlank     (VBlank),     // O
-    .HBlank     (HBlank),     // O
-    .video_de   (video_de)    // O
+    .VSync      (VSync_61),   // O
+    .HSync      (HSync_61),   // O
+    .VBlank     (VBlank_61),  // O
+    .HBlank     (HBlank_61),  // O
+    .video_de   (de_61)       // O
 );
 
-// White on black: the Studio II's 1861 has no colour, so every channel follows
-// the single dot bit. A machine with a CDP1864 will drive these three from
-// colour RAM instead (see docs/succession-plan.md §6).
+// ---- CDP1864, the colour machines' video ---------------------------------
+// Both parts are instantiated and the active one selected, rather than making
+// one module's geometry runtime-switchable: the 1861's timing is delicately
+// tuned and documented as such, and both parts are tiny. See the header of
+// rtl/pixie/cdp1864.v.
+//
+// Note the different I/O decode. On the 1864 the display is turned off by INP 4,
+// not OUT 1 -- OUT 1 is taken over by the background colour step. The datasheet
+// gives the opcodes: 61 or 69 enable interrupt and DMA, 6C disables them.
+wire       DMAO_64, INT_64, EFx_64;
+wire       VSync_64, HSync_64, VBlank_64, HBlank_64, de_64;
+wire [2:0] video_64;
+
+cdp1864 cdp1864
+(
+    .clk        (clk_sys),
+    .ce_pix     (ce_pix),
+    .cpu_ce     (cpu_ce),
+    .reset      (reset & ~clear_key),
+
+    .SC         (SC),
+    .data_in    (ram_q),
+    .colour_in  (colour_dot),
+    .con        (colour_on),
+    .disp_on    (io_inp && (io_n == 3'd1)),
+    .disp_off   ((io_inp && (io_n == 3'd4)) || clear_key),
+    .bg_step    (io_out && (io_n == 3'd1)),
+
+    .DMAO       (DMAO_64),
+    .INT        (INT_64),
+    .EFx        (EFx_64),
+
+    .csync      (),
+    .video      (video_64),
+    .VSync      (VSync_64),
+    .HSync      (HSync_64),
+    .VBlank     (VBlank_64),
+    .HBlank     (HBlank_64),
+    .video_de   (de_64)
+);
+
+// ---- select ---------------------------------------------------------------
+// The Studio II's 1861 has no colour, so every channel follows its single dot
+// bit -- white on black, unchanged from before the video path widened.
 wire       video_dot;
-assign     video = {3{video_dot}};
+wire       DMAO_61, INT_61, EFx_61;
+wire       VSync_61, HSync_61, VBlank_61, HBlank_61, de_61;
+
+assign video    = machine_mpt02 ? video_64 : {3{video_dot}};
+assign DMAO     = machine_mpt02 ? DMAO_64  : DMAO_61;
+assign INT      = machine_mpt02 ? INT_64   : INT_61;
+assign EFx      = machine_mpt02 ? EFx_64   : EFx_61;
+
+always @(*) begin
+	VSync    = machine_mpt02 ? VSync_64  : VSync_61;
+	HSync    = machine_mpt02 ? HSync_64  : HSync_61;
+	VBlank   = machine_mpt02 ? VBlank_64 : VBlank_61;
+	HBlank   = machine_mpt02 ? HBlank_64 : HBlank_61;
+	video_de = machine_mpt02 ? de_64     : de_61;
+end
 
 ////////////////// KEYPAD //////////////////////////////////////////////////////////////////
 
@@ -963,9 +1020,52 @@ reg  [7:0]  cart_page = 8'h00;    // indexed by address bits [10:8]: page $08..$
 
 wire        bank0    = (ram_a[15:12] == 4'h0);
 wire        rom_sel  = bank0 && !ram_a[11];                        // $0000-$07FF
-wire        cart_sel = bank0 &&  ram_a[11] && cart_page[ram_a[10:8]];
-wire        ram_sel  = !rom_sel && !cart_sel && !ram_a[9];         // the A9 = 0 mirror
+// The CDP1864 machines put a second ROM region at $0C00-$0FFF -- MAME's
+// mpt02_map has .rom() there as well as at $0000-$07FF, and the Studio III BIOS
+// is a 4K image covering both. On those machines it is ROM whether or not a
+// cartridge paged anything in, so it takes precedence over the RAM mirror that
+// $0C00-$0DFF would otherwise be.
+wire        rom_hi   = machine_mpt02 && bank0 && (ram_a[11:10] == 2'b11);   // $0C00-$0FFF
+// Colour RAM: 64 cells behind a one-page window at $0B00-$0BFF. Only six address
+// lines are decoded, which is why MAME names the storage ($0B00-$0B3F) and Emma 02
+// the window ($0B00-$0BFF) without disagreeing. See docs/succession-plan.md §6.
+wire        col_sel  = machine_mpt02 && bank0 && (ram_a[11:8] == 4'hB);
+wire        cart_sel = bank0 &&  ram_a[11] && cart_page[ram_a[10:8]] && !rom_hi && !col_sel;
+wire        ram_sel  = !rom_sel && !rom_hi && !col_sel && !cart_sel && !ram_a[9];
 wire        cpu_wr   = ram_wr && ram_sel;                          // RAM is the only writeable thing
+wire        col_wr   = ram_wr && col_sel;
+
+// ---- CDP1864 colour RAM ---------------------------------------------------
+// 64 x 3 bits, so a plain register array rather than block RAM. The cell for a
+// display byte is {off[7:5], off[2:0]}: the low three bits are the column (8
+// bytes across a 64-pixel row) and off[7:5] the row group, so one cell covers 8
+// pixels across by 4 logical rows down. Indexing is MAME's, from
+// mpt02_state::dma_w(), whose offset is the DMA address (cosmac_device passes
+// R[0]). Reads are combinational and off the *current* address, because the
+// 1864 latches colour "concurrent with the latching of the luminance
+// information" -- the byte and its colour arrive together.
+reg  [2:0]  colour_ram [0:63];
+// CON, "Color On". The datasheet has this pin "connected to the gated MWR signal
+// of the color memory", so colour switches on with the first write to colour RAM
+// and the part is monochrome until then. Without it, every game that never
+// writes colour RAM came out on a blue field instead of black -- which is how
+// this was caught, against the reference emulator's Conic sweep. MAME fakes it
+// with con_w(0) on every DMA and flags that as a hack.
+reg         colour_on;
+always @(posedge clk_sys) begin
+	if (reset)       colour_on <= 1'b0;
+	else if (col_wr) colour_on <= 1'b1;
+end
+always @(posedge clk_sys) if (col_wr) colour_ram[ram_a[5:0]] <= ram_d[2:0];
+wire [5:0]  col_index = {ram_a[7:5], ram_a[2:0]};
+wire [2:0]  colour_cell = colour_ram[col_index];
+// Colour RAM bit order is the 1864's pin order, which is NOT {R,G,B}: MAME's
+// mpt02_state has rdata_r() = BIT(m_color,0), bdata_r() = BIT(m_color,1) and
+// gdata_r() = BIT(m_color,2), i.e. bit0 red, bit1 blue, bit2 green. Permute into
+// the {R,G,B} the video bus carries. Getting this wrong renders the right picture
+// in the wrong colours -- the pinball table came out magenta-bordered instead of
+// yellow, which is how the bug was spotted.
+wire [2:0]  colour_dot = {colour_cell[0], colour_cell[2], colour_cell[1]};
 
 // Both arrays have one cycle of latency, so the read mux select has to be
 // delayed with the data. The CPU holds an address for a whole machine cycle
@@ -974,7 +1074,7 @@ wire [7:0]  rom_q;
 wire [7:0]  sram_q;
 reg         rom_sel_q, ram_sel_q;
 always @(posedge clk_sys) begin
-	rom_sel_q <= rom_sel | cart_sel;
+	rom_sel_q <= rom_sel | cart_sel | rom_hi;
 	ram_sel_q <= ram_sel;
 end
 // Open bus reads back as $FF, matching MAME's unmap_value_high and the likely
@@ -1094,8 +1194,12 @@ wire  [7:0] st2_pg    = st2_page[st2_blk];
 // system ROM ($00-$03), not RAM ($08-$09), and below $10. $0C/$0D ARE legal --
 // race.st2 pages ROM over the default RAM mirror there, which is why the memory
 // map calls $C00-$DFF "RAM/ROM". $00 is also the format's "unused block" marker.
+// Page $0B is the CDP1864's colour RAM, not cartridge space, so a cartridge must
+// not be able to page ROM over it on that machine. (On the Studio II $0B is an
+// ordinary cartridge window and stays loadable, which is why this is gated.)
 wire        st2_pg_ok = (st2_pg[7:4] == 4'h0) && (st2_pg[3:0] > 4'h3)
-                        && (st2_pg[3:0] != 4'h8) && (st2_pg[3:0] != 4'h9);
+                        && (st2_pg[3:0] != 4'h8) && (st2_pg[3:0] != 4'h9)
+                        && !(machine_mpt02 && (st2_pg[3:0] == 4'hB));
 
 wire        st2_data  = ioctl_addr >= 16'd256;          // past the header
 wire [11:0] cart_a    = st2_mode ? {st2_pg[3:0], ioctl_addr[7:0]}

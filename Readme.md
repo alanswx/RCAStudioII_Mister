@@ -105,6 +105,18 @@ takes a CRC16 of the cartridge as it loads and selects a profile from a table in
 `GUNFIGHTER` is a full cross with fire on `5`; in one-player mode it collapses onto keypad B, while two-player mode splits across A and B. `8WAY` is `CROSS` plus diagonals (`1/3/7/9`). `DOODLES` uses the same idea but sends everything to keypad B only.
 
 `PADDLE` is single-player and keypad-B-only. It maps racquet movement to `B2`/`B8`, and the left, Fire, and right buttons to the setup choices `B4`, `B5`, and `B6`, respectively.
+`PADDLE` is single-player and keypad-B-only, for **Squash** on the TV Arcade III
+cartridge. It maps racquet movement to `B2`/`B8`, and the left, Fire, and right
+buttons to the setup choices `B4`, `B5`, and `B6`, respectively.
+
+> **\* Tennis/Squash gives you Squash, not Tennis.** The cartridge holds both.
+> Tennis is two-player and starts on `A2`; Squash is one-player and starts on
+> `A1`. `PADDLE` is keypad-B-only and one-player, and Start presses `A1`, so a
+> single gamepad plays **Squash** properly rather than half of Tennis. Use the
+> keyboard (or two pads with `Mapping: Manual` and `Cross`) if you want Tennis.
+> Both CRCs on that line, `88FB` and `FB76`, are the same cartridge -- the
+> `.bin` and the `.st2`, which hash apart because the CRC covers the file header
+> and all.
 
 `CLEAR_ONLY` leaves the gamepad's Select button available for **CLEAR**, but
 disables all controller-driven keypad presses; keyboard, on-screen numstick, and

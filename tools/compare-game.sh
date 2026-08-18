@@ -79,7 +79,7 @@ ref_opts=( --machine "$MACHINE" )
 "$REF" "${ref_opts[@]}" --frames "$FRAMES" ${PRESS[@]+"${PRESS[@]}"} "${shot_args[@]}" --ascii --quiet --outdir "$TMP" ${cart_ref[@]+"${cart_ref[@]}"} 2>/dev/null \
   | grep -E "^  [.#BGCRMY]+$" | sed 's/^  //' | tr '.' ' ' | awk -v n="$ROWS" '{for(i=0;i<n;i++) print}' > "$TMP/ref.txt"
 # the RTL sim defaults to ../rom/studio2.rom, which is relative to verilator/
-"$RTL" --bios "$BIOS" --frames "$FRAMES" ${PRESS[@]+"${PRESS[@]}"} "${shot_args[@]}" --ascii --outdir "$TMP" --prefix r ${cart_rtl[@]+"${cart_rtl[@]}"} 2>/dev/null \
+"$RTL" --machine "$MACHINE" --bios "$BIOS" --frames "$FRAMES" ${PRESS[@]+"${PRESS[@]}"} "${shot_args[@]}" --ascii --outdir "$TMP" --prefix r ${cart_rtl[@]+"${cart_rtl[@]}"} 2>/dev/null \
   | grep -E "^ *[0-9]+ \|" | sed 's/^ *[0-9]* |//; s/|$//' > "$TMP/rtl.txt"
 
 nref=$(wc -l < "$TMP/ref.txt"); nrtl=$(wc -l < "$TMP/rtl.txt")
