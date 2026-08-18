@@ -126,7 +126,7 @@ pixie_video pixie_video (
 // Note the different I/O decode. On the 1864 the display is turned off by INP 4,
 // not OUT 1 -- OUT 1 is taken over by the background colour step. The datasheet
 // gives the opcodes: 61 or 69 enable interrupt and DMA, 6C disables them.
-wire       DMAO_64, INT_64, EFx_64;
+wire       DMAO_64, INT_64, EFx_64, aud_64;
 wire       VSync_64, HSync_64, VBlank_64, HBlank_64, de_64;
 wire [2:0] video_64;
 
@@ -144,12 +144,20 @@ cdp1864 cdp1864
     .disp_on    (io_inp && (io_n == 3'd1)),
     .disp_off   ((io_inp && (io_n == 3'd4)) || clear_key),
     .bg_step    (io_out && (io_n == 3'd1)),
+    // OUT 4 loads the tone divider; Q is AOE, which gates the output. Both
+    // straight from the datasheet's control-line truth table and Weisbecker's
+    // own Studio III notes ("64 instruction sets sound frequency (inverse)",
+    // "Q gates sound output").
+    .tone_we    (io_out && (io_n == 3'd4)),
+    .tone_d     (cpu_dout),
+    .aoe        (Q),
 
     .DMAO       (DMAO_64),
     .INT        (INT_64),
     .EFx        (EFx_64),
 
     .csync      (),
+    .aud        (aud_64),
     .video      (video_64),
     .VSync      (VSync_64),
     .HSync      (HSync_64),
@@ -1144,7 +1152,13 @@ always @(posedge clk_sys) begin
 	end
 end
 
-assign audio = snd_out;
+// The Studio II's beeper is the discrete NE555 modelled above; the CDP1864
+// machines have the tone generator inside the video part instead, so the 555
+// goes away with the machine rather than being gated off. Weisbecker's Studio
+// III sketch (IMG_1536.JPG) does keep a 555 alongside a "16 pin new chip for
+// programmable tones", but that is the III A prototype -- the production
+// Studio III and MPT-02 use the CDP1864, which is what this models.
+assign audio = machine_mpt02 ? aud_64 : snd_out;
 
 ////////////////// CARTRIDGE LOADER /////////////////////////////////////////
 //

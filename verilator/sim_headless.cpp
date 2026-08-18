@@ -809,6 +809,7 @@ int main(int argc, char** argv) {
     }
 
     printf("\n");
+    printf("audio: %ld output edges, %ld Q edges\n", a_edges, q_edges);
     printf("done: %ld frames in %ld cycles\n", fg.frame, cycles);
     printf("      last frame %dx%d, hash %08X, %s\n",
            fg.last_width, fg.last_height, fg.hash(),
