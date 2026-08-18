@@ -208,11 +208,10 @@ assign BUTTONS = 0;
 localparam CONF_STR = {
 	"RCA-StudioII;v4;",
 	"-;",
-	// Which machine. One core with a selector, rather than an .rbf per machine.
-	// The BIOS differs per machine and is not embedded, so a Studio III image has
-	// to be loaded through Load Firmware to match this row.
-	"O[13],Machine,Studio II,MPT-02/III;",
 	"F1,ST2BINROM,Load Cartridge;",
+	"-;",
+	// Must load valid firmware after switching to Studio III
+	"O[13],Machine,Studio II,Studio III;",
 	"F0,BINROM,Load Firmware;",
 	"-;",
 	// Mapping picks who owns the Joystick row below it. On Auto the core drives

@@ -114,9 +114,6 @@ buttons to the setup choices `B4`, `B5`, and `B6`, respectively.
 > `A1`. `PADDLE` is keypad-B-only and one-player, and Start presses `A1`, so a
 > single gamepad plays **Squash** properly rather than half of Tennis. Use the
 > keyboard (or two pads with `Mapping: Manual` and `Cross`) if you want Tennis.
-> Both CRCs on that line, `88FB` and `FB76`, are the same cartridge -- the
-> `.bin` and the `.st2`, which hash apart because the CRC covers the file header
-> and all.
 
 `CLEAR_ONLY` leaves the gamepad's Select button available for **CLEAR**, but
 disables all controller-driven keypad presses; keyboard, on-screen numstick, and
@@ -273,14 +270,9 @@ and the scanned ones in `docs/*.zip`.
 
 Manuals are in `docs/` as PDFs and scan zips.
 
-Every manual begins **"Press CLEAR"**. CLEAR is the Studio II's console reset
-button (see `docs/RCA_Studio_II_Service_Manual.pdf`, Figure 1); press **F3**,
-use **Clear** in the OSD, or press Select on the virtual joystick.
+#### Resident games (no cartridge)
 
-#### Built-in games (no cartridge)
-
-Five games live in the BIOS. From `docs/RCA_Studio_II_Service_Manual.pdf` (pages
-7–8), which uses them as the console's self-test. Press **CLEAR** first, then:
+Five games are resident in the RCA Studio II BIOS ROM image.
 
 | Game | Select | Controls |
 |------|--------|----------|
