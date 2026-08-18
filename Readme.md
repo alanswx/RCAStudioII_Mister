@@ -32,8 +32,7 @@ the OSD.
 
 | OSD slot | File | Loads at |
 |----------|------|----------|
-| `Load Cartridge` | `.st2`, `.bin`, `.rom` | `.bin`/`.rom` flat at `$0400`; `.st2` 
-paged per its header |
+| `Load Cartridge` | `.st2`, `.bin`, `.rom` | `.bin`/`.rom` at `$0400`; `.st2` paged by header |
 | `Load Firmware` | `.bin`, `.rom` | `$0000` |
 
 
@@ -41,9 +40,10 @@ The core is held in reset until a BIOS is loaded.
 
 ## Controls
 
-The Studio II has two 10-key keypads. Keypad A is on the left (read through
-`EF3`), the right is keypad B (`EF4`); software scans them by writing the key
-number to `OUT 2` and testing the flags — see `docs/keyboard.txt`.
+The Studio II has two 10-key keypads. In the official documentation, they are referred
+to as "Keyboards". "Keypad" is used here to avoid confusion with the usual modern usage.
+Keypad A is on the left (read through `EF3`), the right is keypad B (`EF4`); software 
+scans them by writing the key number to `OUT 2` and testing the flags. See `docs/keyboard.txt`.
 
 Each keypad is laid out to correspond with the existing jzIntv "[keyhack](https://forums.atariage.com/applications/core/interface/file/attachment.php?id=484005)" 
 keypad-to-keyboard mapping. Seemed better to use this than invent a new one.
@@ -56,7 +56,8 @@ keypad-to-keyboard mapping. Seemed better to use this than invent a new one.
        X                      ,
 ```
 
-The original jzIntv keyhack layout this is based on can be seen ![here](https://media.invisioncic.com/r322239/monthly_01_2017/post-46336-0-51390500-1483262333_thumb.png).
+The original jzIntv keyhack layout this is based on can be seen here:  
+![jzIntv keyhack.txt layout](https://media.invisioncic.com/r322239/monthly_01_2017/post-46336-0-51390500-1483262333_thumb.png).
 
 In table form:
 
@@ -65,15 +66,17 @@ In table form:
 | **Keypad A** | `1` | `2` | `3` | `Q` | `W` | `E` | `A` | `S` | `D` | `X` |
 | **Keypad B** | `7` | `8` | `9` | `U` | `I` | `O` | `J` | `K` | `L` | `,` |
 
-**CLEAR** — the console reset button every manual asks for — is **F3**, or
-**Clear** in the OSD. Select on the joystick is always Clear. The core attempts to
-maintain sync during Clear to avoid television signal dropouts.
+**CLEAR** is **F3**, or **Clear** in the OSD. Roughly equivalent to "reset" on other 
+consoles. Select on the joystick is always Clear. 
+
+The core attempts to maintain Pixie video timing to avoid television signal dropouts
+during Clear events.
 
 ### Joystick
 
 By default, keypad controls are dynamically mapped to gamepads on a per-game basis. The core 
-takes a **CRC16 of the cartridge as it loads** and selects a profile from a table in 
-`rtl/rcastudioii.sv`. Joystick and keyboard inputs are both accepted at once.
+takes a CRC16 of the cartridge as it loads and selects a profile from a table in 
+`rtl/rcastudioii.sv`. Joystick and keyboard inputs accepted simultaneously.
 
 #### Profiles
 
@@ -164,9 +167,9 @@ accept input other than Clear.
 #### Mapping: Auto or Manual
 
 On `Auto` the core automatically loads the mapping associated with the game, then
-writes back the loaded profile it detected into the OSD menu. The profile option
+writes back the loaded profile it detected into the OSD menu. The Joystick option
 will be grayed out but still updates to reflect your current profile.
-On `Manual` you can select any mapping from the profile field.
+On `Manual` you can select any mapping from the Joystick field.
 
 #### Start, Select, and the Players setting
 
