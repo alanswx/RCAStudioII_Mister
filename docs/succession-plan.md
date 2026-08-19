@@ -638,3 +638,40 @@ took many iterations to settle, and wants an A/B against the Studio II corpus
 behind it. Conic M-1200, which Emma lists as NTSC, comes along once that is
 settled. And none of the NTSC side is checked against the reference emulator,
 which models only the PAL machine.
+
+---
+
+## 10. Studio IV: out of scope for this core (2026-08-19)
+
+`#9` asked whether the Studio IV is worth attempting. Having read both
+Weisbecker's own I/O spec and Emma 02's machine configs: **not in this core.** It
+shares the 1802 and almost nothing else.
+
+Emma's `data/Xml/StudioIV/*.xml`:
+
+| | Studio II / III | Studio IV |
+|---|---|---|
+| video | `pixie` / `cdp1861` / `1864` | **`st4`**, its own part |
+| colour RAM | 64 cells at `$0B00` | **1 KB**, at `$2800-$2BFF` or `$1000-$13FF` — *configurable* |
+| RAM | 512 bytes | up to **`$97FF`** on the 32 K builds |
+| ports | `OUT 1` background, `OUT 4` tone | `OUT 4,6` colour, `OUT 5` DMA |
+| software | cartridges | BASIC and CHIP-8 **system images** |
+
+The software on disk says the same thing: `am4kbas` (4 K BASIC) in 1978, 2020 and
+32 K variants, `super-chip`, and Studio IV V2/V3 system ROMs. There is not a
+cartridge among them.
+
+So none of what this core is built around applies — not the ST2 loader, the CRC
+profile table, the keypad model, the 512-byte RAM decode, nor the cartridge
+paradigm itself. It is a computer that happens to share a CPU, and it belongs in
+its own core.
+
+**What we do have, for whoever takes it on**, is unusually good: Weisbecker's
+typed "STUDIO IV INSTRUCTIONS" of 20 July 1977 (`docs/rca-technical/Studio II III
+IV/IMG_0353.JPG`, transcribed in `CLAUDE.md` §2.1) gives the whole port map —
+`61` tone, `62` key select, `63` output port, `64` TV control with RGB background,
+spot map and the 192-vs-128 line select, `65` DMA-out, `6B` input port, and "TV
+off after reset". Emma's `<out type="dma">5</out>` agrees with his `65`, so the
+production machine kept at least part of that prototype map. His colour-chip
+sketch (`IMG_1535.JPG`) and the "III A — STUDIO II COMPATIBLE" design
+(`IMG_1536.JPG`) are the surrounding context.
