@@ -140,7 +140,7 @@ pixie_video pixie_video (
 
     .data_in    (ram_q),      // I [7:0]  byte the CPU delivers during a DMA-OUT cycle
     .vis_mode   (machine_visicom),  // I
-    .data_in2   (sram_q_b),   // I [7:0]  Visicom plane 1: the byte $200 higher
+    .data_in2   (pl1_q),      // I [7:0]  Visicom plane 1: the byte $200 higher
     .colour_in  (colour_dot), // I  CDP1862 colour for that byte (NTSC Studio III)
     .con        (colour_on),  // I
     .bg_step    (io_out && (io_n == 3'd1) && !machine_visicom),  // I  OUT 1 steps the background
@@ -1165,10 +1165,20 @@ wire        ram_sel  = machine_visicom
                      ? (vis_ram || vis_pl1)
                      : (!rom_sel && !rom_hi && !col_sel && !cart_sel && !ram_a[9]);
 
-// Plane 1 lives above the 512 bytes every other machine has, so the array is 1K
-// and the top half is Visicom-only. Nothing else can address it.
-wire [9:0]  sram_addr = vis_pl1 ? {2'b10, ram_a[7:0]} : {1'b0, ram_a[8:0]};
-wire        cpu_wr   = ram_wr && ram_sel;                          // RAM is the only writeable thing
+// Plane 1 is its own 256-byte array rather than a second window into the main
+// RAM, and it is addressed by A7-A0 in both of its roles: the video reads it
+// during a DMA cycle, when the address bus holds R(0) = $11xx, and the CPU
+// reads or writes it at $13xx. Same low byte either way, so one single-port
+// array serves both and there is never a conflict -- the CPU is not driving the
+// bus during a DMA cycle.
+//
+// This is deliberately NOT port B of the main RAM, which is where it started.
+// That array already had a port-B writer (the CLEAR wipe) and so was already
+// uninferrable; adding a port-B read doubled it to 1K and doubled the logic it
+// was costing. Keeping plane 1 separate keeps both arrays in block RAM, and is
+// closer to the machine anyway -- it has separate chips.
+wire        cpu_wr   = ram_wr && ram_sel && !vis_pl1;             // RAM is the only writeable thing
+wire        pl1_wr   = ram_wr && vis_pl1;                        // ...and the Visicom's second plane
 wire        col_wr   = ram_wr && col_sel;
 
 // ---- CDP1864 colour RAM ---------------------------------------------------
@@ -1208,10 +1218,12 @@ wire [2:0]  colour_dot = {colour_cell[0], colour_cell[2], colour_cell[1]};
 // (32 clk_sys), so a registered select is settled long before it is sampled.
 wire [7:0]  rom_q;
 wire [7:0]  sram_q;
-reg         rom_sel_q, ram_sel_q;
+wire [7:0]  pl1_q;
+reg         rom_sel_q, ram_sel_q, pl1_sel_q;
 always @(posedge clk_sys) begin
 	rom_sel_q <= rom_sel | cart_sel | rom_hi;
 	ram_sel_q <= ram_sel;
+	pl1_sel_q <= vis_pl1;
 end
 // Open bus reads back as $FF, matching MAME's unmap_value_high and the likely
 // floating-bus behaviour of the real machine (nothing drives the lines, and
@@ -1223,7 +1235,9 @@ end
 // render as the full-screen white flash MAME shows. Nothing in the §9 corpus
 // reads undecoded space (tools/memdecode-test.sh covers it instead), so the
 // frame comparison is unaffected.
-assign ram_q = ram_sel_q ? sram_q : (rom_sel_q ? rom_q : 8'hFF);
+assign ram_q = pl1_sel_q ? pl1_q
+             : ram_sel_q ? sram_q
+             : rom_sel_q ? rom_q : 8'hFF;
 
 
 ////////////////// SOUND ////////////////////////////////////////////////////
@@ -1385,69 +1399,78 @@ dpram #(8, 12) dpram
 	.q_b()
 );
 
-// The RAM: 512 bytes on the Studio II and III ($0800-$08FF program/system,
-// $0900-$09FF display), 1K on the Visicom, whose top half is the second bit
-// plane the video reads through port B.
+// The RAM: 512 bytes ($0800-$08FF program/system, $0900-$09FF display on the
+// Studio II and III; $1000-$11FF on the Visicom, whose bit plane 0 is its top
+// half). The Visicom's plane 1 is the separate 256-byte array below.
 // Selected by A9 = 0, so the address inside it is just A8-A0.
 // Add a port-B writer used to clear VRAM on CLEAR without resetting the Pixie
 reg [8:0] clear_addr_b = 9'd0;
 reg       clear_active = 1'b0;
-reg       ram_cs_b_sig = 1'b0;
-reg       wren_b_sig = 1'b0;
-reg [9:0] address_b_sig = 10'd0;
-reg [7:0] data_b_sig = 8'd0;
 
-// Port B's read half was unused (q_b was left open), which is what makes the
-// Visicom's two-bytes-per-DMA-cycle possible without a second array or a stolen
-// cycle: plane 0 comes back on port A as the byte the CPU is fetching, plane 1
-// on port B from $200 higher, both with the same one-cycle latency. The clear
-// sequencer still owns port B while it runs, but that is only while CLEAR is
-// held, when the display is blanked anyway.
-wire [9:0] sram_addr_b = {2'b10, ram_a[7:0]};
-wire [7:0] sram_q_b;
-
+// The wipe drives port A, not port B. Port B writing is what stopped this array
+// inferring as block RAM: two active write ports mean mixed-port read-during-
+// write, which an M10K cannot honour, and Quartus reported
+//
+//   Info (276009): RAM logic "...|dpram:sram|mem" is uninferred due to
+//                  unsupported read-during-write behavior
+//
+// and built all 512 bytes out of logic instead -- 6,119 ALUTs and 4,104
+// registers, most of the whole core. The ROM dpram and the Visicom's sram2 use
+// this same module with port B tied off and both infer cleanly, which is what
+// makes this the fix rather than a ramstyle attribute.
+//
+// Safe on port A because CLEAR is folded into reset, so the CPU is held in reset
+// for the whole wipe and is not driving the bus.
 always @(posedge clk_sys) begin
-    // Default: no write, and port B reads plane 1 for the video
-    ram_cs_b_sig <= 1'b0;
-    wren_b_sig  <= 1'b0;
-    address_b_sig <= sram_addr_b;
-    data_b_sig <= 8'd0;
-
-    // Start a clear sequence when CLEAR is asserted (and not already active)
     if (clear_key && !clear_active) begin
         clear_active <= 1'b1;
         clear_addr_b <= 9'd256; // VRAM starts at offset 256 in the 512-byte RAM
     end
     else if (clear_active) begin
-        // Write zero to current VRAM address
-        ram_cs_b_sig <= 1'b1;
-        wren_b_sig   <= 1'b1;
-        address_b_sig <= {1'b0, clear_addr_b};
-        data_b_sig   <= 8'd0;
-        if (clear_addr_b == 9'd511) begin
-            // Finished clearing VRAM; deassert clear_active on next cycle
-            clear_active <= 1'b0;
-        end
-        else begin
-            clear_addr_b <= clear_addr_b + 1'b1;
-        end
+        if (clear_addr_b == 9'd511) clear_active <= 1'b0;
+        else                        clear_addr_b <= clear_addr_b + 1'b1;
     end
 end
 
-dpram #(8, 10) sram
+wire [8:0] sram_a_addr = clear_active ? clear_addr_b : ram_a[8:0];
+wire [7:0] sram_a_data = clear_active ? 8'd0         : ram_d;
+wire       sram_a_we   = clear_active ? 1'b1         : cpu_wr;
+
+dpram #(8, 9) sram
 (
 	.clock(clk_sys),
 	.ram_cs(1'b1),
-	.address_a(sram_addr),
-	.wren_a(cpu_wr),
-	.data_a(ram_d),
+	.address_a(sram_a_addr),
+	.wren_a(sram_a_we),
+	.data_a(sram_a_data),
 	.q_a(sram_q),
 
-	.ram_cs_b(ram_cs_b_sig),
-	.wren_b(wren_b_sig),
-	.address_b(address_b_sig),
-	.data_b(data_b_sig),
-	.q_b(sram_q_b)
+	// Port B is tied off entirely, which is what lets this infer as block RAM.
+	// Do not give it a write or a read without re-checking the inferred-
+	// altsyncram list in output_files/RCAStudioII.map.rpt (CLAUDE.md §8).
+	.ram_cs_b(1'b0),
+	.wren_b(1'b0),
+	.address_b(9'd0),
+	.data_b(),
+	.q_b()
+);
+
+// The Visicom's second bit plane: 256 bytes at $1300-$13FF, read every cycle at
+// A7-A0 so the video has it during DMA and the CPU has it at $13xx.
+dpram #(8, 8) sram2
+(
+	.clock(clk_sys),
+	.ram_cs(1'b1),
+	.address_a(ram_a[7:0]),
+	.wren_a(pl1_wr),
+	.data_a(ram_d),
+	.q_a(pl1_q),
+
+	.ram_cs_b(1'b0),
+	.wren_b(1'b0),
+	.address_b(8'd0),
+	.data_b(),
+	.q_b()
 );
 
 

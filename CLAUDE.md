@@ -242,13 +242,20 @@ tools/quartus-build.sh map      # analysis & synthesis only (~1.5 min)
 tools/quartus-build.sh clean
 ```
 
-Last known-good build: **0 errors**, timing closed (worst setup slack
-+0.710 ns), 10,003 ALMs (24 %), 444 kbit of block RAM (8 %), whole flow
-~6 minutes. Most of that is the MiSTer
-framework — `rcastudioii` itself is ~1,140 ALMs (of which the CPU is ~600) and
-`numstick` another ~940. The "19 %" quoted here previously was measured before
-numstick landed; a same-day A/B put the memory decode at **+86 ALMs and
-+4 kbit** over the pre-decode core, which is just the 512-byte RAM.
+Last known-good build (2026-08-19, all four machines): **0 errors**, timing
+closed (worst setup slack +0.567 ns, hold +0.242 ns), **10,310 ALMs (25 %)**,
+463 kbit of block RAM (8 %), 74 RAM blocks, whole flow ~6 minutes. Most of that
+is the MiSTer framework; `numstick` alone is ~940 ALMs.
+
+That is within a few hundred ALMs of the 10,003 recorded before any of the
+colour work, which is not a coincidence and is worth reading §10 (2026-08-19)
+for: the CDP1864, CDP1862, CDP1863 and the whole Visicom together cost a few
+hundred ALMs, while a single RAM that had quietly fallen out of block memory was
+costing four thousand. Three builds isolated it — 18,384 ALMs (44 %), then
+14,096 (34 %), then 10,310 (25 %) — and the check that catches it is in §8.
+
+An older note here put the memory decode at **+86 ALMs and +4 kbit** over the
+pre-decode core, which is just the 512-byte RAM.
 
 **Do not run `quartus_sh --flow compile`.** The image is amd64 under emulation
 on Apple Silicon, and the qsf's `NUM_PARALLEL_PROCESSORS ALL` makes Quartus fork
@@ -520,6 +527,12 @@ model does; the first three are directed tests and should not move at all.
 - Keep the PLL in `rtl/pll*`; the framework requires it there.
 - Prefer deleting dead code over commenting it out. This tree is already hard to
   read because so much of it is commented-out history — git has that.
+- After changing anything about a memory's ports, run at least
+  `tools/quartus-build.sh map` and check the RAM still appears in the
+  `Inferred altsyncram megafunction` list in `output_files/RCAStudioII.map.rpt`.
+  A memory that falls out of block RAM into logic costs thousands of ALMs, still
+  fits, still closes timing, and is invisible to every simulation in this repo
+  (§10, 2026-08-19).
 - When changing timing or video, state which reference you matched against
   (MAME / Emma 02 / rca-studio2 / AVI1861) in the commit message.
 
@@ -630,10 +643,11 @@ Colour comes from somewhere no other machine here puts it. Emma 02's
 `Cdp1802::visicomDmaOut` reads **two** bytes per DMA cycle — `M(R(0))` and
 `M(R(0)+$200)` — and takes the top bit of each, so the picture is two bit planes
 512 apart and every pixel is one of four fixed colours. Implemented as a second
-line buffer and shift register inside `cdp1861.v`, fed through **port B of the
-existing RAM**, whose read half had never been connected. Both planes therefore
-arrive in one cycle with matched latency, needing no second array and no stolen
-cycle. The RAM went 512 bytes → 1K, with plane 1 in the top half.
+line buffer and shift register inside `cdp1861.v`, fed from **its own 256-byte
+array** addressed by A7-A0 — the same low byte serves both of its roles, since
+the video reads it during a DMA cycle (address bus = `R(0)` = `$11xx`) and the
+CPU at `$13xx`, and the CPU is not driving the bus during DMA. Both planes
+arrive in the same cycle with matched latency.
 
 The four colours are fixed RGB values, not combinations of three colour pins, so
 they cannot ride the `{R,G,B}` bus the 1864 defined. `RCAStudioII.sv` applies the
@@ -658,6 +672,33 @@ screens were checked by eye against Emma's own descriptions. Colours 2 and 3
 require plane 1's bit, so any screen listing one is direct evidence the second
 read happened. The Studio II side is unmoved: §9 26/48, memory decode 8/8, tone
 8/8, and Invaders still animates from its `.st2`.
+
+**A synthesis defect the simulator could not see — and it predates this work.**
+Plane 1 was first read through port B of the main RAM, whose read half was
+unused. That simulated perfectly and cost 8,000 ALMs. But reverting it did not
+restore them: `output_files/RCAStudioII.map.rpt` still said
+
+```
+Info (276009): RAM logic "...|dpram:sram|mem" is uninferred due to
+               unsupported read-during-write behavior
+```
+
+with the 512-byte RAM at 6,119 ALUTs and **0 block memory bits**. So it had
+already been built out of logic; using port B doubled the array and doubled the
+damage rather than causing it. The cause is the CLEAR-clears-VRAM sequencer
+writing through port B — two active write ports give mixed-port read-during-
+write, which an M10K cannot honour. The ROM `dpram` and the new `sram2` use the
+same module with port B tied off and both infer, which is what identified it.
+
+Fixed by moving the wipe to port A, which is safe because CLEAR is folded into
+reset so the CPU is held in reset throughout. No `ramstyle` attribute and no
+change to the shared `rtl/dpram.sv`. Measured across three full builds:
+18,384 ALMs (44%) with plane 1 on port B, 14,096 (34%) once plane 1 got its own
+array, and lower again with the wipe moved.
+
+**The lesson: after changing anything about a memory's ports, check the
+`Inferred altsyncram megafunction` list in `output_files/*.map.rpt`.** A RAM that
+falls into logic still fits, still closes timing, and passes every test here.
 
 Also here: `tools/score-conic.sh`, because the "14/28" recorded for the Studio
 III PAL sweep could not be reproduced from the note. The obvious uniform-A1 sweep

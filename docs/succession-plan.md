@@ -726,10 +726,15 @@ on** and there is no disable port at all.
   output: a second line buffer and shift register beside the first, clocked
   together. `video` becomes "either plane set", because colour 0 is a dark green
   background rather than black.
-- The 512-byte RAM became 1K. Plane 1 lives in the top half, and is read through
-  **port B of the same dual-port array** — whose read half was unused (`q_b` was
-  left open). Both planes therefore arrive in one cycle with matched latency, and
-  the machine needs no second array and no stolen cycle.
+- Plane 1 is **its own 256-byte array**, addressed by A7-A0. That works because
+  the low byte is the same in both of its roles: the video reads it during a DMA
+  cycle, when the address bus holds `R(0) = $11xx`, and the CPU reads or writes
+  it at `$13xx`. The CPU is not driving the bus during a DMA cycle, so a single
+  port serves both and both planes arrive in the same cycle with matched latency.
+
+  This started as port B of the main RAM, whose read half was unused, and that
+  was wrong in a way nothing in simulation could show — see "the 8,000 ALMs"
+  below.
 - The palette is applied in `RCAStudioII.sv`, which is the only place wide enough
   for it. `video[2:0]` still carries a 3-bit approximation so the Verilator
   harness and anything else with three wires keeps working.
@@ -755,6 +760,55 @@ offset specifically — a misaligned second plane would break them up.
 Start keys are Emma's (`Helpfiles/FaqVisicom*.htm`): built-ins on 1 Doodle,
 2 Bowling, 3 Patterns, 4 Freeway, 7 Addition, and every cartridge on 0. The
 gamepad Start button presses 0 on this machine rather than the usual 1.
+
+### The RAM that was never in block RAM
+
+Reading plane 1 through port B of the main RAM simulated perfectly and cost
+nothing visible: lint clean, every test green, frames correct. The Quartus build
+is where it showed — and it showed something older than this work.
+
+`output_files/RCAStudioII.map.rpt` reports which arrays became block memory. The
+main RAM was not among them:
+
+```
+Info (276009): RAM logic "...|dpram:sram|mem" is uninferred due to
+               unsupported read-during-write behavior
+
+dpram:sram   12,384 combinational ALUTs   6,160 registers   0 block memory bits
+```
+
+Reverting the plane-1 change did not fix it — the same message, at half the size
+(6,119 ALUTs). So the 512-byte RAM had **already** been built out of logic before
+any of this; using port B doubled the array and therefore doubled the damage,
+but did not cause it. The cause is that the CLEAR-clears-VRAM sequencer writes
+through port B: two active write ports mean mixed-port read-during-write, which
+an M10K cannot honour. The ROM `dpram` and the new `sram2` use the same module
+with port B tied off, and both infer cleanly — which is what identified it.
+
+Two fixes, measured separately against a full build each:
+
+| | ALMs | of device | block memory |
+|---|---|---|---|
+| plane 1 on port B (first attempt) | 18,384 | 44 % | 457,103 |
+| plane 1 in its own array | 14,096 | 34 % | 459,151 |
+| CLEAR wipe moved to port A | **10,310** | **25 %** | 463,247 |
+
+Timing closed on all three (+0.761, then +0.567 ns worst setup). The last row is
+within a few hundred ALMs of the 10,003 recorded before any colour work existed,
+which puts the real cost of the CDP1864, CDP1862, CDP1863 and the Visicom in
+perspective: a few hundred ALMs between them, against four thousand for one
+mis-inferred RAM.
+
+The second fix leaves `rtl/dpram.sv` alone and needs no `ramstyle` attribute: the
+wipe drives port A, which is safe because CLEAR is folded into reset, so the CPU
+is held in reset for its whole duration and is not driving the bus. Port B is now
+tied off entirely, matching the two instances that always worked.
+
+**The general lesson, because the Verilator harness cannot see any of this:**
+after changing anything about a memory's ports, check that it still appears in
+the `Inferred altsyncram megafunction` list in `output_files/*.map.rpt`. A RAM
+that falls into logic still fits, still closes timing, and passes every test in
+this repo.
 
 ### One number that moved, and did not
 
