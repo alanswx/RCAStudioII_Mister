@@ -36,6 +36,7 @@
 #define PIX(sig)  (top->rootp->top__DOT__rcastudio__DOT__pixie_video__DOT__cdp1861__DOT__##sig)
 #define DPRAM     (top->rootp->top__DOT__rcastudio__DOT__dpram__DOT__mem)   // ROM/cart image, $0000-$0FFF
 #define SRAM      (top->rootp->top__DOT__rcastudio__DOT__sram__DOT__mem)    // the 512 bytes of RAM, $0800-$09FF
+#define COLRAM    (top->rootp->top__DOT__rcastudio__DOT__colour_ram)         // 64 CDP1864 colour cells
 
 static Vtop* top = nullptr;
 static vluint64_t main_time = 0;
@@ -351,7 +352,7 @@ static void dump_state(FILE* f, long frame, const FrameGrabber& fg, bool with_vr
 
     fprintf(f, "-- Cartridge mapping --\n");
     {
-        static const char* pn[] = {"NONE","CROSS","SPACEWAR","FREEWAY","BOWLING","BASEBALL","HOMEBREW","GUNFIGHTER","8WAY","DOODLES","HB2P","UNMAPPED","LEGACY-PADDLE"};
+        static const char* pn[] = {"NONE","CROSS","SPACEWAR","FREEWAY","BOWLING","BASEBALL","HOMEBREW","GUNFIGHTER","8WAY","DOODLE","HB2P","UNMAPPED","LEGACY-PADDLE"};
         int pr = top->rootp->top__DOT__rcastudio__DOT__profile;
         fprintf(f, "  cart CRC16 %04X  ->  profile %d (%s)\n",
                 top->rootp->top__DOT__rcastudio__DOT__cart_crc, pr,
@@ -370,6 +371,18 @@ static void dump_state(FILE* f, long frame, const FrameGrabber& fg, bool with_vr
     fprintf(f, "  keylatch %X  playerA %03X  playerB %03X\n",
             RS(keylatch), RS(playerA), RS(playerB));
 
+    // The 64 CDP1864 colour cells, laid out as they appear on screen: 8 columns
+    // across by 8 row-groups down. Printed in the 1864's own pin order, matching
+    // tools/refemu's --colour, so the two can be diffed without a permutation in
+    // the way.
+    if (with_vram && RS(machine_mpt02)) {
+        fprintf(f, "-- CDP1864 colour RAM (row group x column), 1864 pin order --\n");
+        for (int g = 0; g < 8; g++) {
+            fprintf(f, "  g%d:", g);
+            for (int c = 0; c < 8; c++) fprintf(f, " %d", (int)COLRAM[g * 8 + c]);
+            fprintf(f, "\n");
+        }
+    }
     if (with_vram) {
         fprintf(f, "-- Display RAM $0900-$09FF --\n");
         for (int r = 0; r < 256; r += 16) {
@@ -418,11 +431,16 @@ static void usage(const char* argv0) {
 "    --vram               include $0800-$09FF hexdumps in state dumps\n"
 "    --dump-file FILE     write dumps here instead of stdout\n"
 "\n"
+"  Machine\n"
+"    --machine NAME       studio2 (default) or mpt02/studio3 -- the CDP1864\n"
+"                         colour machine: PAL 312-line frame, 192 display lines,\n"
+"                         colour RAM at $B00. Needs its own --bios.\n"
+"\n"
 "  Input\n"
 "    --joy-map N          OSD \"Joystick\" profile, and switch \"Mapping\" to Manual:\n"
 "                         0 none/keypad-only, 1 cross, 2 spacewar, 3 freeway,\n"
 "                         4 bowling, 5 baseball, 6 homebrew, 7 gunfighter,\n"
-"                         8 8-way, 9 doodles, 10 2P homebrew, 11 unmapped,\n"
+"                         8 8-way, 9 doodle, 10 2P homebrew, 11 unmapped,\n"
 "                         12 paddle (legacy). Omit for auto-detection.\n"
 "    --joy MASK@F[:H]     drive joystick 0 with MASK (bit0 right, 1 left, 2 down,\n"
 "                         3 up, 4 fire, 5 extra, 6 start, 17:8 A0..A9,\n"
@@ -482,6 +500,7 @@ int main(int argc, char** argv) {
     std::string swap_file; long swap_frame = -1; bool swap_done = false;
     uint8_t  joy_override = 0;   // applied once top exists
     bool     joy_manual   = false;
+    bool     machine_mpt02 = false;
     uint8_t  players_mode = 0;
     // Q gates the Studio II's beeper; track its edges so the core can be compared
     // against the reference emulator's Q even though AUDIO_L/R are still tied off.
@@ -549,6 +568,12 @@ int main(int argc, char** argv) {
             swap_file = t.substr(0, at);
             swap_frame = atol(t.c_str() + at + 1);
         }
+        else if (a == "--machine") {
+            std::string m = next("--machine");
+            if      (m == "studio2") machine_mpt02 = false;
+            else if (m == "mpt02" || m == "studio3") machine_mpt02 = true;
+            else { fprintf(stderr, "error: --machine must be studio2 or mpt02\n"); return 1; }
+        }
         else if (a == "--joy-map") { joy_override = (uint8_t)atoi(next("--joy-map")); joy_manual = true; }
         else if (a == "--trace-q")    trace_q = true;
         else if (a == "--frame-log")  frame_log = true;
@@ -605,6 +630,7 @@ int main(int argc, char** argv) {
     top = new Vtop();
     top->joy_override = joy_override;
     top->joy_manual   = joy_manual;
+    top->machine_mpt02 = machine_mpt02;
     top->players = players_mode;
 
     IoctlDriver io;
@@ -783,6 +809,7 @@ int main(int argc, char** argv) {
     }
 
     printf("\n");
+    printf("audio: %ld output edges, %ld Q edges\n", a_edges, q_edges);
     printf("done: %ld frames in %ld cycles\n", fg.frame, cycles);
     printf("      last frame %dx%d, hash %08X, %s\n",
            fg.last_width, fg.last_height, fg.hash(),

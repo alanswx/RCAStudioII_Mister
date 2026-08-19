@@ -11,6 +11,7 @@ module top(
    input [3:0]   joy_override/*verilator public_flat*/,
    input         joy_manual/*verilator public_flat*/,
    input [1:0]   players/*verilator public_flat*/,
+   input         machine_mpt02/*verilator public_flat*/,
 
    output [7:0] VGA_R/*verilator public_flat*/,
    output [7:0] VGA_G/*verilator public_flat*/,
@@ -104,6 +105,7 @@ rcastudioii rcastudio
 	.joy_manual(joy_manual),
 	.auto_profile(),
 	.players(players),
+	.machine_mpt02(machine_mpt02),
 	.osk_a(10'd0),
 	.osk_b(10'd0)
 );

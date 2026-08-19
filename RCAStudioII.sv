@@ -26,7 +26,7 @@ module emu
 	input         RESET,
 
 	//Must be passed to hps_io module
-	inout  [48:0] HPS_BUS,
+	inout  [45:0] HPS_BUS,
 
 	//Base video clock. Usually equals to CLK_SYS.
 	output        CLK_VIDEO,
@@ -47,11 +47,16 @@ module emu
 	output        VGA_DE,    // = ~(VBlank | HBlank)
 	output        VGA_F1,
 	output [1:0]  VGA_SL,
-	output        VGA_SCALER, // Force VGA scaler
+	output        VGA_SCALER,  // Force VGA scaler
+	output        VGA_DISABLE,
 
 	input  [11:0] HDMI_WIDTH,
 	input  [11:0] HDMI_HEIGHT,
 	output        HDMI_FREEZE,
+	output        HDMI_BLACKOUT,
+	output        HDMI_BOB_DEINT,
+
+
 
 `ifdef MISTER_FB
 	// Use framebuffer in DDRAM (USE_FB=1 in qsf)
@@ -181,7 +186,10 @@ assign {DDRAM_CLK, DDRAM_BURSTCNT, DDRAM_ADDR, DDRAM_DIN, DDRAM_BE, DDRAM_RD, DD
 assign VGA_SL = 0;
 assign VGA_F1 = 0;
 assign VGA_SCALER = 0;
+assign VGA_DISABLE = 0;
 assign HDMI_FREEZE = 0;
+assign HDMI_BLACKOUT = 0;
+assign HDMI_BOB_DEINT = 0;
 
 // Beeper: a square wave gated by the 1802's Q line, generated in rcastudioii.sv.
 wire audio;
@@ -198,43 +206,30 @@ assign BUTTONS = 0;
 
 `include "build_id.v"
 localparam CONF_STR = {
-	"RCA-StudioII;v3;",
-	"-;",
+	"RCA-StudioII;v4;",
 	"F1,ST2BINROM,Load Cartridge;",
+	"-;",
+	// Must load valid firmware after switching to Studio III
+	"O[13],Machine,Studio II,Studio III;",
 	"F0,BINROM,Load Firmware;",
 	"-;",
-	// Mapping picks who owns the Joystick row below it. On Auto the core drives
-	// that row: it writes the profile it detected back into the menu through
-	// hps_io's status_set, so loading Gunfighter leaves the menu reading
-	// "Gunfighter" instead of "Auto". Switch to Manual and the row keeps
-	// whatever it is showing and becomes yours to change -- so Manual always
-	// starts from the detected profile rather than from a stale one.
 	"O[6],Mapping,Auto,Manual;",
-	// Value 0 is MAP_NONE, which still passes Start through; Clear-only (11) is the
-	// one that silences the pad completely. Paddle (12) is a single-player,
-	// keypad-B-only profile for the homebrew tennis.st2, distinct from retail
-	// Tennis/Squash's CROSS profile.
-	// Order must match the localparams in rtl/rcastudioii.sv -- the row's value
-	// IS the profile number.
-	"D2O[5:2],Joystick,None,Cross,Space War,Freeway,Bowling,Baseball,Homebrew,Gunfighter,8-way,Doodles,2P Homebrew,Clear-only,Paddle;",
+	// Order must match the localparams in rtl/rcastudioii.sv
+	"D2O[5:2],Joystick,None,Cross,Space War,Freeway,Bowling,Baseball,Homebrew,Gunfighter,8-way,Doodle,2P Homebrew,Clear-only,Paddle;",
 	"O[8:7],Players,Auto,1,2;",
 	"O[10:9],Stick Keypad,Off,Pad A,Pad B;",
 	"-;",
 	"O[122:121],Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
 	"O[12:11],Scale,Normal,V-Integer,Narrower HV-Integer,Wider HV-Integer;",
 	"-;",
-//	"T[0],Reset;",
 	"T[1],Clear;",
 	"R[0],Reset and close OSD;",
-	// Non-OSD entries (J/jn/V) must sit below every menu row: the menu's selection
-	// pass counts any entry starting >= 'A' (Main menu.cpp), but its drawing pass
-	// skips J -- a J placed mid-string shifts every row after it off by one.
+	// Non-OSD entries (J/jn/V) must sit below every menu row; a J placed mid-string shifts 
+	// every row after it off by one.
+	// Fire/Extra mirror the MPT-02 joystick: fire on 5, a second button on 0.
+	"J1,Fire,Extra,Start,Clear,A0,A1,A2,A3,A4,A5,A6,A7,A8,A9,B0,B1,B2,B3,B4,B5,B6,B7,B8,B9;",
 	// A0..B9 are direct per-key bindings (see rtl/rcastudioii.sv); jn gives
-	// defaults to the first three only, so the direct keys stay unbound until
-	// the user maps them deliberately.
-	// Fire/Extra mirror the MPT-02 joystick, the closest thing to an official
-	// Studio II controller: fire on 5, a second button on 0.
-	"J1,Fire,Extra,Start,Select,A0,A1,A2,A3,A4,A5,A6,A7,A8,A9,B0,B1,B2,B3,B4,B5,B6,B7,B8,B9;",
+	// defaults to the first three only.
 	"jn,A,B,Start,Select;",
 	"V,v",`BUILD_DATE
 };
@@ -252,9 +247,10 @@ wire  [15:0] joystick_l_analog_0, joystick_r_analog_0;
 wire  [15:0] joystick_l_analog_1, joystick_r_analog_1;
 
 // CLEAR is the Studio II's console button. It resets the CPU and blanks/clears
-// the display, but the Pixie's timing generator must keep running or HDMI/analog
-// displays can lose sync. Mapped to F3 (0x04), the OSD "Clear" button, and
-// gamepad Select.
+// the display, but the Pixie's timing generator is kept running in order to be
+// friendlier to display sync. 
+// TODO: Ensure this "hack" does not compromise accuracy. ~elle
+// Mapped to F3 (0x04), the OSD "Clear" button, and the gamepad (as Clear).
 reg clear_key = 1'b0;
 always @(posedge clk_sys) begin
 	reg old_stb;
@@ -313,6 +309,8 @@ pll pll
 
 // The CDP1861 emits one pixel per CPU clock: 1.7897725 MHz nominal, 1.760229 MHz
 // here (clk_sys/4, and the real Studio II's RC oscillator was tuned by eye anyway).
+// TODO: We should still consider the feasibility of hitting true nominal. We are
+// further off than I'd like. ~elle
 reg [1:0] ce_cnt = 2'd0;
 always @(posedge clk_sys) ce_cnt <= ce_cnt + 2'd1;
 wire ce_pix = (ce_cnt == 2'd0);
@@ -368,6 +366,7 @@ rcastudioii rcastudio
 	.joystick_0(joystick_0),
 	.joystick_1(joystick_1),
 	.joy_override(status[5:2]),
+	.machine_mpt02(status[13]),
 	.joy_manual(status[6]),
 	.auto_profile(auto_profile),
 	.players(status[8:7]),

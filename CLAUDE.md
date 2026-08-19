@@ -27,7 +27,7 @@ Quartus with timing closed (§4).
 Recent additions that matter for day-to-day use include the OSD-managed joystick
 profile system with its Auto/Manual split (the menu shows the detected profile
 instead of the word "Auto"), the default 8-way profile,
-Gunfighter/8-way/Doodles special cases, the Clear-only profile for digit-entry
+Gunfighter/8-way/Doodle special cases, the Clear-only profile for digit-entry
 software, the memory decode, and config-versioning so old saved menu state does
 not silently map to the wrong fields.
 
@@ -389,33 +389,45 @@ do not assume the R(0) story above.
 ### 6.2 Memory decode -- done (2026-08-15)
 Implemented; see §10. `tools/memdecode-test.sh` covers it.
 
-### 6.2b Retail Tennis/Squash is mapped to PADDLE -- open question (2026-08-17)
+### 6.2b Tennis/Squash is mapped to PADDLE -- a design choice, not a bug (2026-08-17)
 
-`6b5b999` (Elle's, merged 2026-08-17) folded the retail TV Arcade III hash onto
-the homebrew tennis line:
+An earlier version of this entry called Elle's `6b5b999` a regression on the
+grounds that it folded "two different cartridges" onto one line. **That was
+wrong, and this records the correction**, because the wrong version was published
+and could otherwise get acted on.
+
+The line in question:
 
 ```
--16'h88FB: begin map_profile <= MAP_CROSS;  start_key <= 4'd2; end   # retail
--16'hFB76: begin map_profile <= MAP_PADDLE; start_key <= 4'd1; end   # homebrew
+-16'h88FB: begin map_profile <= MAP_CROSS;  start_key <= 4'd2; end
+-16'hFB76: begin map_profile <= MAP_PADDLE; start_key <= 4'd1; end
 +16'h88FB, 16'hFB76: begin map_profile <= MAP_PADDLE; start_key <= 4'd1; end
 ```
 
-Those are **different cartridges**, not two dumps of one: `88FB` is retail TV
-Arcade III (two-player Tennis, and per the RCA manual it starts on `A2`; `A1` is
-one-player Squash), `FB76` is Paul Robson's single-player homebrew `tennis.st2`.
+`88FB` and `FB76` are **the same cartridge in two containers**, not two
+cartridges. Measured: `88FB` is TV Arcade III Tennis + Squash as a 512-byte
+`.bin`; `FB76` is the same title as a 768-byte `.st2`, whose payload is
+byte-identical to that `.bin` and whose header title field reads
+"TV ARCADE III TENNIS". They hash apart only because the CRC covers the file as
+downloaded, header and all -- which is exactly why the table already pairs
+`.st2` with `.bin` elsewhere (`16'hFBEF, 16'h2B4D` for Asteroids, and so on).
+So grouping them is *consistent with the table's own convention*, and there is
+no "homebrew tennis": nothing by Paul Robson of that name exists in any corpus
+here.
 
-Two things look wrong for the retail cartridge. `map_padA(MAP_PADDLE)` is empty
-(the case arm is literally `MAP_PADDLE: ;`) and `MAP_PADDLE` is in
-`profile_1p`, so in two-player Tennis both sticks collapse onto keypad B and
-player A has no pad at all. And Start now presses `A1`, which starts the wrong
-game.
+What is left is one design question about one game, not a conflation. The
+cartridge holds two games: **Tennis** is two-player and starts on `A2`,
+**Squash** is one-player and starts on `A1` (Readme, from the RCA manual).
+`MAP_PADDLE` is keypad-B-only and sits in `profile_1p`, and the new start key is
+`A1`. That is a coherent package: it gives a gamepad user **Squash**, which one
+stick can actually play, instead of Tennis, which needs two keypads. The previous
+`MAP_CROSS` + `A2` gave Tennis, which a single pad plays only half of.
 
-**Deliberately left as-is** pending Elle's reasoning — she may have hardware
-findings the code does not show. Do not "fix" it without asking her first. Note
-the frame comparison cannot demonstrate this: retail Tennis does not visibly
-respond to held stick input in the harness, so the evidence is the code path,
-not a screenshot. If it is to be reverted, the previous mapping was `MAP_CROSS`
-with `start_key <= 4'd2`.
+So both mappings are defensible and the choice is Elle's to make. Left as-is.
+If it is ever revisited, the trade is "Squash with a pad" against "Tennis with
+two pads", not correct against incorrect. Note the frame harness cannot
+distinguish them: retail Tennis does not visibly respond to held stick input in
+these scenarios.
 
 ### 6.3 Top level — `RCAStudioII.sv`
 - No PAL support, and the BIOS is not embedded (the core is held in reset until
@@ -550,10 +562,24 @@ the old truncate-to-12-bits version scored exactly the same 18/21. That is what
 cartridge that pokes each case and checks the result out of the simulated RAM.
 It fails 4 of its 8 checks against the pre-decode core.
 
-**The reference is authoritative for instruction *order*, not for cycle
-timing.** Its model gives the CPU zero cycles during all 128 display lines
-rather than 6 of every 14, so it runs ~952 instructions/frame where real
-hardware (and the RTL) does **1321**. Do not "fix" the RTL to match 952.
+**The reference's cycle model was corrected on 2026-08-17 and now matches
+hardware's instruction rate, but it is still not cycle-accurate.** It used to give
+the CPU no cycles at all during the 128 display lines, so it ran ~952
+instructions/frame against hardware's 1321 -- a 28% shortfall, and the reason the
+old warning here said "do not fix the RTL to match 952". It now also gets the 6
+of every 14 cycles that the CPU keeps while DMA takes the other 8, and measures
+**1322/frame** against hardware's 1321.
+
+That fixed the *total* and not the *distribution*. The model has no scanline
+counter, so those display-window cycles all arrive in one lump before the next
+interrupt rather than interleaved between DMA bursts, and `CPU_ReadEFlag(1)`
+still returns a constant 1 -- so software that spins on EF1 or counts cycles
+across the display window still cannot be modelled. Measured effect: the §9 score
+did not move (27 -> 26 of 48 frames, three cases shifting by one frame each,
+which is animation-phase noise), while on the CDP1864 colour demo the reference
+went from 4 distinct colour states to 7 against the RTL's 9 -- closer, but still
+with none in common. So it is a fidelity improvement rather than an accuracy one.
+`tools/score-21.sh` measures the score; there was no script for it before.
 
 For CPU debugging both sims emit the same trace layout; strip the differing
 first and last columns to diff them:
@@ -721,7 +747,7 @@ cosmac does the same). Fixed in `rtl/cdp1802.v` (FETCH no longer yields to DMA;
 until its 8 cycles are actually serviced rather than for a positional window,
 dropping at the 7th acknowledge because the CPU commits one more cycle after
 the request falls — holding it a cycle longer ran 9 cycles/line and R(0)
-drifted +1 a line (Doodles lost its dot; that is the symptom to check).
+drifted +1 a line (Doodle lost its dot; that is the symptom to check).
 
 Verified: the whole corpus — 5 built-ins, 8 homebrews in both formats — is
 **pixel-identical to the pre-fix RTL** at the test frames, the memory-decode
@@ -863,7 +889,7 @@ uses 4/5/6 for racquet size, and Space War fires on keypad A while steering on
 keypad B. Presses are OR'd with the keyboard. Unknown cartridges get `8WAY`.
 
 The five BIOS built-ins have no cartridge to CRC, so they are told apart by the
-key that starts them (A1 Doodles, A2 Patterns, A3 Bowling, A4 Freeway, A5
+key that starts them (A1 Doodle, A2 Patterns, A3 Bowling, A4 Freeway, A5
 Addition), latching on the first press after reset only -- those keys are reused
 during play. An OSD "Joystick" setting overrides the whole thing, since the table
 can only be as good as its entries.
