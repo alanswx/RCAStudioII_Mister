@@ -452,3 +452,66 @@ Consequences, which matter for how the harness gets used:
 - `grand-pack.st2` (CRC `1594`) has no joystick profile entry and falls to the
   default; the other 13 Conic CRCs were already in the table, paired with their
   Studio II equivalents.
+
+---
+
+## 8. Why analog video does not sync (2026-08-18)
+
+The Readme lists "Analog video does not work yet" and "Direct video does not
+work yet". The cause is not a sync polarity or a clock rate — **we are not
+emitting a TV raster at all.**
+
+Both video parts here blank everything outside the bitmap, so the active area we
+present is 64×128 (Studio II) or 64×192 (Studio III) inside a 112×262 or 112×312
+frame. Even a display that locks to the sync has no picture to draw.
+
+### What the real part does
+
+It emits a **full-size raster with the small bitmap inside it**, and the border is
+active video painted in the background colour — not blanking. Three sources say
+so independently:
+
+- **Datasheet Fig. 4** (p6) draws it literally: `VERTICAL BLANKING` and
+  `HORIZONTAL BLANKING` at the edges, a large region marked `BACKGROUND`, and the
+  64×192 `DISPLAY AREA` inside that.
+- **Datasheet Fig. 6** (p8): horizontal blanking totals 13.14 µs of a 64 µs line,
+  leaving ~50.9 µs active. Vertical blanking is 24H of 312, with the 4H vertical
+  sync inside it.
+- **MAME's `cdp1861.h`**: `HBLANK_END = 12` against `SCREEN_WIDTH = 112`, so 100
+  of 112 pixel times are active; `SCANLINE_VBLANK_END = 16` of 262, so 246 lines
+  are active. The 64×128 display sits inside that.
+
+And the photographs of real Studio III output confirm it: the picture occupies
+the middle of the screen inside a wide border, and that border is the background
+colour (black in most of those shots, because those programs selected black).
+
+### There is no upscaler — that was the question
+
+Nothing scales anything. The picture fills a TV screen by three plain means:
+
+1. **Vertically**, software shows each logical row over several scanlines by
+   rewinding `R(0)` — 4 lines a row on the NTSC 1861, 6 on the PAL 1864. That is
+   what the ISR in datasheet Fig. 5 is doing with its repeated
+   `DEC R0` / `PLO R0`, and why 32 rows becomes 128 or 192 lines.
+2. **Horizontally**, pixels are simply *wide*: one per CPU clock, 568 ns each, so
+   64 of them span 36.4 µs of a ~51 µs active line.
+3. **The rest of the raster is background colour**, which is what makes the frame
+   full-size.
+
+### Measured gap
+
+| | ours | should be |
+|---|---|---|
+| HSync | 3.98 µs | 4.57 (1864) / 4.7 (NTSC) |
+| front porch | 0.57 µs | ~1.5–3.14 |
+| back porch | **22.72 µs** | ~4.7 |
+| active | 36.36 µs | ~50.9 |
+| active lines | **128 of 262** | ~246 of 262 (NTSC), ~288 of 312 (PAL) |
+
+Three faults at once: the sync pulse is narrow, the porches are so asymmetric the
+picture would sit far right even if it locked, and the active window is a
+fraction of the raster. Tracked as task #17, and best done with #15 (BCKGND),
+since painting the border is what the background luminance output is for.
+
+None of this affects HDMI, where `video_freak` scales whatever it is given — which
+is why the core looks correct on HDMI and produces nothing usable on analog.
