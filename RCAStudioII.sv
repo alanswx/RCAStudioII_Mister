@@ -212,7 +212,7 @@ localparam CONF_STR = {
 	// Must load valid firmware after switching machine. The two Studio IIIs are
 	// different chipsets, not one part with two sets of timings: PAL is a CDP1864,
 	// NTSC is a CDP1861 with a CDP1862 for colour and a CDP1863 for tone.
-	"O[14:13],Machine,Studio II,Studio III PAL,Studio III NTSC;",
+	"O[14:13],Machine,Studio II,Studio III PAL,Studio III NTSC,Visicom;",
 	"F0,BINROM,Load Firmware;",
 	"-;",
 	"O[6],Mapping,Auto,Manual;",
@@ -344,6 +344,7 @@ wire VBlank;
 wire VSync;
 wire [2:0] video;   // {R,G,B} from the core
 wire       video_bg;    // ...at background luminance (CDP1864 BCKGND)
+wire [1:0] vis_index;   // Visicom: one of its four fixed colours
 
 rcastudioii rcastudio
 (
@@ -365,6 +366,7 @@ rcastudioii rcastudio
 	.VSync(VSync),
 	.video_de(),
 	.video(video),
+	.vis_index(vis_index),
 	.audio(audio),
 	.joystick_0(joystick_0),
 	.joystick_1(joystick_1),
@@ -450,9 +452,27 @@ assign CLK_VIDEO = clk_sys;
 // both background and data -- what the datasheet describes and what Emma 02's
 // palette shows (back_blue 0,0,128 against blue 0,0,255). Half scale here.
 wire [7:0] vid_lvl = video_bg ? 8'h80 : 8'hFF;
-wire [7:0] vid_r = video[2] ? vid_lvl : 8'h00;
-wire [7:0] vid_g = video[1] ? vid_lvl : 8'h00;
-wire [7:0] vid_b = video[0] ? vid_lvl : 8'h00;
+
+// The Visicom is the exception: its four colours are fixed values chosen by
+// Toshiba, not combinations of three colour pins, so they cannot be expressed
+// on the {R,G,B} bus above. Emma 02's Visicom/standard.xml carries them as
+// back 0,64,0 and fore1..3 -- a dark green field with cyan, yellow-green and
+// salmon over it. (MAME's visicom.cpp has the same four roles at slightly
+// different values; Emma's are the ones the frame comparison uses.)
+wire machine_visicom = (status[14:13] == 2'd3);
+reg [23:0] vis_rgb;
+always @(*) begin
+	case (vis_index)
+		2'd0:    vis_rgb = 24'h004000;
+		2'd1:    vis_rgb = 24'h70D0FF;
+		2'd2:    vis_rgb = 24'hD0FF70;
+		default: vis_rgb = 24'hFF7070;
+	endcase
+end
+
+wire [7:0] vid_r = machine_visicom ? vis_rgb[23:16] : (video[2] ? vid_lvl : 8'h00);
+wire [7:0] vid_g = machine_visicom ? vis_rgb[15:8]  : (video[1] ? vid_lvl : 8'h00);
+wire [7:0] vid_b = machine_visicom ? vis_rgb[7:0]   : (video[0] ? vid_lvl : 8'h00);
 
 ////////////////// On-screen keypad (Jaguar core's numstick, via ColecoAdam) //
 //

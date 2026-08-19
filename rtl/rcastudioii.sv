@@ -74,6 +74,11 @@ module rcastudioii
 	// That needs a fourth bit, and it belongs with the 1864 itself rather than
 	// being guessed at here.
 	output       [2:0] video,
+	// Visicom only: which of its four colours this pixel is. The palette is
+	// four fixed RGB values that a 1-bit-per-channel bus cannot carry, so the
+	// top level applies it; `video` above still gets a 3-bit approximation for
+	// anything that only has three wires (the simulation harness).
+	output       [1:0] vis_index,
 	// BCKGND from the CDP1864: this pixel's colour came from the background
 	// select rather than a lit bit, so it should be shown at lower luminance.
 	// Always low on the monochrome Studio II, which has no background colour.
@@ -87,9 +92,16 @@ module rcastudioii
 localparam [1:0] MACHINE_STUDIO2   = 2'd0;
 localparam [1:0] MACHINE_S3_PAL    = 2'd1;
 localparam [1:0] MACHINE_S3_NTSC   = 2'd2;
+localparam [1:0] MACHINE_VISICOM   = 2'd3;
 
-wire is_studio3    = (machine != MACHINE_STUDIO2);
-wire machine_mpt02 = (machine == MACHINE_S3_PAL);   // has the CDP1864
+// The Visicom is NOT a Studio III despite Robson's visicom.txt calling it a
+// "clone of the Studio 3". It has a plain CDP1861 and no colour RAM at all: its
+// colour comes from a second bit plane in main RAM, so none of the Studio III
+// memory map, colour RAM or tone generator applies to it. Keeping is_studio3 as
+// "not a Studio II" would have handed it all three.
+wire is_studio3      = (machine == MACHINE_S3_PAL) || (machine == MACHINE_S3_NTSC);
+wire machine_mpt02   = (machine == MACHINE_S3_PAL);   // has the CDP1864
+wire machine_visicom = (machine == MACHINE_VISICOM);
 
 ////////////////// VIDEO //////////////////////////////////////////////////////////////////
 
@@ -117,14 +129,21 @@ pixie_video pixie_video (
     // were tied on/off, so the display could never be disabled and the 1861 started generating
     // interrupts from reset instead of from the moment the BIOS enabled it. The earlier commented
     // version keyed off io_n[0] alone, which cannot tell INP 1 from OUT 1.
-    .disp_on    (io_inp && (io_n == 3'd1)),  // I
-    .disp_off   ((io_out && (io_n == 3'd1)) || clear_key),  // I: also blank display while CLEAR is asserted
+    // The Visicom enables the display with OUT 1 rather than INP 1, and has no
+    // disable port at all -- Emma 02's config carries a single <out type="on">1
+    // where the Studio II carries <out>1 and <in>1, which its parser turns into
+    // PIXIE_OUT_OUT with only the enable populated.
+    .disp_on    (machine_visicom ? (io_out && (io_n == 3'd1))
+                                 : (io_inp && (io_n == 3'd1))),  // I
+    .disp_off   ((!machine_visicom && io_out && (io_n == 3'd1)) || clear_key),  // I: also blank display while CLEAR is asserted
 
 
     .data_in    (ram_q),      // I [7:0]  byte the CPU delivers during a DMA-OUT cycle
+    .vis_mode   (machine_visicom),  // I
+    .data_in2   (sram_q_b),   // I [7:0]  Visicom plane 1: the byte $200 higher
     .colour_in  (colour_dot), // I  CDP1862 colour for that byte (NTSC Studio III)
     .con        (colour_on),  // I
-    .bg_step    (io_out && (io_n == 3'd1)),  // I  OUT 1 steps the background
+    .bg_step    (io_out && (io_n == 3'd1) && !machine_visicom),  // I  OUT 1 steps the background
 
     .DMAO       (DMAO_61),    // O
     .INT        (INT_61),     // O
@@ -135,6 +154,7 @@ pixie_video pixie_video (
     .csync      (),           // O
     .video      (video_dot),  // O  one bit: the 1861 is a monochrome part
     .colour_out    (col61_dot),
+    .vis_index     (vis_index),
     .bg_active     (col61_bg),
     .bg_colour_out (col61_bgc),
 
@@ -238,7 +258,22 @@ cdp1862 cdp1862
     .bckgnd     (bg_61)
 );
 
-assign video    = machine_mpt02 ? video_64 : video_61;
+// The Visicom's four colours do not fit a 1-bit-per-channel bus, so the exact
+// palette is applied at the top level (RCAStudioII.sv) from vis_index. What
+// goes out here is the nearest 3-bit approximation, which is what the Verilator
+// harness captures -- the four colours stay distinguishable in a PNG or an
+// ASCII dump, which is all that side needs.
+reg  [2:0] vis_approx;
+always @(*) begin
+	case (vis_index)
+		2'd0:    vis_approx = 3'b010;   // background: dark green
+		2'd1:    vis_approx = 3'b011;   // cyan
+		2'd2:    vis_approx = 3'b110;   // yellow
+		default: vis_approx = 3'b100;   // red
+	endcase
+end
+
+assign video    = machine_visicom ? vis_approx : (machine_mpt02 ? video_64 : video_61);
 assign DMAO     = machine_mpt02 ? DMAO_64  : DMAO_61;
 assign INT      = machine_mpt02 ? INT_64   : INT_61;
 assign EFx      = machine_mpt02 ? EFx_64   : EFx_61;
@@ -686,9 +721,14 @@ always @(posedge clk_sys) begin
 			// Fallback
 			// ----------------------------------------------------------------
 
+			// Every Visicom cartridge dumped so far starts on 0, not 1 -- Emma
+			// 02's FaqVisicomCartridges says "to start press 0" (or space, which
+			// is its keypad-A 0) for all of them, and the built-in games use
+			// 1/2/3/4/7 instead. There is no CRC entry for any of them yet, so
+			// the machine decides rather than the table.
 			default: begin
 				map_profile <= MAP_8WAY;
-				start_key   <= 4'd1;
+				start_key   <= machine_visicom ? 4'd0 : 4'd1;
 			end
 
 		endcase
@@ -1089,7 +1129,7 @@ wire  [7:0]  ram_q;  // data returned to the CPU (and to the 1861 during DMA)
 reg  [7:0]  cart_page = 8'h00;    // indexed by address bits [10:8]: page $08..$0F
 
 wire        bank0    = (ram_a[15:12] == 4'h0);
-wire        rom_sel  = bank0 && !ram_a[11];                        // $0000-$07FF
+wire        rom_sel  = bank0 && (!ram_a[11] || machine_visicom);   // $0000-$07FF ($0000-$0FFF on the Visicom)
 // The CDP1864 machines put a second ROM region at $0C00-$0FFF -- MAME's
 // mpt02_map has .rom() there as well as at $0000-$07FF, and the Studio III BIOS
 // is a 4K image covering both. On those machines it is ROM whether or not a
@@ -1100,8 +1140,34 @@ wire        rom_hi   = is_studio3 && bank0 && (ram_a[11:10] == 2'b11);      // $
 // lines are decoded, which is why MAME names the storage ($0B00-$0B3F) and Emma 02
 // the window ($0B00-$0BFF) without disagreeing. See docs/succession-plan.md §6.
 wire        col_sel  = is_studio3 && bank0 && (ram_a[11:8] == 4'hB);
-wire        cart_sel = bank0 &&  ram_a[11] && cart_page[ram_a[10:8]] && !rom_hi && !col_sel;
-wire        ram_sel  = !rom_sel && !rom_hi && !col_sel && !cart_sel && !ram_a[9];
+wire        cart_sel = bank0 &&  ram_a[11] && cart_page[ram_a[10:8]] && !rom_hi && !col_sel && !machine_visicom;
+
+// ---- Toshiba Visicom COM-100 ----------------------------------------------
+// A different map from either Studio, and the only one here that puts RAM above
+// $0FFF. From Emma 02's Visicom/standard.xml:
+//
+//   $0000-$07FF  ROM   2K image: BIOS, and the built-in games at $0400-$07FF
+//                      (Emma declares the window as $0000-$03FF and lets the
+//                      cartridge overlay $0400-$07FF, which is the Studio II
+//                      arrangement stated differently)
+//   $0800-$0FFF  ROM   further cartridge space
+//   $1000-$11FF  RAM   512 bytes: scratch at $1000-$10FF, bit plane 0 at $1100
+//   $1300-$13FF  RAM   256 bytes: bit plane 1
+//   $1200-$12FF        nothing
+//
+// Both RAM windows repeat every $400 all the way to $FFFF -- Emma spells the
+// mirrors out one by one in <map>, which is the same statement as decoding
+// A9-A0 within each 1K page and ignoring everything above.
+wire        vis_ram  = machine_visicom && !bank0 && !ram_a[9];            // 512B, plane 0 in its top half
+wire        vis_pl1  = machine_visicom && !bank0 && (ram_a[9:8] == 2'b11);// 256B, plane 1
+
+wire        ram_sel  = machine_visicom
+                     ? (vis_ram || vis_pl1)
+                     : (!rom_sel && !rom_hi && !col_sel && !cart_sel && !ram_a[9]);
+
+// Plane 1 lives above the 512 bytes every other machine has, so the array is 1K
+// and the top half is Visicom-only. Nothing else can address it.
+wire [9:0]  sram_addr = vis_pl1 ? {2'b10, ram_a[7:0]} : {1'b0, ram_a[8:0]};
 wire        cpu_wr   = ram_wr && ram_sel;                          // RAM is the only writeable thing
 wire        col_wr   = ram_wr && col_sel;
 
@@ -1273,8 +1339,13 @@ wire  [7:0] st2_pg    = st2_page[st2_blk];
 // Page $0B is the CDP1864's colour RAM, not cartridge space, so a cartridge must
 // not be able to page ROM over it on that machine. (On the Studio II $0B is an
 // ordinary cartridge window and stays loadable, which is why this is gated.)
+// On the Visicom RAM is not in this bank at all -- it sits at $1000 and above --
+// so $08 and $09 are ordinary cartridge space there. Every one of Emma 02's six
+// Visicom cartridges pages exactly $08-$0F, which the Studio II rule rejects
+// outright: without this the whole image is dropped and the machine boots to its
+// built-in games as though no cartridge were inserted.
 wire        st2_pg_ok = (st2_pg[7:4] == 4'h0) && (st2_pg[3:0] > 4'h3)
-                        && (st2_pg[3:0] != 4'h8) && (st2_pg[3:0] != 4'h9)
+                        && (machine_visicom || ((st2_pg[3:0] != 4'h8) && (st2_pg[3:0] != 4'h9)))
                         && !(is_studio3 && (st2_pg[3:0] == 4'hB));
 
 wire        st2_data  = ioctl_addr >= 16'd256;          // past the header
@@ -1314,21 +1385,32 @@ dpram #(8, 12) dpram
 	.q_b()
 );
 
-// The 512 bytes of RAM: $0800-$08FF program/system, $0900-$09FF display.
+// The RAM: 512 bytes on the Studio II and III ($0800-$08FF program/system,
+// $0900-$09FF display), 1K on the Visicom, whose top half is the second bit
+// plane the video reads through port B.
 // Selected by A9 = 0, so the address inside it is just A8-A0.
 // Add a port-B writer used to clear VRAM on CLEAR without resetting the Pixie
 reg [8:0] clear_addr_b = 9'd0;
 reg       clear_active = 1'b0;
 reg       ram_cs_b_sig = 1'b0;
 reg       wren_b_sig = 1'b0;
-reg [8:0] address_b_sig = 9'd0;
+reg [9:0] address_b_sig = 10'd0;
 reg [7:0] data_b_sig = 8'd0;
 
+// Port B's read half was unused (q_b was left open), which is what makes the
+// Visicom's two-bytes-per-DMA-cycle possible without a second array or a stolen
+// cycle: plane 0 comes back on port A as the byte the CPU is fetching, plane 1
+// on port B from $200 higher, both with the same one-cycle latency. The clear
+// sequencer still owns port B while it runs, but that is only while CLEAR is
+// held, when the display is blanked anyway.
+wire [9:0] sram_addr_b = {2'b10, ram_a[7:0]};
+wire [7:0] sram_q_b;
+
 always @(posedge clk_sys) begin
-    // Default: inactive
+    // Default: no write, and port B reads plane 1 for the video
     ram_cs_b_sig <= 1'b0;
     wren_b_sig  <= 1'b0;
-    address_b_sig <= 9'd0;
+    address_b_sig <= sram_addr_b;
     data_b_sig <= 8'd0;
 
     // Start a clear sequence when CLEAR is asserted (and not already active)
@@ -1340,7 +1422,7 @@ always @(posedge clk_sys) begin
         // Write zero to current VRAM address
         ram_cs_b_sig <= 1'b1;
         wren_b_sig   <= 1'b1;
-        address_b_sig <= clear_addr_b;
+        address_b_sig <= {1'b0, clear_addr_b};
         data_b_sig   <= 8'd0;
         if (clear_addr_b == 9'd511) begin
             // Finished clearing VRAM; deassert clear_active on next cycle
@@ -1352,11 +1434,11 @@ always @(posedge clk_sys) begin
     end
 end
 
-dpram #(8, 9) sram
+dpram #(8, 10) sram
 (
 	.clock(clk_sys),
 	.ram_cs(1'b1),
-	.address_a(ram_a[8:0]),
+	.address_a(sram_addr),
 	.wren_a(cpu_wr),
 	.data_a(ram_d),
 	.q_a(sram_q),
@@ -1365,7 +1447,7 @@ dpram #(8, 9) sram
 	.wren_b(wren_b_sig),
 	.address_b(address_b_sig),
 	.data_b(data_b_sig),
-	.q_b()
+	.q_b(sram_q_b)
 );
 
 

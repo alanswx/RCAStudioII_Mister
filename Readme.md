@@ -20,9 +20,24 @@ separate, hardware-accurate RAM mirroring.
 
 ### Studio III
 
-* Studio III: PAL-only. NTSC and Visicom support are WIP; see **Current limitations**.
+* Studio III: PAL and NTSC are both implemented. They are different chipsets, not
+one part with two sets of timings: PAL is a CDP1864, NTSC is a CDP1861 with a
+CDP1862 for colour and a CDP1863 for tone. Pick the right one for your BIOS.
 * Video: CDP1864 PAL video is working; no visual issues observed.
-* Audio: CDP1864 audio is implemented, but not substantively tested yet.
+* Audio: CDP1864 audio is implemented and checked against the datasheet's
+division chain by `tools/tone-test.sh`, but not substantively play-tested.
+
+### Visicom COM-100
+
+Toshiba's 1978 Japanese machine, sold as a Studio III relative but really its own
+design. It is NTSC with the plain monochrome CDP1861, and gets colour a different
+way from every other machine here: DMA reads *two* bytes per cycle, 512 apart,
+and the two top bits pick one of four fixed colours. RAM sits at `$1000` and up
+rather than `$0800`, so the whole memory map moves with it.
+
+All five built-in games and all six dumped cartridges run. The built-ins start on
+1 Doodle, 2 Bowling, 3 Patterns, 4 Freeway, 7 Addition; every cartridge starts on
+**0**, which is what the gamepad Start button presses on this machine.
 
 ## Features
 
@@ -35,8 +50,8 @@ separate, hardware-accurate RAM mirroring.
 * OSD settings do not save yet.
 * Analog video does not work yet.
 * Direct video does not work yet.
-* Studio III: NTSC support is not implemented yet. 
-* Studio III: Visicom support is not implemented yet.
+* The Visicom has no frame-by-frame reference: `tools/refemu` models the Studio II
+and the two Studio IIIs only, so it is covered by `tools/visicom-test.sh` instead.
 
 ## Installing
 
@@ -63,10 +78,10 @@ loaded at time of writing.
 Known Studio III BIOS images:  
 * Studio III 4KB, md5 `849A484AA4B2784ECE5C35C39D9D51A8`: untested
 * Studio III (PAL) 2KB, md5 `4CBC2F551D12709BB26D1500284C97C2`: working
-* Studio III (NTSC) 2KB, md5 `F2EBBF8FA4A2F8509C041B6F07E55C5A`: partial (no NTSC support)
+* Studio III (NTSC) 2KB, md5 `F2EBBF8FA4A2F8509C041B6F07E55C5A`: working (select `Studio III NTSC`)
 * **Victory (PAL) 4KB, md5 `5E261010D361A378EAB13F543A96D3C5`: working, recommended**
 * Victory (NTSC) 4KB, md5 `85514FD09950DD8C0CC25238A862C8DC`: not working
-* Visicom (NTSC) 2KB, md5 `AEEC6FE3934481E20EB7DB6D5FF56A54`: not working
+* Visicom (NTSC) 2KB, md5 `AEEC6FE3934481E20EB7DB6D5FF56A54`: working (select `Visicom`)
 
 ## Controls
 

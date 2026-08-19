@@ -675,3 +675,91 @@ off after reset". Emma's `<out type="dma">5</out>` agrees with his `65`, so the
 production machine kept at least part of that prototype map. His colour-chip
 sketch (`IMG_1535.JPG`) and the "III A — STUDIO II COMPATIBLE" design
 (`IMG_1536.JPG`) are the surrounding context.
+
+---
+
+## 11. Visicom COM-100: done (2026-08-19)
+
+`#8`, and the last machine on the list. It was deferred once as "a bigger job
+than it looks", on the strength of MAME's `visicom.cpp`: RAM above `$0FFF` where
+our decode stopped, a 2bpp planar path through the 1861's shifter, and a
+four-entry palette of arbitrary RGB values the 3-bit video bus cannot express.
+All three were real; none was as bad as it looked, because Emma 02 states the
+video rule in five lines where MAME states it in bitfields.
+
+### What it actually is
+
+`Cdp1802::visicomDmaOut` (Emma 02, `src/cdp1802.cpp`):
+
+```cpp
+*vram1 = readMem(scratchpadRegister_[0]);
+*vram2 = readMem(scratchpadRegister_[0]+0x200);
+scratchpadRegister_[0]++;
+```
+
+and in `src/pixie.cpp`, per pixel: `if (vram1 & 128) color |= 1; if (vram2 & 128)
+color |= 2;`. So DMA reads two bytes rather than one, 512 apart, and each pixel
+is one of four colours instead of on/off. There is no colour RAM, no CDP1862, no
+`CON`, no background stepping — none of the Studio III colour machinery applies.
+
+Memory, from `data/Xml/Visicom/standard.xml`:
+
+```
+$0000-$07FF  ROM   BIOS, built-in games at $0400-$07FF
+$0800-$0FFF  ROM   cartridge
+$1000-$11FF  RAM   512B: scratch at $1000, bit plane 0 at $1100
+$1300-$13FF  RAM   256B: bit plane 1              ($1100 + $200, as above)
+$1200-$12FF        nothing
+```
+
+Both RAM windows repeat every `$400` to `$FFFF`. Emma spells every mirror out in
+`<map>`; decoding A9-A0 inside each 1K page is the same statement.
+
+I/O differs in one place that matters: `<out type="on">1</out>` where the Studio
+II has `<out>1</out>` and `<in>1</in>`. Emma's parser turns that into
+`PIXIE_OUT_OUT` with only the enable populated, so **`OUT 1` turns the display
+on** and there is no disable port at all.
+
+### How it was built
+
+- `rtl/pixie/cdp1861.v` gained `vis_mode`, `data_in2` and a `vis_index[1:0]`
+  output: a second line buffer and shift register beside the first, clocked
+  together. `video` becomes "either plane set", because colour 0 is a dark green
+  background rather than black.
+- The 512-byte RAM became 1K. Plane 1 lives in the top half, and is read through
+  **port B of the same dual-port array** — whose read half was unused (`q_b` was
+  left open). Both planes therefore arrive in one cycle with matched latency, and
+  the machine needs no second array and no stolen cycle.
+- The palette is applied in `RCAStudioII.sv`, which is the only place wide enough
+  for it. `video[2:0]` still carries a 3-bit approximation so the Verilator
+  harness and anything else with three wires keeps working.
+- `st2_pg_ok` had to learn that `$08` and `$09` are cartridge space here. All six
+  dumped cartridges page exactly `$08-$0F`; under the Studio II rule the entire
+  image was dropped and the machine booted to its built-ins as though empty.
+
+### Verification
+
+There is no frame-by-frame reference: `tools/refemu` covers the Studio II and the
+two Studio IIIs, and Emma 02 has no headless mode (§5). `tools/visicom-test.sh`
+covers it instead — every built-in and every cartridge, locked to the exact set
+of colours it puts on screen. Colours 2 and 3 need plane 1's bit, so any screen
+listing one is direct evidence the second read happened.
+
+The screens were checked by eye against Emma's own descriptions before being
+locked: Addition really is a two-player scoreboard, in cyan and yellow;
+`cas-190` really is a cyan border round the word HOROSCOPE; `cas-130` is a
+baseball diamond with a red bat and three scoreboards. That the two score groups
+come out solidly cyan and solidly yellow is also the evidence for the `+$200`
+offset specifically — a misaligned second plane would break them up.
+
+Start keys are Emma's (`Helpfiles/FaqVisicom*.htm`): built-ins on 1 Doodle,
+2 Bowling, 3 Patterns, 4 Freeway, 7 Addition, and every cartridge on 0. The
+gamepad Start button presses 0 on this machine rather than the usual 1.
+
+### One number that moved, and did not
+
+The Conic PAL sweep reads **16/28**, against the 14/28 recorded in §8. That is
+not a regression: stashing this work and re-running the identical command also
+gives 16/28, so the two figures are different metrics rather than a change. The
+old one was measured by hand and cannot be reproduced from the note. There is now
+a `tools/score-conic.sh`, so whatever it prints is the number from here on.

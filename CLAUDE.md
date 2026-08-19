@@ -31,6 +31,12 @@ Gunfighter/8-way/Doodle special cases, the Clear-only profile for digit-entry
 software, the memory decode, and config-versioning so old saved menu state does
 not silently map to the wrong fields.
 
+The core now covers four machines, selected from the OSD: Studio II, Studio III
+PAL (a CDP1864), Studio III NTSC (a CDP1861 with a CDP1862 for colour and a
+CDP1863 for tone — a different chipset, not the same part retimed) and the
+Toshiba Visicom COM-100, whose colour comes from a second bit plane $200 above
+the first rather than from colour RAM. See `docs/succession-plan.md`.
+
 What is still missing: an embedded BIOS. (PAL is not missing — the Studio II
 never had it; see §7.1.) See §6.
 
@@ -458,6 +464,11 @@ already handles PAL displays without touching core timing. PAL is native to the
 
 ### 7.4 The next machines — see `docs/succession-plan.md`
 
+**Done as of 2026-08-19.** All four machines the core will carry are in: Studio
+II, Studio III PAL (CDP1864), Studio III NTSC (CDP1861 + 1862 + 1863) and the
+Toshiba Visicom COM-100. The Studio IV is deliberately *not* — it shares the
+1802 and nothing else, and belongs in its own core (succession plan §10).
+
 Which machines follow the Studio II, in what order, and what software we hold
 for each. Headline: the CPU-side contract does not change (MAME drives the
 CDP1864 with the same `INT`/`DMA_OUT`/`EFx` our 1861 already produces), so the
@@ -483,9 +494,19 @@ its profile entries.
 
 ### 7.3 Keep the comparison green
 Any RTL change should be re-checked against the reference emulator (§9) before
-committing. The regression is cheap — a few seconds per cartridge. Changes that
-touch memory should also run `tools/memdecode-test.sh`, which no cartridge in
-the corpus can substitute for (§9).
+committing. The regression is cheap — a few seconds per cartridge. The full set,
+in the order they are cheapest to run:
+
+| Script | What it covers | Expected |
+|--------|----------------|----------|
+| `tools/memdecode-test.sh` | the memory decode, which no cartridge in the corpus exercises (§9) | 8/8 |
+| `tools/tone-test.sh` | the CDP1863/1864 tone divider, which no frame can show | 7/7 |
+| `tools/visicom-test.sh` | the Visicom, which has no reference emulator | all ok |
+| `tools/score-21.sh` | the §9 Studio II score, documented start sequences | 26/48 |
+| `tools/score-conic.sh` | the Studio III PAL sweep, uniform A1 | 16/28 |
+
+The last two are comparisons against `tools/refemu` and will move when its cycle
+model does; the first three are directed tests and should not move at all.
 
 ---
 
@@ -596,6 +617,54 @@ cartridges including an RCA test cart.
 ---
 
 ## 10. What changed
+
+### 2026-08-19 — the Toshiba Visicom COM-100, and two bytes per DMA cycle
+
+The fourth and last machine. It is sold as a Studio III relative and Robson's
+`visicom.txt` calls it a "clone of the Studio 3", but it is neither: it has the
+plain monochrome CDP1861, no colour RAM, no CDP1862 and no tone generator, and
+its RAM is at `$1000` rather than `$0800`. `is_studio3` had to stop meaning "not
+a Studio II", which would have handed it all three.
+
+Colour comes from somewhere no other machine here puts it. Emma 02's
+`Cdp1802::visicomDmaOut` reads **two** bytes per DMA cycle — `M(R(0))` and
+`M(R(0)+$200)` — and takes the top bit of each, so the picture is two bit planes
+512 apart and every pixel is one of four fixed colours. Implemented as a second
+line buffer and shift register inside `cdp1861.v`, fed through **port B of the
+existing RAM**, whose read half had never been connected. Both planes therefore
+arrive in one cycle with matched latency, needing no second array and no stolen
+cycle. The RAM went 512 bytes → 1K, with plane 1 in the top half.
+
+The four colours are fixed RGB values, not combinations of three colour pins, so
+they cannot ride the `{R,G,B}` bus the 1864 defined. `RCAStudioII.sv` applies the
+palette; the bus still carries a 3-bit approximation so the Verilator harness
+keeps working unchanged.
+
+Two smaller things the machine needed: `OUT 1` enables its display where every
+other machine here uses `INP 1` (Emma's `<out type="on">1</out>` parses to
+`PIXIE_OUT_OUT` with only the enable populated, and there is no disable port at
+all); and `st2_pg_ok` had to learn that `$08`/`$09` are cartridge space rather
+than RAM. All six dumped cartridges page exactly `$08-$0F`, so under the Studio
+II rule the whole image was dropped and the machine booted to its built-ins as
+though nothing were inserted.
+
+Matched against **Emma 02** throughout — it is the only reference that models
+this machine, and it states the video rule in five lines where MAME's
+`visicom.cpp` states it in bitfields.
+
+Verified by `tools/visicom-test.sh` (new): five built-in games and six
+cartridges, each locked to the exact set of colours it puts on screen, after the
+screens were checked by eye against Emma's own descriptions. Colours 2 and 3
+require plane 1's bit, so any screen listing one is direct evidence the second
+read happened. The Studio II side is unmoved: §9 26/48, memory decode 8/8, tone
+8/8, and Invaders still animates from its `.st2`.
+
+Also here: `tools/score-conic.sh`, because the "14/28" recorded for the Studio
+III PAL sweep could not be reproduced from the note. The obvious uniform-A1 sweep
+gives **16/28** both with and without this work — measured by stashing it and
+re-running the identical command — so the two are different metrics, not a
+regression. The script now defines the number.
+
 
 ### 2026-08-16 — Hockey/Combat "flashing strobes": INT/EFx lead the line by one cycle (AVI1861), parity-adaptive DMA request, open bus = $FF
 

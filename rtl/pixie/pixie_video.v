@@ -29,6 +29,9 @@ module pixie_video
     input             disp_off,
 
     input       [7:0] data_in,     
+    // Visicom COM-100: a second bit plane, delivered in the same DMA cycle
+    input             vis_mode,
+    input       [7:0] data_in2,
 
     output            DMAO,     
     output            INT,     
@@ -50,6 +53,7 @@ module pixie_video
     input             con,
     input             bg_step,
     output      [2:0] colour_out,
+    output      [1:0] vis_index,
     output            bg_active,
     output      [2:0] bg_colour_out  
 );
@@ -63,6 +67,8 @@ cdp1861 cdp1861 (
 
     .SC         (SC),           // I [1:0]
     .data_in    (data_in),      // I [7:0]  byte the CPU delivers during DMA-OUT
+    .vis_mode   (vis_mode),     // I
+    .data_in2   (data_in2),     // I [7:0]
     .disp_on    (disp_on),      // I
     .disp_off   (disp_off),     // I
 
@@ -81,6 +87,7 @@ cdp1861 cdp1861 (
     .colour_in     (colour_in),
     .con           (con),
     .bg_step       (bg_step),
+    .vis_index  (vis_index),
     .colour_out    (colour_out),
     .bg_active     (bg_active),
     .bg_colour_out (bg_colour_out)

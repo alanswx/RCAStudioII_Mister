@@ -42,6 +42,14 @@ while [[ ${1:-} == --machine || ${1:-} == --bios ]]; do
       --bios)    BIOS="$2";    shift 2 ;;
     esac
 done
+if [[ "$MACHINE" == visicom ]]; then
+    # tools/refemu has no Visicom, so there is nothing to compare against. Say so
+    # rather than silently diffing against a Studio II run.
+    echo "error: --machine visicom is not supported here -- tools/refemu models the" >&2
+    echo "       Studio II and the two Studio IIIs only, so there is no reference" >&2
+    echo "       frame to diff against. Run the RTL sim directly instead." >&2
+    exit 2
+fi
 if [[ "$MACHINE" != studio2 ]]; then
     ROWS=6                              # the CDP1864 machines show 32 rows over 192 lines
     if [[ "$BIOS" == "$ROOT/rom/studio2.rom" ]]; then

@@ -432,10 +432,14 @@ static void usage(const char* argv0) {
 "    --dump-file FILE     write dumps here instead of stdout\n"
 "\n"
 "  Machine\n"
-"    --machine NAME       studio2 (default), mpt02/studio3 (PAL CDP1864), or\n"
-"                         studio3ntsc (CDP1861 + 1862 colour + 1863 tone) -- the\n"
-"                         colour machine: PAL 312-line frame, 192 display lines,\n"
-"                         colour RAM at $B00. Needs its own --bios.\n"
+"    --machine NAME       studio2 (default), mpt02/studio3 (PAL CDP1864),\n"
+"                         studio3ntsc (CDP1861 + 1862 colour + 1863 tone), or\n"
+"                         visicom (Toshiba COM-100). The Studio IIIs are colour\n"
+"                         machines: PAL is a 312-line frame with 192 display\n"
+"                         lines and colour RAM at $B00. The Visicom is NTSC like\n"
+"                         the Studio II but gets its colour from a second bit\n"
+"                         plane $200 above the first, so it has no colour RAM.\n"
+"                         Each needs its own --bios.\n"
 "\n"
 "  Input\n"
 "    --joy-map N          OSD \"Joystick\" profile, and switch \"Mapping\" to Manual:\n"
@@ -501,7 +505,7 @@ int main(int argc, char** argv) {
     std::string swap_file; long swap_frame = -1; bool swap_done = false;
     uint8_t  joy_override = 0;   // applied once top exists
     bool     joy_manual   = false;
-    uint8_t  machine = 0;   // 0 studio2, 1 studio3 PAL, 2 studio3 NTSC
+    uint8_t  machine = 0;   // 0 studio2, 1 studio3 PAL, 2 studio3 NTSC, 3 Visicom
     uint8_t  players_mode = 0;
     // Q gates the Studio II's beeper; track its edges so the core can be compared
     // against the reference emulator's Q even though AUDIO_L/R are still tied off.
@@ -574,7 +578,8 @@ int main(int argc, char** argv) {
             if      (m == "studio2") machine = 0;
             else if (m == "mpt02" || m == "studio3" || m == "studio3pal") machine = 1;
             else if (m == "studio3ntsc" || m == "ntsc") machine = 2;
-            else { fprintf(stderr, "error: --machine must be studio2, mpt02/studio3, or studio3ntsc\n"); return 1; }
+            else if (m == "visicom" || m == "com100") machine = 3;
+            else { fprintf(stderr, "error: --machine must be studio2, mpt02/studio3, studio3ntsc or visicom\n"); return 1; }
         }
         else if (a == "--joy-map") { joy_override = (uint8_t)atoi(next("--joy-map")); joy_manual = true; }
         else if (a == "--trace-q")    trace_q = true;
