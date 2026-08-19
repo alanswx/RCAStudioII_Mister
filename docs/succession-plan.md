@@ -388,9 +388,17 @@ Score against the reference, 2 frames per cartridge:
 
 | Set | Cartridges | Frames matching |
 |---|---|---|
-| Conic/Studio III cartridges | 14 | 18 / 28 |
+| Conic/Studio III cartridges | 14 | **14 / 28** |
 | Sarnoff Collection (`.st2` only) | 4 | 4 / 8 |
 | Conic homebrew (`invsn.st2`) | 1 | 2 / 2 |
+
+The Conic figure was 18/28 when first measured and dropped to 14/28 when the
+reference emulator's cycle model was corrected (task #13). Nothing in the RTL
+changed; the reference moved. That is the same effect the §9 Studio II score saw
+(27 → 26 of 48) but larger, and for the same reason — the display window is
+proportionally bigger on these machines, so giving the CPU its display-window
+cycles shifts more software. **Read these numbers as "how far the two models
+agree", not as an accuracy figure for the RTL.**
 
 Frame rate comes out at **50.373 Hz** from the existing PLL (112 × 312 pixel
 times at clk_sys/4), against the datasheet's 50.08 Hz — 0.6% fast, which is not
