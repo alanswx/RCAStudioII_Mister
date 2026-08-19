@@ -143,3 +143,38 @@ cards), **2** doubles — double the bet, exactly one more card — and **0** st
 
 Dealer draws on 16 or less and stands on 17, except a soft 17. A natural
 blackjack pays 2 to 1, an ordinary win 1 to 1, a tie returns your bet.
+
+---
+
+#### Visicom COM-100 (Toshiba, 1978)
+
+A different machine, so different keys — and note the **cartridges all start on
+0**, not 1, which is why the gamepad Start button presses 0 when the Visicom is
+selected. Select `Machine / Visicom` in the OSD and load its own BIOS.
+
+Instructions are Emma 02's, from `refs/emma_02/Helpfiles/FaqVisicom*.htm`.
+
+Resident games:
+
+| Game | Select | Controls |
+|------|--------|----------|
+| **Doodle** | **A1** | A red dot appears bottom-left. Arrow keys (**2/4/6/8**, diagonals **1/3/7/9**) move and draw. **0** cycles the colour red → dark green (erase) → blue → green; **5** cycles the other way. |
+| **Bowling** | **A2** | Players alternate. **2** hooks up, **5** straight, **8** hooks down — keyboard A, then keyboard B. Ten frames. |
+| **Patterns** | **A3** | Draw as in Doodle, then press **3** again and the machine repeats your design over and over. |
+| **Freeway** | **A4** | **0** starts the car. **2** accelerates, **8** brakes, **4**/**6** steer. Score after two minutes. |
+| **Addition** | **A7** | Add the digits shown and press the total. Player 1 on keyboard A, player 2 on keyboard B. 20 numbers. |
+
+Cartridges — all six dumped titles start on **0**:
+
+| Cartridge | Notes |
+|---|---|
+| `cas-110` Arithmetic Drill | |
+| `cas-130` Sports Fan | Baseball and Sumo Wrestling. Baseball: keyboard A bats first, B pitches, swapping every half-inning. Pitching **2/5/8** for outside curve / straight / inside curve; hold ~1/4 s for a change-up. Sumo: **0** and keypad-B **0** for the initial charge, then **4** push, **6** pull, **5** throw. |
+| `cas-140` Gambler I | |
+| `cas-141` Gambler II | |
+| `cas-160` Space Command | |
+| `cas-190` Bagua Blood Horoscope | |
+
+The Visicom's colour comes from a second bit plane rather than colour RAM, so
+every pixel is one of exactly four fixed colours — a dark green field with pale
+cyan, yellow-green and red over it. See `docs/succession-plan.md` §11.

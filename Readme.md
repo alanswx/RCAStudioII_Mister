@@ -48,10 +48,18 @@ All five built-in games and all six dumped cartridges run. The built-ins start o
 ## Current limitations
 
 * OSD settings do not save yet.
-* Analog video does not work yet.
-* Direct video does not work yet.
-* The Visicom has no frame-by-frame reference: `tools/refemu` models the Studio II
-and the two Studio IIIs only, so it is covered by `tools/visicom-test.sh` instead.
+* Analog and direct video are **emitted but unverified**. The core now produces a
+full TV raster (88x242 NTSC, 88x292 PAL) with the picture inside a
+background-coloured border, which is what the real parts do and what was missing
+before -- but nobody has yet connected an analog IO board to check. See
+`docs/analog-video.md` for the test procedure and what to do if it does not lock.
+One known deviation: the picture sits 16px from the left and 8px from the right,
+because centring it would mean moving the DMA phase the BIOS depends on.
+* The Visicom has no frame-by-frame *emulator* reference: `tools/refemu` models the
+Studio II and the two Studio IIIs only, so it is covered by
+`tools/visicom-test.sh` instead. It does have a hardware one --
+`refvideo/Freeway [Toshiba Visicom COM-100 Longplay] (1978).mp4` -- which the
+core matches structurally and which settled its palette.
 
 ## Installing
 

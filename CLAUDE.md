@@ -2,6 +2,10 @@
 
 Guidance for working in this repo. Read this before changing RTL.
 
+**New to this repo? Read `docs/handoff.md` first** — it separates what is proven
+from what is merely believed, lists the seven things that will bite you, and
+ranks what to do next. This file is the working reference behind it.
+
 ---
 
 ## 1. What this is
@@ -19,8 +23,9 @@ assuming any timing number here was derived from first principles.
 
 **State of the core: playable.** The CPU has the full instruction set the BIOS
 needs, interrupts and DMA; the video is a real CDP1861 driven by DMA, not a RAM
-scraper. Frames are **pixel-identical to the reference emulator on 18 of 21**
-test cases (§9), the built-in BIOS games and controller profiles are in place,
+scraper. Frames are checked against the reference emulator by
+`tools/score-21.sh`, currently **26 of 48** (§9 explains why the rest differ and
+why that is expected), the built-in BIOS games and controller profiles are in place,
 the beeper and RTL ST2 loader are implemented, and the core builds clean in
 Quartus with timing closed (§4).
 
@@ -200,10 +205,13 @@ DMA-OUT cycles.** The current core implements none of them (§6.1).
 | `RCAStudioII.sv` | MiSTer `emu` top: hps_io, PLL, OSD config string, video chain (video_mixer + video_freak), on-screen keypad |
 | `rtl/rcastudioii.sv` | Core glue: CPU + pixie + memory decode + keypad + joystick profiles + cartridge loader |
 | `rtl/cdp1802.v` | The CPU: full BIOS instruction set, interrupts, DMA, machine-cycle timing |
-| `rtl/dpram.sv` | Dual-port block RAM — instantiated twice, as the 4 KB ROM/cartridge image and the 512 B RAM |
+| `rtl/dpram.sv` | Dual-port block RAM — instantiated **three** times: the 4 KB ROM/cartridge image, the 512 B RAM, and the Visicom's 256 B second bit plane. Port B must stay tied off on any instance that has to infer as block RAM (§8) |
 | `rtl/numstick.sv` | Analog-stick on-screen keypad (Jaguar core's, via ColecoAdam) |
-| `rtl/pixie/pixie_video.v` | Thin wrapper |
-| `rtl/pixie/cdp1861.v` | The video: a real CDP1861, DMA-fed, no frame buffer |
+| `rtl/pixie/pixie_video.v` | Thin wrapper around `cdp1861.v` |
+| `rtl/pixie/cdp1861.v` | The NTSC video: a real CDP1861, DMA-fed, no frame buffer. Also carries the Visicom's second bit plane |
+| `rtl/pixie/cdp1864.v` | The PAL video: CDP1864 — video, colour and tone in one part. A sibling of `cdp1861.v`, deliberately not a parameterisation of it |
+| `rtl/pixie/cdp1862.v` | Colour generator for the NTSC Studio III |
+| `rtl/pixie/cdp1863.v` | Tone generator: the standalone 1863, and the 1864's internal divider |
 
 ### Files present but NOT compiled (dead / reference)
 `rtl/cosmac.v`, `rtl/dma.v`, `rtl/keypad.v`, `rtl/debounce.v`, `rtl/rom.v`,
@@ -443,9 +451,15 @@ distinguish them: retail Tennis does not visibly respond to held stick input in
 these scenarios.
 
 ### 6.3 Top level — `RCAStudioII.sv`
-- No PAL support, and the BIOS is not embedded (the core is held in reset until
-  one is loaded). The rest of the old list — aspect ratio, `CE_PIXEL`, the dead
-  `clk_1m76` — is fixed; see §10 (2026-08-14).
+- **The BIOS is not embedded**, so the core is held in reset until one is loaded
+  from the OSD. This is the single biggest piece of user-facing friction left.
+- **Analog video is emitted but has never been seen on a TV.** The raster is
+  right against the datasheet and the sim; nobody has plugged in an analog IO
+  board. See `docs/analog-video.md` for what to do and how to tell.
+- PAL is no longer missing — it arrived with the CDP1864 (Studio III PAL). It was
+  never a Studio II feature; see §7.1.
+- The rest of the old list — aspect ratio, `CE_PIXEL`, the dead `clk_1m76` — is
+  fixed; see §10 (2026-08-14).
 
 ### 6.4 Minor
 - `sys/` is shared framework code and must not be edited; the remaining Quartus
@@ -458,8 +472,9 @@ these scenarios.
 ## 7. Roadmap
 
 ### 7.1 Polish
-Embedded BIOS, and any final top-level cleanup around default OSD behaviour and
-naming consistency.
+Embedded BIOS, analog-video verification on real hardware
+(`docs/analog-video.md`), and any final top-level cleanup around default OSD
+behaviour and naming consistency. `docs/handoff.md` §5 ranks these.
 
 **"PAL option" used to be listed here and has been removed as a mistake.** There
 was no PAL Studio II: the CDP1861 is NTSC-only (MAME hard-codes 262 scanlines
@@ -510,7 +525,7 @@ in the order they are cheapest to run:
 | `tools/tone-test.sh` | the CDP1863/1864 tone divider, which no frame can show | 7/7 |
 | `tools/visicom-test.sh` | the Visicom, which has no reference emulator | all ok |
 | `tools/score-21.sh` | the §9 Studio II score, documented start sequences | 26/48 |
-| `tools/score-conic.sh` | the Studio III PAL sweep, uniform A1 | 16/28 |
+| `tools/score-conic.sh` | the Studio III PAL sweep, uniform A1 | 22/38 |
 
 The last two are comparisons against `tools/refemu` and will move when its cycle
 model does; the first three are directed tests and should not move at all.
@@ -577,11 +592,17 @@ cd ../../../../verilator
 diff /tmp/c.txt /tmp/r.txt        # expect no output
 ```
 
-Current score: **18 / 21 pixel-identical** (3 built-in-game frames + 18
-cartridges). The three that differ — `86677b`, `87201`, `Concentration Match` —
-render the same structure and the same number of content lines but different
-game state, because the BIOS updates an RNG seed in the ISR and any timing
-difference deals different cards.
+Current score: **26 / 48 frames**, from `tools/score-21.sh` — 5 built-in games
+and 19 cartridge scenarios, two frames each, each driven with its documented
+start sequence. (An older note here said "18 / 21"; that was a different,
+hand-run set and is not comparable. The script defines the number.)
+
+Most of what differs is game state rather than rendering: the BIOS updates an RNG
+seed in its ISR, so any timing difference deals different cards, drops different
+pieces and puts sprites elsewhere. `tools/contact-sheet.py` renders the whole
+library side by side with a per-title percentage of differing scanlines, which is
+the way to tell state from breakage — anything under ~30% is almost always the
+former.
 
 Note on `86677b` and `87201`: the reference emulator renders **full-screen
 random noise** for both from the first frame, before any input. They are not
@@ -591,7 +612,7 @@ their output is free to change without that meaning anything. Do not chase them.
 **What the frame comparison cannot see.** Nothing in the corpus — 18 retail
 cartridges, 8 homebrew, 5 TOSEC `.st2` — reads or writes a RAM mirror, or any
 address above `$0FFF`. The whole memory decode is therefore invisible to it:
-the old truncate-to-12-bits version scored exactly the same 18/21. That is what
+the old truncate-to-12-bits version scored exactly the same. That is what
 `tools/memdecode-test.sh` is for — a hand-assembled 90-byte native-1802
 cartridge that pokes each case and checks the result out of the simulated RAM.
 It fails 4 of its 8 checks against the pre-decode core.
@@ -711,9 +732,11 @@ falls into logic still fits, still closes timing, and passes every test here.
 
 Also here: `tools/score-conic.sh`, because the "14/28" recorded for the Studio
 III PAL sweep could not be reproduced from the note. The obvious uniform-A1 sweep
-gives **16/28** both with and without this work — measured by stashing it and
-re-running the identical command — so the two are different metrics, not a
-regression. The script now defines the number.
+over the Cartridges directory gives **16/28** both with and without this work —
+measured by stashing it and re-running the identical command — so the two are
+different metrics, not a regression. The script defines the number from here on,
+and because it covers all three Conic sets (Cartridges, Homebrew, Sarnoff) it
+prints **22/38**; 16/28 is the Cartridges subset of that.
 
 
 ### 2026-08-16 — Hockey/Combat "flashing strobes": INT/EFx lead the line by one cycle (AVI1861), parity-adaptive DMA request, open bus = $FF

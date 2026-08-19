@@ -541,6 +541,9 @@ their old size and every recorded score keeps its meaning: Studio II byte-identi
 across all 71 images, §9 score 26/48 unchanged, Conic 14/28 unchanged, memdecode
 8/8, tone test passing.
 
+**This section is the diagnosis and the fix. For the current state, the test
+procedure and what to do when it does not lock, see `docs/analog-video.md`.**
+
 Still open: the picture is not horizontally centred (16 px left border against 8),
 because centring it would mean moving the DMA phase that the ISR depends on. And
 none of this has been seen on real analog hardware yet — it is verified against
@@ -837,8 +840,13 @@ this repo.
 
 ### One number that moved, and did not
 
-The Conic PAL sweep reads **16/28**, against the 14/28 recorded in §8. That is
-not a regression: stashing this work and re-running the identical command also
-gives 16/28, so the two figures are different metrics rather than a change. The
-old one was measured by hand and cannot be reproduced from the note. There is now
-a `tools/score-conic.sh`, so whatever it prints is the number from here on.
+The Conic PAL sweep reads **16/28** over the Cartridges directory, against the
+14/28 recorded in §8. That is not a regression: stashing this work and re-running
+the identical command also gives 16/28, so the two figures are different metrics
+rather than a change. The old one was measured by hand and cannot be reproduced
+from the note.
+
+`tools/score-conic.sh` now defines it, and it covers all three Conic sets --
+Cartridges, Homebrew and the Sarnoff Collection -- so **it prints 22/38**. The
+16/28 above is the Cartridges subset of that. Quote the script's number, with the
+date.
