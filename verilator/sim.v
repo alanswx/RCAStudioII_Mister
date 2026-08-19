@@ -35,7 +35,14 @@ module top(
    input [7:0]  ioctl_index,
    output  reg  ioctl_wait=1'b0,
 
-   input [10:0] ps2_key   
+   input [10:0] ps2_key,
+
+   // Run the hardware's /4 pixel enable instead of the tied-high default.
+   // The frame content is normally identical either way, but the phase between
+   // cpu_ce and the pixie's counters is a real degree of freedom on hardware
+   // that ce_pix=1 never exercises -- the Visicom display-base rotation
+   // (2026-08-19) was invisible in sim until this existed. 4x slower.
+   input ce_div4/*verilator public_flat*/
 );
    
    // Core inputs/outputs
@@ -72,11 +79,15 @@ wire audio;   // 1-bit beeper, gated by the 1802's Q line
    assign AUDIO_L = audio ? 16'sd6000 : -16'sd6000;
    assign AUDIO_R = AUDIO_L;
 
-// The sim keeps ce_pix tied high: one pixel per clk_48 edge. Frame content is
-// identical to hardware (everything inside the core is gated on ce_pix), the
-// sim just doesn't burn 4 host cycles per pixel. RCAStudioII.sv divides by 4
-// for the real 1.76MHz timebase.
-wire ce_pix = 1'b1;
+// The sim keeps ce_pix tied high by default: one pixel per clk_48 edge. Frame
+// content is normally identical to hardware (everything inside the core is
+// gated on ce_pix), the sim just doesn't burn 4 host cycles per pixel.
+// RCAStudioII.sv divides by 4 for the real 1.76MHz timebase. With ce_div4 set,
+// the sim runs the same /4 divider as the FPGA top so phase-sensitive
+// behaviour can be reproduced (see the port comment).
+reg [1:0] ce_cnt = 2'd0;
+always @(posedge clk_48) ce_cnt <= ce_cnt + 2'd1;
+wire ce_pix = ce_div4 ? (ce_cnt == 2'd0) : 1'b1;
 wire reset = ioctl_download;
 
 wire key_strobe = old_keystb ^ ps2_key[10];

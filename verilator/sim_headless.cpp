@@ -506,6 +506,7 @@ int main(int argc, char** argv) {
     uint8_t  joy_override = 0;   // applied once top exists
     bool     joy_manual   = false;
     uint8_t  machine = 0;   // 0 studio2, 1 studio3 PAL, 2 studio3 NTSC, 3 Visicom
+    bool     ce_div4 = false;  // run the hardware's /4 pixel enable (4x slower)
     uint8_t  players_mode = 0;
     // Q gates the Studio II's beeper; track its edges so the core can be compared
     // against the reference emulator's Q even though AUDIO_L/R are still tied off.
@@ -573,6 +574,7 @@ int main(int argc, char** argv) {
             swap_file = t.substr(0, at);
             swap_frame = atol(t.c_str() + at + 1);
         }
+        else if (a == "--ce4")     ce_div4 = true;
         else if (a == "--machine") {
             std::string m = next("--machine");
             if      (m == "studio2") machine = 0;
@@ -638,6 +640,7 @@ int main(int argc, char** argv) {
     top->joy_override = joy_override;
     top->joy_manual   = joy_manual;
     top->machine = machine;
+    top->ce_div4 = ce_div4 ? 1 : 0;
     top->players = players_mode;
 
     IoctlDriver io;

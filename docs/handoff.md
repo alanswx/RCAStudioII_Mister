@@ -56,6 +56,31 @@ model does. The first three are directed tests and **should not move at all**.
 percentage of differing scanlines — the way to tell "different game state" from
 "broken" when a score moves.
 
+### Known broken on hardware (first real-hardware run, 2026-08-19)
+
+- **Visicom: the display is rotated by 13 bytes on the FPGA, and is clean in
+  sim.** First observed by Alan playing Gambler I on a DE10: the dealer's card
+  was split across the top/bottom edge of the bitmap and a stake number was
+  split across the left/right edge. Decoding the framebuffer screenshot against
+  the game's true layout (from the sim, which matches VRAM byte-for-byte)
+  shows every element displaced by exactly **+13 bytes with wraparound** —
+  the display renders `vram[i+13]`, i.e. the effective base is `$090D`.
+  Constant across the session, both bit planes together, colours intact —
+  so it is the Visicom BIOS ISR's display-base arithmetic locking to a
+  different orbit on hardware, the same phase-lock family as the Hockey/
+  Combat strobes (`CLAUDE.md` §10 2026-08-16), not a pixel-pipe bug.
+  The sim cannot see it with `ce_pix` tied high; a first `--ce4` harness mode
+  (run the FPGA's /4 enable, `verilator/sim.v` + `--ce4`) reproduces the
+  hardware *clock structure* but still comes up clean — the missing degree of
+  freedom is presumably the divider/counter phase at reset release, which is
+  deterministic in sim and not on hardware (or interacts with the OSD machine
+  switch). Next steps: give the harness a phase-offset knob (preset `ce_cnt`
+  and the cpu_ce divider at reset), sweep all 32 phases over the Visicom CUT
+  screen, and if one reproduces the +13 orbit, extend the INT/EFx-lead +
+  parity-resync tolerance analysis (swept for the Studio II BIOS only) to the
+  Visicom BIOS ISR. Studio II mode on the same build is verified clean on
+  hardware (Invaders/Hockey/Combat, 2026-08-16).
+
 ### Believed, but not covered by anything
 
 - **Analog video.** Emitted, timings check out against the datasheet, never seen
