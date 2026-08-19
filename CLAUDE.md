@@ -662,9 +662,18 @@ than RAM. All six dumped cartridges page exactly `$08-$0F`, so under the Studio
 II rule the whole image was dropped and the machine booted to its built-ins as
 though nothing were inserted.
 
-Matched against **Emma 02** throughout — it is the only reference that models
+Matched against **Emma 02** for behaviour — it is the only emulator that models
 this machine, and it states the video rule in five lines where MAME's
-`visicom.cpp` states it in bitfields.
+`visicom.cpp` states it in bitfields. But **not** for the palette: Emma's four
+colours and MAME's differ, and `refvideo/Freeway [Toshiba Visicom COM-100
+Longplay] (1978).mp4` — a capture of the built-in Freeway on real hardware —
+settles it at summed RGB distance 86 for MAME against 225 for Emma. Emma has
+colour 1 blue-cyan where the machine is a pale green-cyan, which is a hue
+difference rather than a capture artefact, so the core uses MAME's values. The
+same capture is a structural check the core passes: same field, same two dashed
+lanes, same car sprites. Nothing in the test suite could have caught this —
+`tools/visicom-test.sh` works in colour *letters*, and the RGB lives in
+`RCAStudioII.sv`, which the Verilator harness does not compile.
 
 Verified by `tools/visicom-test.sh` (new): five built-in games and six
 cartridges, each locked to the exact set of colours it puts on screen, after the

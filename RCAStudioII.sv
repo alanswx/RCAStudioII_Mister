@@ -455,18 +455,30 @@ wire [7:0] vid_lvl = video_bg ? 8'h80 : 8'hFF;
 
 // The Visicom is the exception: its four colours are fixed values chosen by
 // Toshiba, not combinations of three colour pins, so they cannot be expressed
-// on the {R,G,B} bus above. Emma 02's Visicom/standard.xml carries them as
-// back 0,64,0 and fore1..3 -- a dark green field with cyan, yellow-green and
-// salmon over it. (MAME's visicom.cpp has the same four roles at slightly
-// different values; Emma's are the ones the frame comparison uses.)
+// on the {R,G,B} bus above.
+//
+// Emma 02 and MAME disagree on what those values are, and a real machine settles
+// it. refvideo/"Freeway [Toshiba Visicom COM-100 Longplay] (1978).mp4" is a
+// hardware capture of the built-in Freeway; sampling its four colours gives
+// #003700, #B1ECE6, #DCE12D and #FF3D46. Summed RGB distance from that:
+//
+//              Emma 02   MAME        (MAME's visicom.cpp VISICOM_PALETTE)
+//   colour 1      75       13        #70D0FF vs #AFDFE4 -- Emma's leans blue,
+//   colour 2      74       45           the hardware is a pale green-cyan
+//   colour 3      66       18        #FF7070 vs #EF454A -- Emma's is pink
+//   total        225       86
+//
+// So these are MAME's. The capture is a composite NTSC encode and its absolute
+// levels are not trustworthy, but the *hue* of colour 1 is not a capture
+// artefact: green-cyan and blue-cyan are not the same colour.
 wire machine_visicom = (status[14:13] == 2'd3);
 reg [23:0] vis_rgb;
 always @(*) begin
 	case (vis_index)
 		2'd0:    vis_rgb = 24'h004000;
-		2'd1:    vis_rgb = 24'h70D0FF;
-		2'd2:    vis_rgb = 24'hD0FF70;
-		default: vis_rgb = 24'hFF7070;
+		2'd1:    vis_rgb = 24'hAFDFE4;
+		2'd2:    vis_rgb = 24'hB9C42F;
+		default: vis_rgb = 24'hEF454A;
 	endcase
 end
 

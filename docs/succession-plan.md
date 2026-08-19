@@ -742,10 +742,35 @@ on** and there is no disable port at all.
   dumped cartridges page exactly `$08-$0F`; under the Studio II rule the entire
   image was dropped and the machine booted to its built-ins as though empty.
 
+### The palette: a hardware capture overrules Emma 02 (2026-08-19)
+
+The four colours first shipped as Emma 02's, from `Visicom/standard.xml`. They
+are wrong. `refvideo/Freeway [Toshiba Visicom COM-100 Longplay] (1978).mp4` is a
+capture of the built-in Freeway on a real machine, and sampling it gives:
+
+| | captured | Emma 02 | dist | MAME | dist |
+|---|---|---|---|---|---|
+| background | `#003700` | `#004000` | 9 | `#004000` | 9 |
+| colour 1 | `#B1ECE6` | `#70D0FF` | 75 | `#AFDFE4` | **13** |
+| colour 2 | `#DCE12D` | `#D0FF70` | 74 | `#B9C42F` | **45** |
+| colour 3 | `#FF3D46` | `#FF7070` | 66 | `#EF454A` | **18** |
+| | | | 225 | | **86** |
+
+So the core now uses MAME's `VISICOM_PALETTE`. The capture is a composite NTSC
+encode and its absolute levels are not trustworthy — but colour 1's *hue* is not
+a capture artefact: Emma has it blue-cyan, the hardware is a pale green-cyan.
+
+The capture is also a structural check, and the core passes it: same dark green
+field, same two dashed lane lines, same car sprites in the same two colours. Only
+the horizontal inset differs, which is the capture's own framing. Note the frame
+comparison could not have caught the palette — `tools/visicom-test.sh` works in
+colour *letters*, and the RGB values live in `RCAStudioII.sv`, which the Verilator
+harness does not even compile.
+
 ### Verification
 
-There is no frame-by-frame reference: `tools/refemu` covers the Studio II and the
-two Studio IIIs, and Emma 02 has no headless mode (§5). `tools/visicom-test.sh`
+There is no frame-by-frame reference for gameplay: `tools/refemu` covers the
+Studio II and the two Studio IIIs, and Emma 02 has no headless mode (§5). `tools/visicom-test.sh`
 covers it instead — every built-in and every cartridge, locked to the exact set
 of colours it puts on screen. Colours 2 and 3 need plane 1's bit, so any screen
 listing one is direct evidence the second read happened.
