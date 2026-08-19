@@ -548,3 +548,61 @@ the datasheet's figures and the sim, not a TV.
 
 None of this affects HDMI, where `video_freak` scales whatever it is given — which
 is why the core looks correct on HDMI and produces nothing usable on analog.
+
+---
+
+## 9. The NTSC Studio III is a different chipset (2026-08-18)
+
+`#16` was written as "give the CDP1864 a second, NTSC set of timings". That
+premise is wrong, and Emma 02's machine XML says so outright.
+
+`refs/emma_02/data/Xml/StudioIII/standard-ntsc.xml` against `standard-pal.xml`:
+
+| | PAL Studio III / MPT-02 | **NTSC Studio III** |
+|---|---|---|
+| video | `<video type="1864">` | **`<video type="cdp1861">`** |
+| colour | inside the 1864 | **`<video type="cdp1862">`** |
+| sound | inside the 1864 | **`<sound type="cdp1863">`** |
+| frame | 312 lines, display 76..267 (192) | 262 lines, display 64..191 (128) |
+| interrupt | line 74 | line 62 |
+
+So the PAL machine integrates video, colour and tone into one part, and **the NTSC
+machine is three separate chips**: the CDP1861 we already have, plus a CDP1862
+colour generator and a CDP1863 tone generator. That is why `studio3_ntsc.bin`
+will not run under PAL timing — not a timing tweak, a different video subsystem.
+It is also why MAME cannot help: it has no NTSC Studio III at all.
+
+### The good news: we have already written most of it
+
+MAME's device headers show the 1862 and 1863 are exactly the halves of the 1864
+we implemented:
+
+- `cdp1862.h` has `rdata_cb` / `bdata_cb` / `gdata_cb`, `bkg_w` and `con_w`, and
+  `BKG LUM` / `BKG CHR` pins. Same colour RAM at `$0B00-$0BFF`, same background
+  step on `OUT 1`, same CON, same background-luminance idea as BCKGND.
+- `cdp1863.cpp` takes its latch on `OUT 4` as the 1864 does. Its divider differs:
+  `clock/8/(latch+1)/2` against the 1864's `clock/8/4/(latch+1)/2`, so the same
+  latch gives four times the frequency.
+
+So the work is mostly *re-attaching* logic we have, not writing new logic.
+
+### What it actually takes
+
+1. A third machine value in the OSD row, and the memory decode (`$0C00-$0FFF`
+   ROM, colour RAM at `$0B00`) driven by "is a Studio III" rather than by
+   "is the 1864", which is how it is gated today.
+2. The colour path — colour RAM lookup, border, CON, BCKGND — factored out of
+   `cdp1864.v` so the 1861 can use it too. That is the bulk of it.
+3. The 1863 divider, which is the 1864's with one fewer division stage.
+4. **The risk:** Emma puts the NTSC Studio III display at 64..191 with the
+   interrupt at 62, where our 1861 uses 80..208 and 78 (MAME's numbers, tuned
+   against real software). Same structure, 16 lines apart. Making the 1861's
+   geometry machine-dependent touches the timing that took many iterations to
+   settle — see its `INT_LEAD` / `EFX_LEAD` / `DMA_ADAPT` commentary. Do that
+   part last and behind an A/B against the Studio II corpus.
+
+Note this cannot be validated the usual way until it exists: with the
+`$0C00-$0FFF` window gated on the colour machine, `studio3_ntsc.bin` cannot even
+start under Studio II timing, so there is no cheap experiment that confirms the
+decomposition ahead of implementing it. The documentary evidence is strong and
+consistent; treat it as the plan, not as proof.
