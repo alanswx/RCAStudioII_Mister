@@ -87,10 +87,29 @@ module cdp1864
 localparam PIXELS_PER_LINE   = 112;                   // 14 machine cycles, as the 1861
 localparam LINES_PER_FRAME   = 312;                   // PAL. INLACE low = 312 non-interlaced.
 
-// Display window. Emma 02's soundic_victory_mpt-02.xml gives display lines 76 to
-// 267 inclusive, which is exactly 192 -- the "max 192 vertical" the datasheet
-// advertises, and 32 logical rows shown 6x. Preferred over MAME's
-// SCANLINE_DISPLAY_START, which carries a "// ???" from MAME itself.
+// Display window: 192 lines, which every source agrees on (the feature list, the
+// "192" dimension inside Fig 4's display area, and its 192H bracket). Where those
+// 192 lines *sit* in the 312-line frame is not agreed, and was investigated on
+// 2026-08-18 without being settled:
+//
+//   Emma 02  76..267 inclusive -- exactly 192, and hardware-tested
+//   MAME     60, carrying a "// ???" MAME wrote itself
+//   Fig 4    both EF pulses and both dashed lines land on 96 and 264, which is
+//            168 lines, not the 192 the bracket beside them is labelled. The
+//            figure disagrees with itself by 24 lines, so it cannot arbitrate.
+//
+// Emma's 76 is kept because it is the only value from something known to run on
+// real hardware, and because it sits the picture roughly centred: vertical
+// blanking is 20H (Fig 4), so centring 192 lines in the remaining 292 would put
+// it at 70, which is near 76 and nowhere near 96.
+//
+// It makes no observable difference today, and that was measured rather than
+// assumed: moving the whole window to Fig 4's 96..288 gives byte-identical
+// results across all 14 Conic cartridges (14/28 either way). It cannot matter
+// while everything outside the window is blanked and the harness captures only
+// the display window. It starts to matter with the full raster (see
+// docs/succession-plan.md §8), where this offset is what positions the picture
+// on screen -- decide it there, against the photographs of real hardware.
 localparam DISPLAY_START     = 76;
 localparam DISPLAY_END       = 268;                   // one past the last (192 lines)
 localparam INT_START         = DISPLAY_START - 2;     // 74
