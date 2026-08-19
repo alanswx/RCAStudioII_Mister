@@ -60,9 +60,13 @@ wire audio;   // 1-bit beeper, gated by the 1802's Q line
    // The Studio II's 1861 is mono and drives all three together, so this is
    // still white on black.
    wire [2:0] video/*verilator public_flat*/;
-   assign VGA_R = {8{video[2]}};
-   assign VGA_G = {8{video[1]}};
-   assign VGA_B = {8{video[0]}};
+   // BCKGND: background pixels at half luminance, as in the FPGA top level. The
+   // frame grabber thresholds on non-zero, so this does not disturb captures.
+   wire       video_bg/*verilator public_flat*/;
+   wire [7:0] vid_lvl = video_bg ? 8'h80 : 8'hFF;
+   assign VGA_R = video[2] ? vid_lvl : 8'h00;
+   assign VGA_G = video[1] ? vid_lvl : 8'h00;
+   assign VGA_B = video[0] ? vid_lvl : 8'h00;
     
    // MAP OUTPUTS
    assign AUDIO_L = audio ? 16'sd6000 : -16'sd6000;
@@ -100,6 +104,7 @@ rcastudioii rcastudio
 
 	.video_de(video_de),
 	.bitmap_de(bitmap_de),
+	.video_bg(video_bg),
 
 	.video(video),
 	.audio(audio),

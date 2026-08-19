@@ -78,6 +78,14 @@ module cdp1864
     // meaning.
     output            bitmap_de,
     output      [2:0] video,        // {R,G,B}
+    // BCKGND. Datasheet: "This output indicates that the color selected by the
+    // RGB outputs is due to background color select rather than a one bit in a
+    // display luminance byte. BCKGND may be used to lower the luminance of the
+    // background color so that the same color may be used for display of data."
+    // So it is not a fourth colour -- it is a brightness qualifier on the three.
+    // Blanked (held high on the real pin) during blanking; here it simply reads
+    // low outside the raster, since there is no colour to qualify.
+    output            bckgnd,
     output reg        VSync,
     output reg        HSync,
     output reg        VBlank,
@@ -302,6 +310,13 @@ assign video = in_raster
                                    : (shift_reg[7] ? 3'b111    : 3'b000))
                       : border)
                  : 3'b000;
+
+// High wherever the RGB above came from the background rather than from a set
+// bit in a luminance byte: the border, and unlit pixels inside the bitmap once
+// colour is on. Not asserted before CON, where the part is monochrome and the
+// "background" is plain black.
+assign bckgnd = in_raster && display_enabled && colour_on_seen &&
+                !(in_active_d && shift_con && shift_reg[7]);
 
 // CON latched once, for the border: the per-byte conbuf only covers the bitmap.
 reg colour_on_seen;

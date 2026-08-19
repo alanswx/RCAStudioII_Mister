@@ -70,6 +70,10 @@ module rcastudioii
 	// That needs a fourth bit, and it belongs with the 1864 itself rather than
 	// being guessed at here.
 	output       [2:0] video,
+	// BCKGND from the CDP1864: this pixel's colour came from the background
+	// select rather than a lit bit, so it should be shown at lower luminance.
+	// Always low on the monochrome Studio II, which has no background colour.
+	output reg         video_bg,
 	output             audio
 );
 
@@ -132,7 +136,7 @@ pixie_video pixie_video (
 // not OUT 1 -- OUT 1 is taken over by the background colour step. The datasheet
 // gives the opcodes: 61 or 69 enable interrupt and DMA, 6C disables them.
 wire       DMAO_64, INT_64, EFx_64, aud_64;
-wire       VSync_64, HSync_64, VBlank_64, HBlank_64, de_64, bde_64;
+wire       VSync_64, HSync_64, VBlank_64, HBlank_64, de_64, bde_64, bg_64;
 wire [2:0] video_64;
 
 cdp1864 cdp1864
@@ -164,6 +168,7 @@ cdp1864 cdp1864
     .csync      (),
     .aud        (aud_64),
     .video      (video_64),
+    .bckgnd     (bg_64),
     .VSync      (VSync_64),
     .HSync      (HSync_64),
     .VBlank     (VBlank_64),
@@ -191,6 +196,7 @@ always @(*) begin
 	HBlank   = machine_mpt02 ? HBlank_64 : HBlank_61;
 	video_de = machine_mpt02 ? de_64     : de_61;
 	bitmap_de = machine_mpt02 ? bde_64   : bde_61;
+	video_bg  = machine_mpt02 ? bg_64    : 1'b0;
 end
 
 ////////////////// KEYPAD //////////////////////////////////////////////////////////////////

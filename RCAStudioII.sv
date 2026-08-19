@@ -341,6 +341,7 @@ wire HSync;
 wire VBlank;
 wire VSync;
 wire [2:0] video;   // {R,G,B} from the core
+wire       video_bg;    // ...at background luminance (CDP1864 BCKGND)
 
 rcastudioii rcastudio
 (
@@ -367,6 +368,7 @@ rcastudioii rcastudio
 	.joystick_1(joystick_1),
 	.joy_override(status[5:2]),
 	.machine_mpt02(status[13]),
+	.video_bg(video_bg),
 	.joy_manual(status[6]),
 	.auto_profile(auto_profile),
 	.players(status[8:7]),
@@ -442,9 +444,13 @@ assign CLK_VIDEO = clk_sys;
 // colour pins. The Studio II's 1861 is monochrome and drives all three together,
 // so this is still white on black -- expanding each bit to full 8-bit scale
 // gives byte-identical output to the old `video ? 8'hFF : 8'h00`.
-wire [7:0] vid_r = {8{video[2]}};
-wire [7:0] vid_g = {8{video[1]}};
-wire [7:0] vid_b = {8{video[0]}};
+// BCKGND lowers the luminance of background pixels, so one colour can serve as
+// both background and data -- what the datasheet describes and what Emma 02's
+// palette shows (back_blue 0,0,128 against blue 0,0,255). Half scale here.
+wire [7:0] vid_lvl = video_bg ? 8'h80 : 8'hFF;
+wire [7:0] vid_r = video[2] ? vid_lvl : 8'h00;
+wire [7:0] vid_g = video[1] ? vid_lvl : 8'h00;
+wire [7:0] vid_b = video[0] ? vid_lvl : 8'h00;
 
 ////////////////// On-screen keypad (Jaguar core's numstick, via ColecoAdam) //
 //
