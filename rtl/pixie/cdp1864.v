@@ -40,8 +40,10 @@
 //  untouched. 1.75MHz / 50Hz / 312 lines = 14.02 cycles a line, against the
 //  Studio II's 1.76MHz / 60Hz / 262 = 14.0.
 //
-//  The tone generator IS implemented here, unlike the Studio II's discrete 555
-//  which lives in rcastudioii.sv. See the AUDIO section below.
+//  The tone generator is NOT here: it lives in rtl/pixie/cdp1863.v, shared with
+//  the NTSC Studio III, which has that part as a separate chip alongside a 1861
+//  and a 1862 (docs/succession-plan.md §9). The 1864 integrates the same
+//  generator, and cdp1863's div4 input selects which division chain to use.
 //
 //============================================================================
 
@@ -62,9 +64,6 @@ module cdp1864
     input             disp_on,      // INP 1
     input             disp_off,     // INP 4 on this machine, not OUT 1
     input             bg_step,      // OUT 1: step the background colour
-    input             tone_we,      // OUT 4: load the tone divider latch
-    input       [7:0] tone_d,       // ...with this byte
-    input             aoe,          // Audio Output Enable -- wired to the 1802's Q
 
     output            DMAO,         // DMA-OUT request, active high
     output reg        INT,          // interrupt request, active high
@@ -72,7 +71,6 @@ module cdp1864
 
     // ---- video side -----------------------------------------------------
     output            csync,
-    output            aud,          // AUDIO OUT: the programmable tone generator
     // DE for the 64x192 bitmap alone; video_de is the whole raster. The harness
     // captures this so its frames stay 64x192 and the recorded scores keep their
     // meaning.
@@ -331,93 +329,6 @@ always @(posedge clk) begin
     if (reset)       in_raster <= 1'b0;
     else if (ce_pix) in_raster <= (hcount >= H_ACTIVE_START) && (vcount >= VBLANK_END);
 end
-
-// ---------------------------------------------------------------------------
-// AUDIO -- the CDP1864's programmable tone generator
-// ---------------------------------------------------------------------------
-//
-//  This part replaces the Studio II's discrete NE555. Sources, all agreeing:
-//
-//  * Datasheet p1: "contains a programmable frequency generator designed to
-//    produce 256 tones that range from 107 Hz to 13672 Hz".
-//  * Datasheet p7, CONTROL LINE TRUTH TABLE: MRD=0, N2=1, N0=0, TPB=1, op code
-//    64 -> LOAD TONE GENERATOR LATCH. And "AUD - AUDIO OUT: This is the output
-//    of the programmable frequency generator."
-//  * Datasheet p6: TPB "is used for strobing the MRD and N lines, for horizontal
-//    line timing, and as the input to the tone generator" -- so the divider is
-//    clocked at the machine-cycle rate, which is what cpu_ce is here.
-//  * Datasheet p5: "AOE - AUDIO OUTPUT ENABLE ... A high level at this input
-//    allows the selected frequency to be generated at the AUDIO-OUT terminal.
-//    A low-level input holds AUDIO OUT low. AOE may be connected to Q output of
-//    the CDP1802".
-//  * Weisbecker's own Studio III notes (docs/rca-technical/Studio II III IV/
-//    IMG_1537.JPG): "64 INSTRUCTION SETS SOUND FREQUENCY (INVERSE)" and
-//    "Q GATES SOUND OUTPUT". The "(INVERSE)" is the useful part -- a larger
-//    latch value gives a *lower* frequency, which is what the divider below does.
-//
-//  Frequency. The datasheet pins only the two endpoints, so the division chain
-//  is MAME's (cdp1864_device::sound_stream_update, BSD-3-Clause):
-//
-//      f = clock / 8 / 4 / (latch+1) / 2
-//
-//  clock/8 is the machine-cycle (TPB) rate, so in terms of cpu_ce ticks the
-//  output toggles every 4*(latch+1) of them. That reproduces both published
-//  endpoints exactly at 1.75MHz:
-//
-//      latch 255 ->   106.8 Hz   (datasheet: 107)
-//      latch  53 ->   506.4 Hz   (MAME's power-on default)
-//      latch   1 -> 13671.9 Hz   (datasheet: 13672)
-//
-//  The latch resets to 0x35 whenever AOE falls. That is MAME's behaviour and is
-//  *not* in the datasheet; it means software must set the pitch for each note or
-//  get the default tone. Followed here because it is the only source for it.
-
-localparam [7:0] TONE_DEFAULT = 8'h35;
-
-reg  [7:0] tone_latch;
-reg  [9:0] tone_cnt;                                  // up to 4*256 cpu_ce ticks
-reg        tone_out;
-reg        aoe_d;
-
-always @(posedge clk) begin
-    if (reset) begin
-        tone_latch <= TONE_DEFAULT;
-        tone_cnt   <= 10'd0;
-        tone_out   <= 1'b0;
-        aoe_d      <= 1'b0;
-    end
-    else begin
-        aoe_d <= aoe;
-
-        //  MAME reverts the latch to its default when AOE goes away
-        //  (cdp1864_device::aoe_w). That is undocumented -- the datasheet says
-        //  nothing about it and neither do Weisbecker's notes -- but it is the
-        //  only account of the behaviour, so it is followed here.
-        //
-        //  Note it is the *edge* that resets, not the level. Holding the latch at
-        //  its default for as long as AOE is low would make it impossible to set
-        //  the pitch before enabling the tone, which is the natural order for
-        //  software to use (and the order the directed test uses). Writing it
-        //  that way is what tools/tone-test.sh caught: every latch value came
-        //  back as the default 0x35.
-        if (aoe_d && !aoe) tone_latch <= TONE_DEFAULT;
-        if (tone_we)       tone_latch <= tone_d;       // OUT 4 always wins
-
-        if (!aoe) begin                                // AOE low holds AUDIO OUT
-            tone_cnt <= 10'd0;                         // low (datasheet p5)
-            tone_out <= 1'b0;
-        end
-        else if (cpu_ce) begin                         // TPB drives the divider
-            if (tone_cnt >= {tone_latch, 2'b00} + 10'd3) begin
-                tone_cnt <= 10'd0;                     // half period = 4*(latch+1)
-                tone_out <= ~tone_out;
-            end
-            else tone_cnt <= tone_cnt + 10'd1;
-        end
-    end
-end
-
-assign aud = aoe & tone_out;
 
 // ---------------------------------------------------------------------------
 // Sync, blanking and the CPU-visible status flags. The EF shape is the same as

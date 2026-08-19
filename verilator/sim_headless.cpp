@@ -375,7 +375,7 @@ static void dump_state(FILE* f, long frame, const FrameGrabber& fg, bool with_vr
     // across by 8 row-groups down. Printed in the 1864's own pin order, matching
     // tools/refemu's --colour, so the two can be diffed without a permutation in
     // the way.
-    if (with_vram && RS(machine_mpt02)) {
+    if (with_vram && (RS(machine) == 1)) {
         fprintf(f, "-- CDP1864 colour RAM (row group x column), 1864 pin order --\n");
         for (int g = 0; g < 8; g++) {
             fprintf(f, "  g%d:", g);
@@ -432,7 +432,8 @@ static void usage(const char* argv0) {
 "    --dump-file FILE     write dumps here instead of stdout\n"
 "\n"
 "  Machine\n"
-"    --machine NAME       studio2 (default) or mpt02/studio3 -- the CDP1864\n"
+"    --machine NAME       studio2 (default), mpt02/studio3 (PAL CDP1864), or\n"
+"                         studio3ntsc (CDP1861 + 1862 colour + 1863 tone) -- the\n"
 "                         colour machine: PAL 312-line frame, 192 display lines,\n"
 "                         colour RAM at $B00. Needs its own --bios.\n"
 "\n"
@@ -500,7 +501,7 @@ int main(int argc, char** argv) {
     std::string swap_file; long swap_frame = -1; bool swap_done = false;
     uint8_t  joy_override = 0;   // applied once top exists
     bool     joy_manual   = false;
-    bool     machine_mpt02 = false;
+    uint8_t  machine = 0;   // 0 studio2, 1 studio3 PAL, 2 studio3 NTSC
     uint8_t  players_mode = 0;
     // Q gates the Studio II's beeper; track its edges so the core can be compared
     // against the reference emulator's Q even though AUDIO_L/R are still tied off.
@@ -570,9 +571,10 @@ int main(int argc, char** argv) {
         }
         else if (a == "--machine") {
             std::string m = next("--machine");
-            if      (m == "studio2") machine_mpt02 = false;
-            else if (m == "mpt02" || m == "studio3") machine_mpt02 = true;
-            else { fprintf(stderr, "error: --machine must be studio2 or mpt02\n"); return 1; }
+            if      (m == "studio2") machine = 0;
+            else if (m == "mpt02" || m == "studio3" || m == "studio3pal") machine = 1;
+            else if (m == "studio3ntsc" || m == "ntsc") machine = 2;
+            else { fprintf(stderr, "error: --machine must be studio2, mpt02/studio3, or studio3ntsc\n"); return 1; }
         }
         else if (a == "--joy-map") { joy_override = (uint8_t)atoi(next("--joy-map")); joy_manual = true; }
         else if (a == "--trace-q")    trace_q = true;
@@ -630,7 +632,7 @@ int main(int argc, char** argv) {
     top = new Vtop();
     top->joy_override = joy_override;
     top->joy_manual   = joy_manual;
-    top->machine_mpt02 = machine_mpt02;
+    top->machine = machine;
     top->players = players_mode;
 
     IoctlDriver io;

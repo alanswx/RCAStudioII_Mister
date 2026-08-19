@@ -206,11 +206,13 @@ assign BUTTONS = 0;
 
 `include "build_id.v"
 localparam CONF_STR = {
-	"RCA-StudioII;v4;",
+	"RCA-StudioII;v5;",
 	"F1,ST2BINROM,Load Cartridge;",
 	"-;",
-	// Must load valid firmware after switching to Studio III
-	"O[13],Machine,Studio II,Studio III;",
+	// Must load valid firmware after switching machine. The two Studio IIIs are
+	// different chipsets, not one part with two sets of timings: PAL is a CDP1864,
+	// NTSC is a CDP1861 with a CDP1862 for colour and a CDP1863 for tone.
+	"O[14:13],Machine,Studio II,Studio III PAL,Studio III NTSC;",
 	"F0,BINROM,Load Firmware;",
 	"-;",
 	"O[6],Mapping,Auto,Manual;",
@@ -367,7 +369,7 @@ rcastudioii rcastudio
 	.joystick_0(joystick_0),
 	.joystick_1(joystick_1),
 	.joy_override(status[5:2]),
-	.machine_mpt02(status[13]),
+	.machine(status[14:13]),
 	.video_bg(video_bg),
 	.joy_manual(status[6]),
 	.auto_profile(auto_profile),

@@ -44,9 +44,13 @@ module rcastudioii
 	input        [9:0] osk_b,          // and for keypad B
 	input  reg         ce_pix,
 	input              clear_key,      // CLEAR button input from top-level; keep video alive during CLEAR
-	//  Which machine. 0 = Studio II (CDP1861, NTSC, mono), 1 = Studio III 
-	//  (CDP1864, PAL, colour). Selected from the OSD; see docs/succession-plan.md.
-	input              machine_mpt02,
+	//  Which machine, from the OSD:
+	//    0  Studio II          CDP1861, NTSC, monochrome
+	//    1  Studio III PAL     CDP1864 -- video, colour and tone in one part
+	//    2  Studio III NTSC    CDP1861 + CDP1862 colour + CDP1863 tone
+	//  The two Studio IIIs are different chipsets, not one part with two sets of
+	//  timings -- see docs/succession-plan.md §9.
+	input        [1:0] machine,
 
 	output reg         HBlank,
 	output reg         HSync,
@@ -76,6 +80,16 @@ module rcastudioii
 	output reg         video_bg,
 	output             audio
 );
+
+//  Derived from `machine`. Most of the machine-dependent behaviour keys off
+//  "is this a Studio III" (the memory map, colour RAM, the tone generator)
+//  rather than off which video part it has, which is only the PAL one.
+localparam [1:0] MACHINE_STUDIO2   = 2'd0;
+localparam [1:0] MACHINE_S3_PAL    = 2'd1;
+localparam [1:0] MACHINE_S3_NTSC   = 2'd2;
+
+wire is_studio3    = (machine != MACHINE_STUDIO2);
+wire machine_mpt02 = (machine == MACHINE_S3_PAL);   // has the CDP1864
 
 ////////////////// VIDEO //////////////////////////////////////////////////////////////////
 
@@ -108,6 +122,9 @@ pixie_video pixie_video (
 
 
     .data_in    (ram_q),      // I [7:0]  byte the CPU delivers during a DMA-OUT cycle
+    .colour_in  (colour_dot), // I  CDP1862 colour for that byte (NTSC Studio III)
+    .con        (colour_on),  // I
+    .bg_step    (io_out && (io_n == 3'd1)),  // I  OUT 1 steps the background
 
     .DMAO       (DMAO_61),    // O
     .INT        (INT_61),     // O
@@ -117,6 +134,9 @@ pixie_video pixie_video (
     .video_clk  (clk_sys),    // I
     .csync      (),           // O
     .video      (video_dot),  // O  one bit: the 1861 is a monochrome part
+    .colour_out    (col61_dot),
+    .bg_active     (col61_bg),
+    .bg_colour_out (col61_bgc),
 
     .VSync      (VSync_61),   // O
     .HSync      (HSync_61),   // O
@@ -135,7 +155,7 @@ pixie_video pixie_video (
 // Note the different I/O decode. On the 1864 the display is turned off by INP 4,
 // not OUT 1 -- OUT 1 is taken over by the background colour step. The datasheet
 // gives the opcodes: 61 or 69 enable interrupt and DMA, 6C disables them.
-wire       DMAO_64, INT_64, EFx_64, aud_64;
+wire       DMAO_64, INT_64, EFx_64;
 wire       VSync_64, HSync_64, VBlank_64, HBlank_64, de_64, bde_64, bg_64;
 wire [2:0] video_64;
 
@@ -153,20 +173,12 @@ cdp1864 cdp1864
     .disp_on    (io_inp && (io_n == 3'd1)),
     .disp_off   ((io_inp && (io_n == 3'd4)) || clear_key),
     .bg_step    (io_out && (io_n == 3'd1)),
-    // OUT 4 loads the tone divider; Q is AOE, which gates the output. Both
-    // straight from the datasheet's control-line truth table and Weisbecker's
-    // own Studio III notes ("64 instruction sets sound frequency (inverse)",
-    // "Q gates sound output").
-    .tone_we    (io_out && (io_n == 3'd4)),
-    .tone_d     (cpu_dout),
-    .aoe        (Q),
 
     .DMAO       (DMAO_64),
     .INT        (INT_64),
     .EFx        (EFx_64),
 
     .csync      (),
-    .aud        (aud_64),
     .video      (video_64),
     .bckgnd     (bg_64),
     .VSync      (VSync_64),
@@ -177,14 +189,56 @@ cdp1864 cdp1864
     .bitmap_de  (bde_64)
 );
 
+// ---- tone generator -------------------------------------------------------
+// The CDP1864 integrates this; the NTSC Studio III has it as a separate CDP1863
+// beside its 1861 and 1862. Same latch on OUT 4 and the same gate on Q either
+// way, differing only by one division stage -- so one instance serves both, with
+// div4 picking the chain. Straight from the datasheet's control-line truth table
+// and Weisbecker's Studio III notes ("64 instruction sets sound frequency
+// (inverse)", "Q gates sound output").
+wire aud_tone;
+cdp1863 cdp1863
+(
+    .clk     (clk_sys),
+    .cpu_ce  (cpu_ce),
+    .reset   (reset & ~clear_key),
+    // The 1864's integrated generator has an extra divide-by-4 that the
+    // standalone 1863 does not, so the same latch sounds four times higher on
+    // the NTSC machine. MAME: cdp1864 f = clk/8/4/(latch+1)/2 against cdp1863
+    // f = clk/8/(latch+1)/2 from its clock2 input, which is where TPB goes.
+    .div4    (machine == MACHINE_S3_PAL),
+    .tone_we (io_out && (io_n == 3'd4)),
+    .tone_d  (cpu_dout),
+    .aoe     (Q),
+    .aud     (aud_tone)
+);
+
 // ---- select ---------------------------------------------------------------
 // The Studio II's 1861 has no colour, so every channel follows its single dot
 // bit -- white on black, unchanged from before the video path widened.
 wire       video_dot;
 wire       DMAO_61, INT_61, EFx_61;
 wire       VSync_61, HSync_61, VBlank_61, HBlank_61, de_61, bde_61;
+wire [2:0] col61_dot, col61_bgc;
+wire       col61_bg;
+wire [2:0] video_61;
+wire       bg_61;
 
-assign video    = machine_mpt02 ? video_64 : {3{video_dot}};
+// The CDP1862 beside the 1861, fitted only on the NTSC Studio III. On a Studio II
+// `enable` is low and it passes the luminance bit straight through as white.
+cdp1862 cdp1862
+(
+    .enable     (machine == MACHINE_S3_NTSC),
+    .luminance  (video_dot),
+    .in_raster  (de_61),
+    .dot_colour (col61_dot),
+    .bg_active  (col61_bg),
+    .bg_colour  (col61_bgc),
+    .video      (video_61),
+    .bckgnd     (bg_61)
+);
+
+assign video    = machine_mpt02 ? video_64 : video_61;
 assign DMAO     = machine_mpt02 ? DMAO_64  : DMAO_61;
 assign INT      = machine_mpt02 ? INT_64   : INT_61;
 assign EFx      = machine_mpt02 ? EFx_64   : EFx_61;
@@ -196,7 +250,7 @@ always @(*) begin
 	HBlank   = machine_mpt02 ? HBlank_64 : HBlank_61;
 	video_de = machine_mpt02 ? de_64     : de_61;
 	bitmap_de = machine_mpt02 ? bde_64   : bde_61;
-	video_bg  = machine_mpt02 ? bg_64    : 1'b0;
+	video_bg  = machine_mpt02 ? bg_64    : bg_61;
 end
 
 ////////////////// KEYPAD //////////////////////////////////////////////////////////////////
@@ -1041,11 +1095,11 @@ wire        rom_sel  = bank0 && !ram_a[11];                        // $0000-$07F
 // is a 4K image covering both. On those machines it is ROM whether or not a
 // cartridge paged anything in, so it takes precedence over the RAM mirror that
 // $0C00-$0DFF would otherwise be.
-wire        rom_hi   = machine_mpt02 && bank0 && (ram_a[11:10] == 2'b11);   // $0C00-$0FFF
+wire        rom_hi   = is_studio3 && bank0 && (ram_a[11:10] == 2'b11);      // $0C00-$0FFF
 // Colour RAM: 64 cells behind a one-page window at $0B00-$0BFF. Only six address
 // lines are decoded, which is why MAME names the storage ($0B00-$0B3F) and Emma 02
 // the window ($0B00-$0BFF) without disagreeing. See docs/succession-plan.md §6.
-wire        col_sel  = machine_mpt02 && bank0 && (ram_a[11:8] == 4'hB);
+wire        col_sel  = is_studio3 && bank0 && (ram_a[11:8] == 4'hB);
 wire        cart_sel = bank0 &&  ram_a[11] && cart_page[ram_a[10:8]] && !rom_hi && !col_sel;
 wire        ram_sel  = !rom_sel && !rom_hi && !col_sel && !cart_sel && !ram_a[9];
 wire        cpu_wr   = ram_wr && ram_sel;                          // RAM is the only writeable thing
@@ -1166,7 +1220,7 @@ end
 // III sketch (IMG_1536.JPG) does keep a 555 alongside a "16 pin new chip for
 // programmable tones", but that is the III A prototype -- the production
 // Studio III and MPT-02 use the CDP1864, which is what this models.
-assign audio = machine_mpt02 ? aud_64 : snd_out;
+assign audio = is_studio3 ? aud_tone : snd_out;
 
 ////////////////// CARTRIDGE LOADER /////////////////////////////////////////
 //
@@ -1221,7 +1275,7 @@ wire  [7:0] st2_pg    = st2_page[st2_blk];
 // ordinary cartridge window and stays loadable, which is why this is gated.)
 wire        st2_pg_ok = (st2_pg[7:4] == 4'h0) && (st2_pg[3:0] > 4'h3)
                         && (st2_pg[3:0] != 4'h8) && (st2_pg[3:0] != 4'h9)
-                        && !(machine_mpt02 && (st2_pg[3:0] == 4'hB));
+                        && !(is_studio3 && (st2_pg[3:0] == 4'hB));
 
 wire        st2_data  = ioctl_addr >= 16'd256;          // past the header
 wire [11:0] cart_a    = st2_mode ? {st2_pg[3:0], ioctl_addr[7:0]}

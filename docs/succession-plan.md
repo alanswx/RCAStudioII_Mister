@@ -601,8 +601,40 @@ So the work is mostly *re-attaching* logic we have, not writing new logic.
    settle — see its `INT_LEAD` / `EFX_LEAD` / `DMA_ADAPT` commentary. Do that
    part last and behind an A/B against the Studio II corpus.
 
-Note this cannot be validated the usual way until it exists: with the
-`$0C00-$0FFF` window gated on the colour machine, `studio3_ntsc.bin` cannot even
-start under Studio II timing, so there is no cheap experiment that confirms the
-decomposition ahead of implementing it. The documentary evidence is strong and
-consistent; treat it as the plan, not as proof.
+### Implemented, and the decomposition is confirmed (2026-08-19)
+
+Built, and it boots — which is the proof the documentary evidence could not give.
+`studio3_ntsc.bin` now runs under `--machine studio3ntsc` and renders Conic
+pinball in full colour at 64×128, against the PAL machine's 64×192: blue field,
+yellow border, green and red bumpers, magenta targets, cyan lanes. Before this it
+would not start at all.
+
+How it went together, in the order it was done:
+
+1. **`rtl/pixie/cdp1863.v`** — the tone generator lifted out of `cdp1864.v`,
+   since both machines need it and only one has an 1864 to hold it. A `div4`
+   input picks the chain: the 1864's integrated generator has an extra
+   divide-by-4 that the standalone part does not, so the same latch sounds four
+   times higher on NTSC.
+2. **The machine select widened to two bits** — Studio II, Studio III PAL, Studio
+   III NTSC — with the memory map (`$0C00-$0FFF` ROM, colour RAM at `$0B00`) and
+   the tone now keyed off *"is a Studio III"* rather than *"has an 1864"*, which
+   is how they had been gated. CONF_STR to `v5`.
+3. **The 1861 latches a colour and a CON bit with each DMA byte** and shifts them
+   beside the luminance, exactly as the 1864 does. That has to live where the DMA
+   is. It is inert on a Studio II, which drives `con` low.
+4. **`rtl/pixie/cdp1862.v`** — deliberately thin, because step 3 does the hard
+   part: it only chooses between the dot colour and the background, which is what
+   the real part does with its RDATA/BDATA/GDATA inputs and its BKG pin.
+
+Nothing regressed: Studio II byte-identical across all 71 images, §9 score 26/48,
+Conic PAL 14/28, memdecode 8/8, tone test passing.
+
+**Still to do on this machine.** Emma puts the NTSC Studio III display at 64..191
+with the interrupt at 62, where our 1861 uses 80..208 and 78. It currently runs on
+the Studio II's geometry, which is why it works at all — making that
+machine-dependent touches the `INT_LEAD` / `EFX_LEAD` / `DMA_ADAPT` timing that
+took many iterations to settle, and wants an A/B against the Studio II corpus
+behind it. Conic M-1200, which Emma lists as NTSC, comes along once that is
+settled. And none of the NTSC side is checked against the reference emulator,
+which models only the PAL machine.

@@ -66,6 +66,8 @@ V_SRC = \
 	$(RTL)/dpram.sv \
 	$(RTL)/pixie/cdp1861.v \
 	$(RTL)/pixie/cdp1864.v \
+	$(RTL)/pixie/cdp1863.v \
+	$(RTL)/pixie/cdp1862.v \
 	$(RTL)/pixie/pixie_video.v
 
 C_SRC = \

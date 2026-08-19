@@ -44,7 +44,14 @@ module pixie_video
     output            VBlank,
     output            HBlank,
     output            video_de,
-    output            bitmap_de  
+    output            bitmap_de,
+    // CDP1862 hand-off, for the NTSC Studio III
+    input       [2:0] colour_in,
+    input             con,
+    input             bg_step,
+    output      [2:0] colour_out,
+    output            bg_active,
+    output      [2:0] bg_colour_out  
 );
 
 // RCA Studio II
@@ -70,7 +77,13 @@ cdp1861 cdp1861 (
     .VBlank     (VBlank),       // O
     .HBlank     (HBlank),       // O
     .video_de   (video_de),
-    .bitmap_de  (bitmap_de)      // O
+    .bitmap_de  (bitmap_de),     // O
+    .colour_in     (colour_in),
+    .con           (con),
+    .bg_step       (bg_step),
+    .colour_out    (colour_out),
+    .bg_active     (bg_active),
+    .bg_colour_out (bg_colour_out)
 );
 
 endmodule

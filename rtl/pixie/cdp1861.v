@@ -51,6 +51,14 @@ module cdp1861
     // ---- CPU side -------------------------------------------------------
     input       [1:0] SC,           // 1802 state code: 2'b10 == DMA cycle
     input       [7:0] data_in,      // byte the CPU put on the bus this DMA cycle
+    // CDP1862 colour, for the NTSC Studio III. That machine puts a separate
+    // colour generator beside this part, fed from the same colour RAM and the
+    // same DMA cycles -- so the latching lives here, where the DMA is, and the
+    // colouring is done by cdp1862.v downstream. All of this is inert on a
+    // Studio II, which has no 1862 and drives con low.
+    input       [2:0] colour_in,    // {R,G,B} from colour RAM for that byte
+    input             con,          // Color On: colour RAM has been written
+    input             bg_step,      // OUT 1: step the background colour
     input             disp_on,      // INP 1
     input             disp_off,     // OUT 1
 
@@ -61,6 +69,9 @@ module cdp1861
     // ---- video side -----------------------------------------------------
     output            csync,
     output            video,
+    output      [2:0] colour_out,   // dot colour for the pixel on `video`
+    output            bg_active,    // this pixel takes the background colour
+    output      [2:0] bg_colour_out,// ...which is this
     // DE for the 64x128 bitmap alone, as distinct from video_de, which is now the
     // whole raster. The Verilator harness captures this so its frames stay 64x128
     // and every recorded score keeps its meaning; the framework gets video_de.
@@ -232,6 +243,8 @@ assign DMAO = display_enabled && line_displayed &&
               (hcount >= (dma_early ? DMA_START - 8 : DMA_START)) && (dma_cnt < 4'd7);
 
 reg  [7:0] linebuf [0:7];   // filled by DMA during this line, shown 8 pixels behind
+reg  [2:0] colbuf  [0:7];   // the CDP1862's colour for each of those bytes
+reg  [7:0] conbuf;
 reg  [3:0] dma_cnt;
 
 always @(posedge clk) begin
@@ -247,6 +260,8 @@ always @(posedge clk) begin
         // DMAO here would lose the last byte of the line.
         if (cpu_ce && (SC == 2'b10) && (dma_cnt < 4'd8)) begin
             linebuf[dma_cnt[2:0]] <= data_in;
+            colbuf [dma_cnt[2:0]] <= colour_in;
+            conbuf [dma_cnt[2:0]] <= con;
             dma_cnt   <= dma_cnt + 4'd1;
         end
     end
@@ -256,6 +271,8 @@ end
 // Pixel shifter
 // ---------------------------------------------------------------------------
 reg [7:0] shift_reg;
+reg [2:0] shift_col;
+reg       shift_con;
 wire in_active = line_displayed && (hcount >= ACTIVE_START) && (hcount < ACTIVE_END);
 
 always @(posedge clk) begin
@@ -263,8 +280,11 @@ always @(posedge clk) begin
     else if (ce_pix) begin
         if (in_active) begin
             // Reload on each 8-pixel boundary inside the active window.
-            if (hcount[2:0] == 3'd0)
+            if (hcount[2:0] == 3'd0) begin
                 shift_reg <= linebuf[hcount[5:3] - 3'd5];   // ACTIVE_START/8 == 5
+                shift_col <= colbuf [hcount[5:3] - 3'd5];
+                shift_con <= conbuf [hcount[5:3] - 3'd5];
+            end
             else
                 shift_reg <= {shift_reg[6:0], 1'b0};
         end
@@ -282,6 +302,46 @@ always @(posedge clk) begin
 end
 
 assign video = display_enabled & in_active_d & shift_reg[7];
+
+// ---------------------------------------------------------------------------
+// CDP1862 hand-off. This part stays monochrome -- `video` is its luminance bit,
+// exactly as before -- and everything below is what the colour generator beside
+// it would consume. A Studio II leaves con low and cdp1862.v passes white.
+// ---------------------------------------------------------------------------
+reg [1:0] bg_index;
+always @(posedge clk) begin
+    if (reset)        bg_index <= 2'd0;
+    else if (bg_step) bg_index <= bg_index + 2'd1;
+end
+
+reg [2:0] bg_colour;
+always @(*) begin
+    case (bg_index)                    // Emma 02's order for this palette:
+        2'd0:    bg_colour = 3'b001;   // blue
+        2'd1:    bg_colour = 3'b000;   // black
+        2'd2:    bg_colour = 3'b010;   // green
+        default: bg_colour = 3'b100;   // red
+    endcase
+end
+
+reg colour_on_seen;
+always @(posedge clk) begin
+    if (reset)    colour_on_seen <= 1'b0;
+    else if (con) colour_on_seen <= 1'b1;
+end
+
+reg in_raster;
+always @(posedge clk) begin
+    if (reset)       in_raster <= 1'b0;
+    else if (ce_pix) in_raster <= (hcount >= H_ACTIVE_START) &&
+                                  !((vcount >= VSYNC_START) || (vcount < VBLANK_END));
+end
+
+assign colour_out    = shift_con ? shift_col : 3'b111;
+assign bg_colour_out = bg_colour;
+// Background wherever the picture is not a lit dot, once colour is on.
+assign bg_active     = in_raster && display_enabled && colour_on_seen &&
+                       !(in_active_d && shift_con && shift_reg[7]);
 
 // were emitted this frame.
 
