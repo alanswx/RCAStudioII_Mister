@@ -53,6 +53,10 @@ module rcastudioii
 	output reg         VBlank,
 	output reg         VSync,
 	output reg         video_de,
+	// DE for the bitmap alone, as distinct from video_de (the whole raster). The
+	// simulation harness captures this so its frames stay 64x128 / 64x192 and the
+	// recorded scores keep their meaning. Unused by the FPGA top level.
+	output reg         bitmap_de,
 	// {R,G,B}, one bit per channel -- this mirrors the hardware rather than
 	// inventing a format. The CDP1864 in the successor machines has exactly one
 	// RDATA, GDATA and BDATA pin, fed from colour RAM, which is what gives it
@@ -114,7 +118,8 @@ pixie_video pixie_video (
     .HSync      (HSync_61),   // O
     .VBlank     (VBlank_61),  // O
     .HBlank     (HBlank_61),  // O
-    .video_de   (de_61)       // O
+    .video_de   (de_61),      // O
+    .bitmap_de  (bde_61)      // O
 );
 
 // ---- CDP1864, the colour machines' video ---------------------------------
@@ -127,7 +132,7 @@ pixie_video pixie_video (
 // not OUT 1 -- OUT 1 is taken over by the background colour step. The datasheet
 // gives the opcodes: 61 or 69 enable interrupt and DMA, 6C disables them.
 wire       DMAO_64, INT_64, EFx_64, aud_64;
-wire       VSync_64, HSync_64, VBlank_64, HBlank_64, de_64;
+wire       VSync_64, HSync_64, VBlank_64, HBlank_64, de_64, bde_64;
 wire [2:0] video_64;
 
 cdp1864 cdp1864
@@ -163,7 +168,8 @@ cdp1864 cdp1864
     .HSync      (HSync_64),
     .VBlank     (VBlank_64),
     .HBlank     (HBlank_64),
-    .video_de   (de_64)
+    .video_de   (de_64),
+    .bitmap_de  (bde_64)
 );
 
 // ---- select ---------------------------------------------------------------
@@ -171,7 +177,7 @@ cdp1864 cdp1864
 // bit -- white on black, unchanged from before the video path widened.
 wire       video_dot;
 wire       DMAO_61, INT_61, EFx_61;
-wire       VSync_61, HSync_61, VBlank_61, HBlank_61, de_61;
+wire       VSync_61, HSync_61, VBlank_61, HBlank_61, de_61, bde_61;
 
 assign video    = machine_mpt02 ? video_64 : {3{video_dot}};
 assign DMAO     = machine_mpt02 ? DMAO_64  : DMAO_61;
@@ -184,6 +190,7 @@ always @(*) begin
 	VBlank   = machine_mpt02 ? VBlank_64 : VBlank_61;
 	HBlank   = machine_mpt02 ? HBlank_64 : HBlank_61;
 	video_de = machine_mpt02 ? de_64     : de_61;
+	bitmap_de = machine_mpt02 ? bde_64   : bde_61;
 end
 
 ////////////////// KEYPAD //////////////////////////////////////////////////////////////////

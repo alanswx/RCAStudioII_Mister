@@ -744,7 +744,12 @@ int main(int argc, char** argv) {
         }
 
         // Sample video on the rising edge (ce_pix is tied high in sim.v)
-        bool boundary = fg.clock(top->VGA_VS, top->VGA_HS, top->VGA_DE,
+        // Capture the bitmap window, not the whole raster. The core emits a full
+        // NTSC/PAL raster now (border painted in the background colour), so
+        // VGA_DE would give 88x242 / 88x292 frames and invalidate every recorded
+        // score. bitmap_de marks the 64x128 / 64x192 bitmap alone.
+        bool boundary = fg.clock(top->VGA_VS, top->VGA_HS,
+                                 top->rootp->top__DOT__bitmap_de != 0,
                                  (uint8_t)((top->VGA_R ? 4 : 0) |
                                            (top->VGA_G ? 2 : 0) |
                                            (top->VGA_B ? 1 : 0)));

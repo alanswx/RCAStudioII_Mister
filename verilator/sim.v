@@ -45,6 +45,9 @@ wire audio;   // 1-bit beeper, gated by the 1802's Q line
    wire VSync, HSync;
    wire VBlank, HBlank;
    wire video_de;
+   // The bitmap window, which the harness captures instead of the full raster --
+   // see rtl/rcastudioii.sv. Keeps captured frames at 64x128 / 64x192.
+   wire bitmap_de/*verilator public_flat*/;
 
    assign VGA_VS = VSync;
    assign VGA_HS = HSync;
@@ -96,6 +99,7 @@ rcastudioii rcastudio
 	.VSync(VSync),
 
 	.video_de(video_de),
+	.bitmap_de(bitmap_de),
 
 	.video(video),
 	.audio(audio),

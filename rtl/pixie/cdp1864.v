@@ -73,6 +73,10 @@ module cdp1864
     // ---- video side -----------------------------------------------------
     output            csync,
     output            aud,          // AUDIO OUT: the programmable tone generator
+    // DE for the 64x192 bitmap alone; video_de is the whole raster. The harness
+    // captures this so its frames stay 64x192 and the recorded scores keep their
+    // meaning.
+    output            bitmap_de,
     output      [2:0] video,        // {R,G,B}
     output reg        VSync,
     output reg        HSync,
@@ -129,11 +133,25 @@ localparam ACTIVE_END        = ACTIVE_START + 64;     // 104
 localparam DE_START          = ACTIVE_START;
 localparam DE_END            = DE_START + 64;
 
-localparam HSYNC_START       = 105;
-localparam HSYNC_END         = 112;
-// PAL vertical sync, from MAME's cdp1864: VBLANK starts 4 lines before the end
-// of the frame and VSync occupies lines 0..3.
-localparam VSYNC_END         = 4;                     // VSync is lines 0..3, so there is no START to name
+// Sync and blanking as a real PAL line, straight off the datasheet's Fig 6
+// (p8), rather than a window around the bitmap. See docs/succession-plan.md §8
+// for why the old layout could not be displayed.
+//
+//     front porch   0..8    4.54us   (Fig 6: 3.14)
+//     HSync         8..16   4.54us   (Fig 6: 4.57)
+//     back porch   16..24   4.54us   (Fig 6: 3.43, incl. breezeway and burst)
+//     active       24..112 49.99us   (Fig 6: 50.86)
+//
+// The bitmap stays at 40..104: the DMA phase pins it, and the BIOS ISR counts
+// cycles against that burst.
+localparam HSYNC_START       = 8;
+localparam HSYNC_END         = 16;
+localparam H_ACTIVE_START    = 24;
+// Vertical, also Fig 6: vertical sync 4H, vertical blanking 24H. Using 20 here to
+// match Fig 4's "20H" vertical blanking bracket, which is the more specific of
+// the two. VSync is lines 0..3, so there is no START to name.
+localparam VSYNC_END         = 4;
+localparam VBLANK_END        = 20;
 
 // ---------------------------------------------------------------------------
 // Counters
@@ -272,10 +290,32 @@ end
 // the background only applies within the displayed picture.
 // Before CON the part is monochrome: white dots on black, exactly as an 1861.
 // After it, a lit pixel takes its dot colour and an unlit one the background.
-assign video = (display_enabled && in_active_d)
-                 ? (shift_con ? (shift_reg[7] ? shift_col : bg_colour)
-                              : (shift_reg[7] ? 3'b111    : 3'b000))
+//
+// Outside the bitmap but still inside the raster the part paints the background
+// colour -- Fig 4 shows BACKGROUND filling the area around the DISPLAY AREA, and
+// it is what makes the picture full-screen on a TV. Outside the raster it is
+// blanking, which must be black.
+wire [2:0] border = (display_enabled && colour_on_seen) ? bg_colour : 3'b000;
+assign video = in_raster
+                 ? ((display_enabled && in_active_d)
+                      ? (shift_con ? (shift_reg[7] ? shift_col : bg_colour)
+                                   : (shift_reg[7] ? 3'b111    : 3'b000))
+                      : border)
                  : 3'b000;
+
+// CON latched once, for the border: the per-byte conbuf only covers the bitmap.
+reg colour_on_seen;
+always @(posedge clk) begin
+    if (reset)    colour_on_seen <= 1'b0;
+    else if (con) colour_on_seen <= 1'b1;
+end
+
+// Inside the visible raster (the delayed forms track the shifter's one-pixel lag).
+reg in_raster;
+always @(posedge clk) begin
+    if (reset)       in_raster <= 1'b0;
+    else if (ce_pix) in_raster <= (hcount >= H_ACTIVE_START) && (vcount >= VBLANK_END);
+end
 
 // ---------------------------------------------------------------------------
 // AUDIO -- the CDP1864's programmable tone generator
@@ -384,8 +424,11 @@ always @(posedge clk) begin
         // the linter rightly flags. The 1861 needs both terms because its VSync
         // sits at 254..257 instead.
         VSync  <= (vcount < VSYNC_END);
-        HBlank <= !((hcount >= DE_START) && (hcount < DE_END));
-        VBlank <= !line_displayed;
+        // Blanking describes the raster now. Everything inside it but outside the
+        // bitmap is active picture painted in the background colour, which is what
+        // Fig 4 draws as BACKGROUND surrounding the DISPLAY AREA.
+        HBlank <= (hcount < H_ACTIVE_START);
+        VBlank <= (vcount < VBLANK_END);
 
         INT <= display_enabled &&
                (((vcount == INT_START - 1)     && (hcount >= 112 - INT_LEAD)) ||
@@ -404,6 +447,15 @@ end
 
 assign csync    = ~(HSync ^ VSync);
 assign video_de = ~(VBlank | HBlank);
+
+// The bitmap's own window, for the harness. This is what video_de used to be.
+reg bitmap_de_r;
+always @(posedge clk) begin
+    if (reset)       bitmap_de_r <= 1'b0;
+    else if (ce_pix) bitmap_de_r <= line_displayed &&
+                                    (hcount >= DE_START) && (hcount < DE_END);
+end
+assign bitmap_de = bitmap_de_r;
 
 endmodule
 

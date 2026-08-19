@@ -510,8 +510,41 @@ Nothing scales anything. The picture fills a TV screen by three plain means:
 
 Three faults at once: the sync pulse is narrow, the porches are so asymmetric the
 picture would sit far right even if it locked, and the active window is a
-fraction of the raster. Tracked as task #17, and best done with #15 (BCKGND),
-since painting the border is what the background luminance output is for.
+fraction of the raster.
+
+### Fixed 2026-08-18
+
+Both parts now emit a real raster: **88×242** on the NTSC 1861 and **88×292** on
+the PAL 1864, measured out of the sim. Line layout, against Fig 6:
+
+| | ours | Fig 6 |
+|---|---|---|
+| front porch `0..8` | 4.54 µs | 3.14 |
+| HSync `8..16` | 4.54 µs | 4.57 |
+| back porch `16..24` | 4.54 µs | 3.43 |
+| active `24..112` | 49.99 µs | 50.86 |
+
+The bitmap stays at `40..104` because the DMA phase pins it — the BIOS ISR counts
+cycles against that burst — so it sits 16 pixels from the left of the active area
+and 8 from the right rather than dead centre. Vertically the 1864 blanks 20 lines
+(Fig 4's `20H`) and the 1861 wraps 20 lines around the end of the frame, keeping
+its VSync at 254 so the sim's frame boundary does not move.
+
+On the 1864 the border is painted in the **background colour**, which is the
+BACKGROUND region of Fig 4 and the reason the picture fills a TV. On the mono
+1861 it is black.
+
+**The harness was protected rather than re-baselined.** The core now exports a
+second `bitmap_de` alongside `video_de`, marking the 64×128 / 64×192 bitmap
+alone, and the Verilator frame grabber captures that. So captured frames keep
+their old size and every recorded score keeps its meaning: Studio II byte-identical
+across all 71 images, §9 score 26/48 unchanged, Conic 14/28 unchanged, memdecode
+8/8, tone test passing.
+
+Still open: the picture is not horizontally centred (16 px left border against 8),
+because centring it would mean moving the DMA phase that the ISR depends on. And
+none of this has been seen on real analog hardware yet — it is verified against
+the datasheet's figures and the sim, not a TV.
 
 None of this affects HDMI, where `video_freak` scales whatever it is given — which
 is why the core looks correct on HDMI and produces nothing usable on analog.

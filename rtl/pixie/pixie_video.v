@@ -43,7 +43,8 @@ module pixie_video
     output            HSync,    
     output            VBlank,
     output            HBlank,
-    output            video_de  
+    output            video_de,
+    output            bitmap_de  
 );
 
 // RCA Studio II
@@ -68,7 +69,8 @@ cdp1861 cdp1861 (
     .HSync      (HSync),        // O
     .VBlank     (VBlank),       // O
     .HBlank     (HBlank),       // O
-    .video_de   (video_de)      // O
+    .video_de   (video_de),
+    .bitmap_de  (bitmap_de)      // O
 );
 
 endmodule

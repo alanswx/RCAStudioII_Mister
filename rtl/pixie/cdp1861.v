@@ -61,6 +61,10 @@ module cdp1861
     // ---- video side -----------------------------------------------------
     output            csync,
     output            video,
+    // DE for the 64x128 bitmap alone, as distinct from video_de, which is now the
+    // whole raster. The Verilator harness captures this so its frames stay 64x128
+    // and every recorded score keeps its meaning; the framework gets video_de.
+    output            bitmap_de,
     output reg        VSync,
     output reg        HSync,
     output reg        VBlank,
@@ -128,10 +132,31 @@ localparam DE_END            = DE_START + 64;
 // line's column counter reset mid-picture and the image came out rotated. With the active
 // window now ending at 104 (last pixel out at 104), only 105..111 is left free -- a 7-pixel
 // HSync, ~4.0us at this dot clock, close enough to NTSC's 4.7us.
-localparam HSYNC_START       = 105;
-localparam HSYNC_END         = 112;
+// Sync and blanking, laid out as a real NTSC line rather than as a window around
+// the bitmap. Previously HSync sat at 105..112 with the active window covering
+// only the 64 display pixels, which left a 22.7us back porch against a 0.57us
+// front porch and gave a display no TV could render -- see
+// docs/succession-plan.md §8. Against the CDP1864 datasheet's Fig 6 (the 1861 has
+// no equivalent figure, and the two parts share a 112-pixel line):
+//
+//     front porch   0..8    4.54us   (Fig 6: 3.14)
+//     HSync         8..16   4.54us   (Fig 6: 4.57)
+//     back porch   16..24   4.54us   (Fig 6: 3.43, incl. breezeway and burst)
+//     active       24..112 49.99us   (Fig 6: 50.86)
+//
+// The bitmap stays at 40..104 because the DMA phase pins it -- the BIOS ISR
+// counts cycles against that burst -- so it sits 16 pixels from the left of the
+// active area and 8 from the right, rather than dead centre.
+localparam HSYNC_START       = 8;
+localparam HSYNC_END         = 16;
+localparam H_ACTIVE_START    = 24;
+// Vertical sync stays at 254 rather than moving to line 0. The sim advances its
+// frame counter on the VSync edge, so moving it would shift every capture by a
+// few lines and quietly invalidate the recorded scores for no gain. Vertical
+// blanking therefore wraps the end of the frame: 20 lines from 254 through 12.
 localparam VSYNC_START       = 254;
 localparam VSYNC_END         = 258;
+localparam VBLANK_END        = 12;
 
 // ---------------------------------------------------------------------------
 // Counters -- both advance exactly once per pixel time. The old state machine
@@ -272,8 +297,10 @@ always @(posedge clk) begin
     else if (ce_pix) begin
         HSync  <= (hcount >= HSYNC_START) && (hcount < HSYNC_END);
         VSync  <= (vcount >= VSYNC_START) && (vcount < VSYNC_END);
-        HBlank <= !((hcount >= DE_START) && (hcount < DE_END));
-        VBlank <= !line_displayed;
+        // Blanking now describes the raster, not the bitmap: everything outside
+        // it is active picture, drawn black on this monochrome part.
+        HBlank <= (hcount < H_ACTIVE_START);
+        VBlank <= (vcount >= VSYNC_START) || (vcount < VBLANK_END);
 
         // INT leads the line-78 boundary by one machine cycle, per the AVI1861
         // (hardware-verified 1861 replacement): its 74HC4040 line counter is
@@ -312,6 +339,15 @@ end
 
 assign csync    = ~(HSync ^ VSync);
 assign video_de = ~(VBlank | HBlank);
+
+// The bitmap's own window, for the harness. This is what video_de used to be.
+reg bitmap_de_r;
+always @(posedge clk) begin
+    if (reset)       bitmap_de_r <= 1'b0;
+    else if (ce_pix) bitmap_de_r <= line_displayed &&
+                                    (hcount >= DE_START) && (hcount < DE_END);
+end
+assign bitmap_de = bitmap_de_r;
 
 endmodule
 
