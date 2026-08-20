@@ -58,6 +58,19 @@ percentage of differing scanlines — the way to tell "different game state" fro
 
 ### Known broken on hardware (first real-hardware run, 2026-08-19)
 
+- **RESOLVED same day — root cause was CLEAR desynchronising the machine-cycle
+  grid.** The CLEAR carve-out keeps the pixie's counters running while the CPU
+  resets, and `cpu_div` used to zero on CLEAR, so on release the machine-cycle
+  grid re-locked at an arbitrary pixel phase — silicon can't do that (CLEAR
+  resets 1802 and 1861 together, CLAUDE.md §2.1). Reproduced by wiring CLEAR
+  into the sim (`verilator/sim.v`) and sweeping the release phase with
+  `--press-phase`: 3 of 8 phases left the Visicom blank or rotated. Fixed by
+  giving `cpu_div` the pixie's own reset (`reset & ~clear_key`) so the grids
+  stay locked through CLEAR; all 8 phases now render byte-identically, and the
+  full battery (26/48, 22/38, visicom, tone, memdecode, lint) is unchanged.
+  Gambler's manual says "press CLEAR" before playing, which is how hardware
+  kept drawing bad tickets. The original description, kept for the record:
+
 - **Visicom: the display is rotated by 13 bytes on the FPGA, and is clean in
   sim.** First observed by Alan playing Gambler I on a DE10: the dealer's card
   was split across the top/bottom edge of the bitmap and a stake number was

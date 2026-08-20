@@ -1030,9 +1030,20 @@ reg WAIT_N      = 1'b1;   // Clear=1, Wait=1 is Run. Was 0, which only worked be
 // cycles per frame, which is what a real Studio II gets.
 reg  [2:0] cpu_div = 3'd0;
 wire       cpu_ce  = ce_pix & (cpu_div == 3'd7);
+// The divider's reset carries the same CLEAR carve-out as the pixie's, and it
+// must: CLEAR keeps the pixie's counters running (so video sync survives) but
+// used to zero cpu_div, so on release the machine-cycle grid re-locked at an
+// arbitrary pixel phase -- a relationship that is fixed in silicon, where
+// CLEAR resets the 1802 and the 1861 together (RCA block diagram, CLAUDE.md
+// §2.1). Three of the eight release phases left the Visicom blank or its
+// display base rotated (the 13/16-byte rotations seen on hardware,
+// docs/handoff.md 2026-08-19); the Studio II titles merely tolerated the
+// misalignment thanks to the ISR-phase work. Keeping the divider counting
+// through CLEAR keeps cpu_ce locked to the pixie across it; on every other
+// reset both still start together from zero.
 always @(posedge clk_sys) begin
-	if (reset)       cpu_div <= 3'd0;
-	else if (ce_pix) cpu_div <= cpu_div + 3'd1;
+	if (reset & ~clear_key) cpu_div <= 3'd0;
+	else if (ce_pix)        cpu_div <= cpu_div + 3'd1;
 end
 reg dma_in_req  = 1'b0;
 //reg dma_out_req = 1'b0;

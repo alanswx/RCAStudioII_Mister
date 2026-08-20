@@ -88,7 +88,21 @@ wire audio;   // 1-bit beeper, gated by the 1802's Q line
 reg [1:0] ce_cnt = 2'd0;
 always @(posedge clk_48) ce_cnt <= ce_cnt + 2'd1;
 wire ce_pix = ce_div4 ? (ce_cnt == 2'd0) : 1'b1;
-wire reset = ioctl_download;
+// CLEAR, exactly as the FPGA top wires it: F3 (PS/2 0x04) sets clear_key,
+// which is folded into reset while also going to the core's clear_key input
+// so the pixie keeps running through it. The sim never modelled this: during
+// CLEAR the CPU's machine-cycle divider is held in reset while the pixie's
+// counters free-run, so the machine-cycle grid re-locks at an arbitrary
+// pixel phase on release -- a degree of freedom that only ever existed on
+// hardware until now (docs/handoff.md, 2026-08-19).
+reg clear_key = 1'b0;
+always @(posedge clk_48) begin
+	reg old_clrstb;
+	old_clrstb <= ps2_key[10];
+	if (old_clrstb != ps2_key[10] && ps2_key[7:0] == 8'h04) clear_key <= ps2_key[9];
+end
+
+wire reset = ioctl_download | clear_key;
 
 wire key_strobe = old_keystb ^ ps2_key[10];
 reg old_keystb = 0;
@@ -127,7 +141,8 @@ rcastudioii rcastudio
 	.players(players),
 	.machine(machine),
 	.osk_a(10'd0),
-	.osk_b(10'd0)
+	.osk_b(10'd0),
+	.clear_key(clear_key)
 );
 
 endmodule
